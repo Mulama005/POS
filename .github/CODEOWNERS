@@ -1,0 +1,17 @@
+# Default reviewers by area — adjust GitHub usernames once the repo is created.
+# See the Task Delegation Plan for full context.
+
+# Dev A — Sales, Payments & Compliance
+/server/Pos.Application/Sales/        @dev-a
+/server/Pos.Infrastructure/Payments/  @dev-a
+/server/Pos.Infrastructure/Tax/       @dev-a
+
+# Dev B — Catalog & Register UI
+/client/src/pages/                    @dev-b
+/server/Pos.Application/Catalog/      @dev-b
+/server/Pos.Application/Inventory/    @dev-b
+
+# Dev C — Platform, Offline & Ops
+/.github/                             @dev-c
+/client/src/offline/                  @dev-c
+/server/Pos.Infrastructure/           @dev-c

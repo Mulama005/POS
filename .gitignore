@@ -1,0 +1,27 @@
+# ---- Frontend (Node / Vite) ----
+client/node_modules/
+client/dist/
+client/.env
+client/.env.*
+!client/.env.example
+
+# ---- Backend (.NET) ----
+server/**/bin/
+server/**/obj/
+server/**/appsettings.Development.json
+server/**/appsettings.Production.json
+
+# ---- Editors / OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ---- Logs ----
+*.log
+npm-debug.log*
+
+# ---- Secrets (belt and braces) ----
+*.pem
+*.key
+.env
