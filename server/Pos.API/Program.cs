@@ -1,6 +1,19 @@
 using Pos.Infrastructure;
+using Sentry;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// --- Sentry (Step 7) ---
+builder.WebHost.UseSentry(options =>
+{
+    options.Dsn = builder.Configuration["Sentry:Dsn"];
+    options.Environment = builder.Configuration["Sentry:Environment"];
+    options.TracesSampleRate = double.Parse(
+        builder.Configuration["Sentry:TracesSampleRate"] ?? "0.1");
+
+    // Only verbose in local dev — don't want Sentry's own debug logging in production logs.
+    options.Debug = builder.Environment.IsDevelopment();
+});
 
 // Add services to the container.
 
@@ -18,6 +31,7 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 // OpenAPI mapping disabled to avoid type load issues during local runs.
 
+app.UseSentryTracing();
 app.UseHttpsRedirection();
 
 app.UseAuthorization();

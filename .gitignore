@@ -9,7 +9,6 @@ client/.env.*
 server/**/bin/
 server/**/obj/
 server/**/appsettings.Development.json
-server/**/appsettings.Production.json
 
 # ---- Editors / OS ----
 .vscode/
