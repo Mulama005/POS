@@ -1,9 +1,19 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Pos.Domain.Entities;
+using Pos.Infrastructure.Identity;
 
 namespace Pos.Infrastructure.Persistence;
 
-public class PosDbContext : DbContext
+/// <summary>
+/// Inherits IdentityDbContext rather than plain DbContext so Identity's own tables
+/// (AspNetUsers, AspNetRoles, AspNetUserRoles, etc.) live in the same database and
+/// the same migration history as the business tables — one connection string, one
+/// `dotnet ef database update` to keep in sync, no risk of the two drifting apart.
+/// Uses Guid keys throughout to match every other entity in this schema.
+/// </summary>
+public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
 {
     public PosDbContext(DbContextOptions<PosDbContext> options) : base(options) { }
 
@@ -14,16 +24,30 @@ public class PosDbContext : DbContext
     public DbSet<SaleItem> SaleItems => Set<SaleItem>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Register> Registers => Set<Register>();
-    public DbSet<User> Users => Set<User>();
+    public DbSet<User> DomainUsers => Set<User>(); // named to avoid colliding with IdentityDbContext's own Users (DbSet<ApplicationUser>)
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<CreditLedger> CreditLedgers => Set<CreditLedger>();
     public DbSet<Repair> Repairs => Set<Repair>();
     public DbSet<InventoryAdjustment> InventoryAdjustments => Set<InventoryAdjustment>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        base.OnModelCreating(modelBuilder);
+        base.OnModelCreating(modelBuilder); // must run first — this is what builds the AspNetUsers/AspNetRoles tables
+
+        // ---------- RefreshToken ----------
+        modelBuilder.Entity<RefreshToken>(e =>
+        {
+            e.Property(x => x.TokenHash).IsRequired().HasMaxLength(200);
+            e.HasIndex(x => x.TokenHash).IsUnique();
+            e.HasIndex(x => x.UserId);
+
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade); // deleting an Identity user removes their refresh tokens
+        });
 
         // ---------- Category ----------
         modelBuilder.Entity<Category>(e =>
