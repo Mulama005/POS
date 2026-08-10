@@ -11,6 +11,8 @@ public class User : BaseEntity
 
     public RegisterUserRole Role { get; set; }
 
+    public bool IsActive { get; set; } = true;
+
     ///Required for the register-scoped authorization policy in Step 9 (e.g. closing a till).
     public Guid? AssignedRegisterId { get; set; }
     public Register? AssignedRegister { get; set; }
