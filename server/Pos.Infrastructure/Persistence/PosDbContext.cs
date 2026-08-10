@@ -82,9 +82,7 @@ public class PosDbContext : DbContext
             e.Property(x => x.Name).IsRequired().HasMaxLength(100);
         });
 
-        // ---------- User ----------
-        // Id is NOT auto-generated here — it is expected to be set to match the
-        // corresponding Identity ApplicationUser.Id (shared primary key, see User.cs).
+        
         modelBuilder.Entity<User>(e =>
         {
             e.Property(x => x.FullName).IsRequired().HasMaxLength(150);

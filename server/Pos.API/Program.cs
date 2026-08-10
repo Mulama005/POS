@@ -1,18 +1,15 @@
-using Pos.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using Pos.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
 builder.Services.AddControllers();
-// OpenAPI/Swagger registration is disabled here to avoid runtime assembly
-// mismatches during local smoke tests. Enable or replace with explicit
-// `AddSwaggerGen()` if you update/OpenAPI packages.
-// builder.Services.AddOpenApi();
 
-// Infrastructure (database, storage, etc.)
-builder.Services.AddInfrastructure(builder.Configuration);
-
+builder.Services.AddOpenApi();
+builder.Services.AddDbContext<PosDbContext>(options =>
+options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
