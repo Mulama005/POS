@@ -3,12 +3,13 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Authorization;
 using Pos.Api;
+using Pos.Api.Authorization;
 using Pos.Application.Auth;
 using Pos.Infrastructure.Auth;
 using Pos.Infrastructure.Identity;
 using Pos.Infrastructure.Persistence;
-using System.IdentityModel.Tokens.Jwt;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -65,7 +66,13 @@ builder.Services.AddAuthentication(options =>
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(PolicyNames.RegisterScoped, policy =>
+        policy.Requirements.Add(new RegisterAccessRequirement()));
+});
+
+builder.Services.AddScoped<IAuthorizationHandler, RegisterAccessHandler>();
 
 // ---------- App services ----------
 builder.Services.AddScoped<IAuthService, AuthService>();
