@@ -9,7 +9,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pos.Application", "Pos.Appl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pos.Infrastructure", "Pos.Infrastructure\Pos.Infrastructure.csproj", "{0F2533E8-F664-4CBA-A58A-AD175627F56E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pos.Api", "Pos.Api\Pos.Api.csproj", "{A1164B7F-254F-4A08-8C02-EBA8ECF01F5E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pos.API", "Pos.API\Pos.API.csproj", "{A1164B7F-254F-4A08-8C02-EBA8ECF01F5E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pos.Application.Tests", "Pos.Application.Tests\Pos.Application.Tests.csproj", "{44CE077C-4F65-4B51-B8E8-18E09882081B}"
 EndProject
