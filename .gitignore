@@ -24,3 +24,4 @@ npm-debug.log*
 *.pem
 *.key
 .env
+cookies.txt
