@@ -2,8 +2,16 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import * as Sentry from '@sentry/react'
 import './index.css'
 import App from './App.tsx'
+
+Sentry.init({
+  dsn: import.meta.env.VITE_SENTRY_DSN,
+  environment: import.meta.env.VITE_SENTRY_ENVIRONMENT,
+  integrations: [Sentry.browserTracingIntegration()],
+  tracesSampleRate: import.meta.env.VITE_SENTRY_ENVIRONMENT === 'production' ? 0.1 : 1.0,
+})
 
 const queryClient = new QueryClient()
 
@@ -11,7 +19,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
       <BrowserRouter>
           <QueryClientProvider client={queryClient}>
-              <App />
+              <Sentry.ErrorBoundary fallback={<p>Something went wrong. Please refresh.</p>}>
+                  <App />
+              </Sentry.ErrorBoundary>
           </QueryClientProvider>
       </BrowserRouter>
   </StrictMode>,

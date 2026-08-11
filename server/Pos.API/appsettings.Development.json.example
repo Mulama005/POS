@@ -12,14 +12,14 @@
   },
 
   "Supabase": {
-    "Url": "",
-    "ServiceRoleKey": "",
+    "Url": "https://YOUR-SUPABASE-PROJECT.supabase.co",
+    "ServiceRoleKey": "YOUR_SUPABASE_SERVICE_ROLE_KEY",
     "Bucket": "pos-files"
   },
 
   "Sentry": {
-    "Dsn": "https://3fbf4914b5a26443da5d8d6f5325432d@o4511881123135488.ingest.de.sentry.io/4511881146859600",
-    "Environment": "Production",
+    "Dsn": "YOUR_SENTRY_DSN",
+    "Environment": "Development",
     "TracesSampleRate": 0.1
   }
 }

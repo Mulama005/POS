@@ -113,6 +113,7 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         {
             e.Property(x => x.FullName).IsRequired().HasMaxLength(150);
             e.Property(x => x.Email).IsRequired().HasMaxLength(256);
+            e.Property(x => x.MfaSecret).HasMaxLength(512);
             e.HasIndex(x => x.Email).IsUnique();
 
             e.HasOne(x => x.AssignedRegister)

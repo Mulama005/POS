@@ -16,6 +16,7 @@ public class AuthResult
     public Guid? AssignedRegisterId { get; set; }
 
     public bool RequiresMfa { get; set; }
+    public string? ChallengeToken { get; set; }
 
     public static AuthResult Fail(string message) => new() { Success = false, ErrorMessage = message };
 }

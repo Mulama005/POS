@@ -1,17 +1,31 @@
-using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.AspNetCore.Authorization;
 using Pos.Api;
 using Pos.Api.Authorization;
 using Pos.Application.Auth;
+using Pos.Application.Common.Interfaces;
 using Pos.Infrastructure.Auth;
 using Pos.Infrastructure.Identity;
 using Pos.Infrastructure.Persistence;
+using Sentry;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// --- Sentry (Step 7) ---
+builder.WebHost.UseSentry(options =>
+{
+    options.Dsn = builder.Configuration["Sentry:Dsn"];
+    options.Environment = builder.Configuration["Sentry:Environment"];
+    options.TracesSampleRate = double.Parse(
+        builder.Configuration["Sentry:TracesSampleRate"] ?? "0.1");
+
+    // Only verbose in local dev — don't want Sentry's own debug logging in production logs.
+    options.Debug = builder.Environment.IsDevelopment();
+});
 
 // Add services to the container.
 
@@ -77,6 +91,9 @@ builder.Services.AddScoped<IAuthorizationHandler, RegisterAccessHandler>();
 // ---------- App services ----------
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddSingleton<IMemoryCache, MemoryCache>();
+builder.Services.AddSingleton<IMfaChallengeStore, MemoryCacheMfaChallengeStore>();
+builder.Services.AddSingleton<IMfaService, MfaService>();
 
 builder.Services.AddCors(options =>
 {
@@ -96,9 +113,25 @@ var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
-    await IdentitySeeder.SeedAsync(scope.ServiceProvider, app.Configuration, app.Environment.IsDevelopment());
+    var connectionString = app.Configuration.GetConnectionString("DefaultConnection");
+    if (!string.IsNullOrWhiteSpace(connectionString))
+    {
+        try
+        {
+            await IdentitySeeder.SeedAsync(scope.ServiceProvider, app.Configuration, app.Environment.IsDevelopment());
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogWarning(ex, "Identity seeding skipped because the database is unavailable or misconfigured.");
+        }
+    }
+    else
+    {
+        app.Logger.LogWarning("Identity seeding skipped because no database connection string was configured.");
+    }
 }
 
+app.UseSentryTracing();
 app.UseHttpsRedirection();
 
 app.UseCors("FrontendDev");

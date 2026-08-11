@@ -34,8 +34,19 @@ public class AuthController : ControllerBase
 
         if (result.RequiresMfa)
         {
-            // Step 10 will flesh this branch out. For now RequiresMfa is always false.
-            return Ok(new { requiresMfa = true, userId = result.UserId });
+            return Ok(new
+            {
+                mfaRequired = true,
+                challengeToken = result.ChallengeToken,
+                user = new
+                {
+                    id = result.UserId,
+                    fullName = result.FullName,
+                    email = result.Email,
+                    role = result.Role,
+                    assignedRegisterId = result.AssignedRegisterId,
+                }
+            });
         }
 
         SetRefreshTokenCookie(result.RefreshToken!);

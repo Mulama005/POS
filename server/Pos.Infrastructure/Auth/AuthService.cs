@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Pos.Application.Auth;
+using Pos.Application.Common.Interfaces;
+using Pos.Domain.Enums;
 using Pos.Infrastructure.Identity;
 using Pos.Infrastructure.Persistence;
 using DomainUser = Pos.Domain.Entities.User;
@@ -15,19 +17,25 @@ public class AuthService : IAuthService
     private readonly PosDbContext _db;
     private readonly ITokenService _tokenService;
     private readonly IConfiguration _config;
+    private readonly IMfaChallengeStore _challengeStore;
+    private readonly IMfaService _mfaService;
 
     public AuthService(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         PosDbContext db,
         ITokenService tokenService,
-        IConfiguration config)
+        IConfiguration config,
+        IMfaChallengeStore challengeStore,
+        IMfaService mfaService)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _db = db;
         _tokenService = tokenService;
         _config = config;
+        _challengeStore = challengeStore;
+        _mfaService = mfaService;
     }
 
     public async Task<AuthResult> LoginAsync(string email, string password, string ipAddress)
@@ -67,9 +75,21 @@ public class AuthService : IAuthService
             return AuthResult.Fail("This account has been deactivated.");
         }
 
-        // TODO (Step 10): if domainUser.Role is Manager or Admin and MFA is enabled
-        // for this user, return AuthResult with RequiresMfa = true and no tokens
-        // here instead of issuing them immediately.
+        if ((domainUser.Role == RegisterUserRole.Manager || domainUser.Role == RegisterUserRole.Admin) && domainUser.MfaEnabled)
+        {
+            var challengeToken = _challengeStore.CreateChallenge(domainUser.Id);
+            return new AuthResult
+            {
+                Success = true,
+                RequiresMfa = true,
+                ChallengeToken = challengeToken,
+                UserId = domainUser.Id,
+                FullName = domainUser.FullName,
+                Email = appUser.Email ?? string.Empty,
+                Role = domainUser.Role.ToString(),
+                AssignedRegisterId = domainUser.AssignedRegisterId,
+            };
+        }
 
         return await IssueTokensAsync(appUser, domainUser, ipAddress);
     }
@@ -149,6 +169,39 @@ public class AuthService : IAuthService
             stored.RevokedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
         }
+    }
+
+    public async Task<AuthResult> VerifyMfaAsync(string challengeToken, string code, string ipAddress)
+    {
+        if (!_challengeStore.TryConsumeChallenge(challengeToken, out var userId))
+        {
+            return AuthResult.Fail("Challenge expired or already used.");
+        }
+
+        var domainUser = await _db.DomainUsers.FirstOrDefaultAsync(u => u.Id == userId);
+        if (domainUser is null || !domainUser.IsActive)
+        {
+            return AuthResult.Fail("Account setup is incomplete or inactive.");
+        }
+
+        if (string.IsNullOrWhiteSpace(domainUser.MfaSecret))
+        {
+            return AuthResult.Fail("MFA is not configured for this account.");
+        }
+
+        var rawSecret = _mfaService.DecryptSecret(domainUser.MfaSecret);
+        if (!_mfaService.ValidateCode(rawSecret, code))
+        {
+            return AuthResult.Fail("Incorrect MFA code.");
+        }
+
+        var appUser = await _userManager.FindByIdAsync(userId.ToString());
+        if (appUser is null)
+        {
+            return AuthResult.Fail("Account not found.");
+        }
+
+        return await IssueTokensAsync(appUser, domainUser, ipAddress);
     }
 
     private async Task<AuthResult> IssueTokensAsync(ApplicationUser appUser, DomainUser domainUser, string ipAddress)

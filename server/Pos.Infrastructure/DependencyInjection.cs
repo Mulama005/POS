@@ -1,7 +1,10 @@
 // server/Pos.Infrastructure/DependencyInjection.cs
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Pos.Application.Common.Interfaces;
+using Pos.Infrastructure.Auth;
 using Pos.Infrastructure.Persistence;   
 using Pos.Infrastructure.Storage;
 
@@ -14,6 +17,12 @@ public static class DependencyInjection
         // --- Database  ---
         services.AddDbContext<PosDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
+
+        // --- MFA / auth helpers ---
+        services.AddDataProtection();
+        services.AddMemoryCache();
+        services.AddScoped<IMfaService, MfaService>();
+        services.AddSingleton<IMfaChallengeStore, MemoryCacheMfaChallengeStore>();
 
         // --- File storage  ---
         services.AddSupabaseStorage(configuration);

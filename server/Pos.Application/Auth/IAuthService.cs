@@ -10,4 +10,7 @@ public interface IAuthService
 
     ///Revokes the given refresh token so it can no longer be used, even if not expired.
     Task LogoutAsync(string refreshToken);
+
+    ///Completes the second step of login by validating the MFA challenge token and one-time code.
+    Task<AuthResult> VerifyMfaAsync(string challengeToken, string code, string ipAddress);
 }

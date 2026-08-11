@@ -16,6 +16,8 @@ public static class IdentitySeeder
         var db = services.GetRequiredService<PosDbContext>();
         var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(IdentitySeeder));
 
+        await db.Database.OpenConnectionAsync();
+
         foreach (var roleName in Enum.GetNames<RegisterUserRole>())
         {
             if (!await roleManager.RoleExistsAsync(roleName))
