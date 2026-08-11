@@ -4,6 +4,15 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+    server: {
+        proxy: {
+            '/api': {
+                target: 'http://localhost:5179',  // Change 5000 to your ASP.NET Core port
+                changeOrigin: true,
+                rewrite: (path) => path,
+            },
+        },
+    },
   plugins: [
       react(),
       VitePWA({
