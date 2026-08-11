@@ -102,6 +102,24 @@ public class AuthController : ControllerBase
         return Ok();
     }
 
+    [HttpGet("me")]
+    [Authorize]
+    public IActionResult Me()
+    {
+        // Fastest way to confirm, end to end, that a JWT actually carries the
+        // claims [Authorize(Roles=...)] and RegisterAccessHandler depend on —
+        // no need to hand-decode a token at jwt.io to sanity-check this.
+        return Ok(new
+        {
+            userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value,
+            email = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value,
+            fullName = User.FindFirst("full_name")?.Value,
+            role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value,
+            assignedRegisterId = User.FindFirst("register_id")?.Value,
+        });
+    }
+
     private void SetRefreshTokenCookie(string rawToken)
     {
         Response.Cookies.Append(RefreshCookieName, rawToken, new CookieOptions
