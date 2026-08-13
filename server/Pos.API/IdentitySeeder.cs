@@ -4,6 +4,7 @@ using Pos.Domain.Entities;
 using Pos.Domain.Enums;
 using Pos.Infrastructure.Identity;
 using Pos.Infrastructure.Persistence;
+using Pos.Application.Common.Interfaces;
 
 namespace Pos.Api;
 
@@ -15,6 +16,7 @@ public static class IdentitySeeder
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
         var db = services.GetRequiredService<PosDbContext>();
         var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(IdentitySeeder));
+        var mfaService = services.GetService<IMfaService>();
 
         await db.Database.OpenConnectionAsync();
 
@@ -34,7 +36,8 @@ public static class IdentitySeeder
             password: config["DevSeed:AdminPassword"],
             fullName: "Dev Admin",
             role: RegisterUserRole.Admin,
-            assignedRegisterId: null);
+            assignedRegisterId: null,
+            mfaService: mfaService);
 
         // Register-scoped authorization (Step 9) needs a Cashier tied to a real
         // register to test against — create both if config for it is present.
@@ -57,7 +60,8 @@ public static class IdentitySeeder
                 password: cashierPassword,
                 fullName: "Dev Cashier",
                 role: RegisterUserRole.Cashier,
-                assignedRegisterId: testRegister.Id);
+                assignedRegisterId: testRegister.Id,
+                mfaService: mfaService);
         }
     }
 
@@ -69,7 +73,8 @@ public static class IdentitySeeder
         string? password,
         string fullName,
         RegisterUserRole role,
-        Guid? assignedRegisterId)
+        Guid? assignedRegisterId,
+        IMfaService? mfaService)
     {
         if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(password)) return;
         if (await userManager.FindByEmailAsync(email) is not null) return; // already seeded
@@ -92,7 +97,7 @@ public static class IdentitySeeder
 
         await userManager.AddToRoleAsync(appUser, role.ToString());
 
-        db.DomainUsers.Add(new User
+        var domainUser = new User
         {
             Id = appUser.Id, // shared primary key with the Identity row
             FullName = fullName,
@@ -100,7 +105,20 @@ public static class IdentitySeeder
             Role = role,
             AssignedRegisterId = assignedRegisterId,
             IsActive = true,
-        });
+        };
+
+        // Auto-enable MFA for Admin/Manager in dev seeding so their logins require MFA immediately.
+        /*if ((role == RegisterUserRole.Admin || role == RegisterUserRole.Manager) && mfaService is not null)
+        {
+            var rawSecret = mfaService.GenerateSecret();
+            domainUser.MfaSecret = mfaService.EncryptSecret(rawSecret);
+            domainUser.MfaEnabled = true;
+            var uri = mfaService.GenerateOtpAuthUri(rawSecret, email);
+            logger.LogInformation("Enabled MFA for seeded {Role} user: {Email}. Scan this OTP URI with your authenticator app: {Uri}", role, email, uri);
+            // Note: To actually enroll an authenticator app, expose the otpAuthUri via /api/auth/mfa/setup if needed.
+        }*/
+
+        db.DomainUsers.Add(domainUser);
         await db.SaveChangesAsync();
 
         logger.LogInformation("Seeded dev {Role} user: {Email}", role, email);

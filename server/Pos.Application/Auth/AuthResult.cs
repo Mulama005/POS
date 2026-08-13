@@ -17,6 +17,7 @@ public class AuthResult
 
     public bool RequiresMfa { get; set; }
     public string? ChallengeToken { get; set; }
+    public bool MfaEnabled { get; set; }
 
     public static AuthResult Fail(string message) => new() { Success = false, ErrorMessage = message };
 }
