@@ -45,6 +45,7 @@ public class AuthController : ControllerBase
                     email = result.Email,
                     role = result.Role,
                     assignedRegisterId = result.AssignedRegisterId,
+                    mfaEnabled = result.MfaEnabled
                 }
             });
         }

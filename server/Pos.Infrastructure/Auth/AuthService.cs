@@ -70,6 +70,13 @@ public class AuthService : IAuthService
             return AuthResult.Fail("Account setup is incomplete. Contact an admin.");
         }
 
+        // Provide a clearer reason for Cashier accounts missing a register assignment —
+        // they cannot operate without being tied to a Register (Step 9 requirement).
+        if (domainUser.Role == RegisterUserRole.Cashier && domainUser.AssignedRegisterId is null)
+        {
+            return AuthResult.Fail("Cashier account is missing a register assignment. Ask a manager/admin to assign a register.");
+        }
+
         if (!domainUser.IsActive)
         {
             return AuthResult.Fail("This account has been deactivated.");

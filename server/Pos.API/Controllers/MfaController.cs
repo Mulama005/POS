@@ -59,7 +59,7 @@ public sealed class MfaController : ControllerBase
 
         var uri = _mfaService.GenerateOtpAuthUri(rawSecret, user.Email);
 
-        return Ok(new { otpAuthUri = uri });
+        return Ok(new { otpAuthUri = uri, rawSecret });
         // Frontend renders `otpAuthUri` as a QR code (e.g. with the `qrcode.react` npm package)
         // for the user to scan with Google Authenticator / Authy / 1Password / etc.
     }
@@ -117,11 +117,14 @@ public sealed class MfaController : ControllerBase
             return Unauthorized(new { message = result.ErrorMessage });
         }
 
+        // Mirror AuthController behavior: set the httpOnly refresh cookie upon successful MFA verification
+        SetRefreshTokenCookie(result.RefreshToken!);
+
         return Ok(new
         {
             mfaRequired = false,
             accessToken = result.AccessToken,
-            refreshToken = result.RefreshToken,
+            // refresh token is persisted in a httpOnly cookie; no need to expose in body for browsers
             user = new
             {
                 id = result.UserId,
@@ -165,6 +168,19 @@ public sealed class MfaController : ControllerBase
     {
         var claim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
         return Guid.TryParse(claim, out var userId) ? userId : null;
+    }
+
+    private void SetRefreshTokenCookie(string rawToken)
+    {
+        const string RefreshCookieName = "posRefreshToken";
+        Response.Cookies.Append(RefreshCookieName, rawToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Expires = DateTimeOffset.UtcNow.AddDays(7),
+            Path = "/api/auth",
+        });
     }
 }
 

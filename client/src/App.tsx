@@ -3,6 +3,7 @@ import { AuthProvider } from './auth/AuthContext';
 import { RequireAuth, RequireRole } from './auth/RouteGuards';
 import { LoginPage } from './auth/LoginPage';
 import './App.css'
+import MfaSetupPage from "./auth/MfaSetupPage.tsx";
 
 const Checkout = () => <div>Checkout</div>;
 const ManagerDashboard = () => <div>Manager Dashboard</div>;
@@ -33,6 +34,10 @@ export default function App() {
 
                   <Route element={<RequireRole roles={["Technician"]} />}>
                       <Route path="/repairs" element={<RepairsQueue />} />
+                  </Route>
+                  
+                  <Route element={<RequireRole roles={["Manager", "Admin"]} />}>
+                      <Route path="/mfa/setup" element={<MfaSetupPage />} />
                   </Route>
 
                   <Route path="/forbidden" element={<Forbidden />} />

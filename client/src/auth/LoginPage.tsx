@@ -1,5 +1,6 @@
 ﻿import React, { useState, useRef, useEffect, type KeyboardEvent, type ClipboardEvent } from 'react';
 import { useAuth } from './AuthContext';
+import { useNavigate } from 'react-router-dom';
 import '../LoginPage.css';
 
 const OTP_LENGTH = 6;
@@ -13,6 +14,8 @@ export const LoginPage: React.FC = () => {
     const [password, setPassword] = useState('');
     const [loginError, setLoginError] = useState('');
     const [loginLoading, setLoginLoading] = useState(false);
+    const navigate = useNavigate();
+
 
     // MFA screen state
     const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
@@ -50,16 +53,31 @@ export const LoginPage: React.FC = () => {
         const res = await login(email, password);
         setLoginLoading(false);
 
-        if (res.success && res.requiresMfa) {
+        if (!res.success) {
+            setLoginError(res.message ?? 'Login failed. Please try again.');
+            return;
+        }
+        if (res.requiresMfa) {
             setScreen('mfa');
             setDigits(Array(OTP_LENGTH).fill(''));
+            // Store challengeToken in state or context for MFA verification
             return;
         }
 
-        if (!res.success) {
-            setLoginError(res.message ?? 'Login failed. Please try again.');
+        // No MFA required – check if user needs to set up MFA
+        const user = res.user;
+        if (user && !user.mfaEnabled && (user.role === 'Admin' || user.role === 'Manager')) {
+            navigate('/mfa/setup');
+            return;
         }
-        // If successful without MFA, auth context handles redirect
+
+        // Role-based redirect
+        if (user) {
+            navigate(`/${user.role.toLowerCase()}`);
+        } else {
+            // Fallback: go to dashboard
+            navigate('/dashboard');
+        }
     };
 
     // ────── MFA Screen Handlers ──────
@@ -109,11 +127,17 @@ export const LoginPage: React.FC = () => {
     const handleMfaVerify = async (code: string) => {
         setMfaLoading(true);
         setMfaError('');
-        const ok = await verifyMfa(code);
+        const result = await verifyMfa(code);
         setMfaLoading(false);
 
-        if (ok) {
-            setScreen('success');
+        if (result.success) {
+            // Redirect to role-based dashboard
+            const user = result.user; // Assuming verifyMfa returns user
+            if (user) {
+                navigate(`/${user.role.toLowerCase()}`);
+            } else {
+                navigate('/dashboard');
+            }
         } else {
             setMfaError('Invalid code. Check your authenticator app and try again.');
             setDigits(Array(OTP_LENGTH).fill(''));
