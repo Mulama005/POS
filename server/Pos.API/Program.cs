@@ -15,6 +15,7 @@ using Sentry;
 
 var builder = WebApplication.CreateBuilder(args);
 
+
 // --- Sentry (Step 7) ---
 builder.WebHost.UseSentry(options =>
 {
@@ -108,8 +109,7 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-// OpenAPI mapping disabled to avoid type load issues during local runs.
+
 
 using (var scope = app.Services.CreateScope())
 {
