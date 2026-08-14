@@ -15,6 +15,25 @@
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
+  /* AyiyaPOS design tokens — namespaced with --pos- so they don't collide
+     with the vars above (those belong to the leftover Vite/React template
+     content in App.tsx/App.css, which real screens will replace step by
+     step; --pos-* is the real app's system going forward). */
+  --pos-bg: #faf9f6;
+  --pos-surface: #ffffff;
+  --pos-ink: #1a1a1a;
+  --pos-ink-muted: #6b6b6b;
+  --pos-border: #e2e0d8;
+  --pos-accent: #0f6b3f;
+  --pos-accent-hover: #0c5732;
+  --pos-accent-soft: rgba(15, 107, 63, 0.1);
+  --pos-warn: #c98a1f;
+  --pos-danger: #c0392b;
+
+  --pos-font-display: 'Space Grotesk', var(--sans);
+  --pos-font-body: 'Inter', var(--sans);
+  --pos-font-mono: 'IBM Plex Mono', var(--mono);
+
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;
   color-scheme: light dark;

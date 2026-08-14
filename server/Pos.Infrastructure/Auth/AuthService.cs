@@ -95,6 +95,7 @@ public class AuthService : IAuthService
                 Email = appUser.Email ?? string.Empty,
                 Role = domainUser.Role.ToString(),
                 AssignedRegisterId = domainUser.AssignedRegisterId,
+                MfaEnabled = domainUser.MfaEnabled,
             };
         }
 
@@ -164,6 +165,7 @@ public class AuthService : IAuthService
             Email = stored.User.Email ?? string.Empty,
             Role = domainUser.Role.ToString(),
             AssignedRegisterId = domainUser.AssignedRegisterId,
+            MfaEnabled = domainUser.MfaEnabled,
         };
     }
 
@@ -239,6 +241,7 @@ public class AuthService : IAuthService
             Email = appUser.Email ?? string.Empty,
             Role = domainUser.Role.ToString(),
             AssignedRegisterId = domainUser.AssignedRegisterId,
+            MfaEnabled = domainUser.MfaEnabled,
         };
     }
 

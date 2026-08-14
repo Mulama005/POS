@@ -1,0 +1,182 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pos-bg);
+  padding: 24px;
+  font-family: var(--pos-font-body);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--pos-surface);
+  border: 1px solid var(--pos-border);
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  box-shadow: 0 12px 32px -12px rgba(26, 26, 26, 0.16);
+  padding: 40px 32px 32px;
+  position: relative;
+  animation: login-card-in 320ms ease-out;
+}
+
+/* Signature element: a torn/perforated edge, like a receipt just pulled
+   from the printer. Built from a repeating triangular gradient rather than
+   an image so it stays crisp at any zoom level. */
+.login-card::before {
+  content: '';
+  position: absolute;
+  top: -11px;
+  left: 0;
+  right: 0;
+  height: 12px;
+  background:
+    linear-gradient(135deg, var(--pos-surface) 50%, transparent 50%),
+    linear-gradient(-135deg, var(--pos-surface) 50%, transparent 50%);
+  background-size: 16px 16px;
+  background-position: bottom left;
+  background-repeat: repeat-x;
+  filter: drop-shadow(0 -2px 3px rgba(26, 26, 26, 0.06));
+}
+
+@keyframes login-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-card {
+    animation: none;
+  }
+}
+
+.login-card__header {
+  margin-bottom: 28px;
+}
+
+.login-wordmark {
+  font-family: var(--pos-font-display);
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+  color: var(--pos-ink);
+}
+
+.login-wordmark__accent {
+  color: var(--pos-accent);
+}
+
+.login-tagline {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--pos-ink-muted);
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login-field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pos-ink);
+}
+
+.login-field input {
+  font-family: var(--pos-font-body);
+  font-size: 15px;
+  padding: 10px 12px;
+  border: 1px solid var(--pos-border);
+  border-radius: 6px;
+  background: var(--pos-bg);
+  color: var(--pos-ink);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.login-field input:focus-visible {
+  outline: none;
+  border-color: var(--pos-accent);
+  box-shadow: 0 0 0 3px var(--pos-accent-soft);
+}
+
+.login-field__error {
+  font-size: 12.5px;
+  color: var(--pos-danger);
+}
+
+.login-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--pos-danger);
+  background: rgba(192, 57, 43, 0.08);
+  border: 1px solid rgba(192, 57, 43, 0.2);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.login-mfa-copy {
+  margin: -6px 0 0;
+  font-size: 13.5px;
+  color: var(--pos-ink-muted);
+}
+
+.login-submit {
+  font-family: var(--pos-font-body);
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--pos-accent);
+  border: none;
+  border-radius: 6px;
+  padding: 11px 16px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.login-submit:hover:not(:disabled) {
+  background: var(--pos-accent-hover);
+}
+
+.login-submit:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.login-submit:focus-visible {
+  outline: 2px solid var(--pos-accent);
+  outline-offset: 2px;
+}
+
+.login-link-button {
+  font-family: var(--pos-font-body);
+  font-size: 13.5px;
+  color: var(--pos-ink-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  align-self: center;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.login-link-button:hover {
+  color: var(--pos-ink);
+}
