@@ -24,4 +24,5 @@ public class User : BaseEntity
     public ICollection<Sale> Sales { get; set; } = new List<Sale>();
     public ICollection<Repair> AssignedRepairs { get; set; } = new List<Repair>();
     public ICollection<AuditLog> AuditLogEntries { get; set; } = new List<AuditLog>();
+    public DateTimeOffset? SessionsRevokedAt { get; set; }
 }
