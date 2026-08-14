@@ -1,5 +1,5 @@
 import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { login as apiLogin, logout as apiLogout, refresh as apiRefresh, verifyMfa as apiVerifyMfa } from '../services/authService'
+import { login as apiLogin, logout as apiLogout, refresh as apiRefresh, verifyMfa as apiVerifyMfa } from '../services/AuthService'
 import { isMfaRequired } from '../types/auth'
 import type { AuthUser, LoginMfaRequiredResponse } from '../types/auth'
 import { registerAuthHandlers, setCurrentAccessToken } from '../services/apiClient'
@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false
     apiRefresh()
-      .then((res) => {
+      .then((res: { accessToken: string; user: AuthUser }) => {
         if (!cancelled) applySession(res.accessToken, res.user)
       })
       .catch(() => {
