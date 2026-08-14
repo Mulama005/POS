@@ -1,54 +1,39 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './auth/AuthContext';
-import { RequireAuth, RequireRole } from './auth/RouteGuards';
-import { LoginPage } from './auth/LoginPage';
-import './App.css'
-import MfaSetupPage from "./auth/MfaSetupPage.tsx";
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { LoginPage } from './pages/LoginPage'
+import { PlaceholderPage } from './pages/PlaceholderPage'
+import { MfaSetupPage } from './pages/MfaSetupPage'
+import { ForbiddenPage } from './pages/ForbiddenPage'
+import { RequireAuth, RequireRole } from './components/RouteGuards'
+import { AuthProvider } from './store/AuthContext'   // ← add this
 
-const Checkout = () => <div>Checkout</div>;
-const ManagerDashboard = () => <div>Manager Dashboard</div>;
-const AdminDashboard = () => <div>Admin Dashboard</div>;
-const RepairsQueue = () => <div>Repairs Queue</div>;
-const Forbidden = () => <div>Forbidden</div>;
-
-export default function App() {
+function App() {
   return (
-      <AuthProvider>
-          <Routes>
-              <Route path="/login" element={<LoginPage />} />
+    <AuthProvider>                                    {/* ← wrap everything */}
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/forbidden" element={<ForbiddenPage />} />
 
-              {/* Everything below requires authentication */}
-              <Route element={<RequireAuth />}>
-                  {/* Role-based homes (you may also navigate programmatically after login) */}
-                  <Route element={<RequireRole roles={["Cashier"]} />}>
-                      <Route path="/checkout" element={<Checkout />} />
-                  </Route>
+        <Route element={<RequireAuth />}>
+          <Route path="/checkout" element={<PlaceholderPage title="Checkout" />} />
+          <Route path="/repairs" element={<PlaceholderPage title="Repairs queue" />} />
+        </Route>
 
-                  <Route element={<RequireRole roles={["Admin"]} />}>
-                      <Route path="/admin" element={<AdminDashboard />} />
-                  </Route>
+        <Route element={<RequireRole roles={['Manager']} />}>
+          <Route path="/dashboard/manager" element={<PlaceholderPage title="Manager dashboard" />} />
+        </Route>
+        <Route element={<RequireRole roles={['Admin']} />}>
+          <Route path="/dashboard/admin" element={<PlaceholderPage title="Admin dashboard" />} />
+        </Route>
 
-                  <Route element={<RequireRole roles={["Manager"]} />}>
-                      <Route path="/manager" element={<ManagerDashboard />} />
-                  </Route>
+        <Route element={<RequireRole roles={['Manager', 'Admin']} />}>
+          <Route path="/mfa/setup" element={<MfaSetupPage />} />
+        </Route>
 
-                  <Route element={<RequireRole roles={["Technician"]} />}>
-                      <Route path="/repairs" element={<RepairsQueue />} />
-                  </Route>
-                  
-                  <Route element={<RequireRole roles={["Manager", "Admin"]} />}>
-                      <Route path="/mfa/setup" element={<MfaSetupPage />} />
-                  </Route>
-
-                  <Route path="/forbidden" element={<Forbidden />} />
-
-                  {/* Default after login can also be a neutral hub */}
-                  {/*<Route path="/" element={<Navigate to="/checkout" replace />} />*/}
-              </Route>
-
-              {/* Catch-all: route to login or 404 */}
-              <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-      </AuthProvider>
-  );
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </AuthProvider>
+  )
 }
+
+export default App

@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { RoleGate } from '../../auth/RouteGuards';
+import { RoleGate } from '../../components/RouteGuards';
 
 export const ActionsBar: React.FC = () => {
     return (
