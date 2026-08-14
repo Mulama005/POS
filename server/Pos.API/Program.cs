@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using Pos.Api;
 using Pos.Api.Authorization;
 using Pos.Application.Auth;
@@ -33,6 +34,37 @@ builder.WebHost.UseSentry(options =>
 builder.Services.AddControllers();
 
 builder.Services.AddOpenApi();
+
+// ---------- Swagger UI (needed to test MFA/register endpoints manually) ----------
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    // Adds the "Authorize" button so a Bearer token can be pasted once and applied
+    // to every request for the rest of the Swagger session.
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Paste just the token — no need to type 'Bearer ' yourself."
+    });
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 
 builder.Services.AddDbContext<PosDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -79,6 +111,38 @@ builder.Services.AddAuthentication(options =>
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromSeconds(30), // small tolerance, not the 5-minute default — access tokens are short-lived by design
         };
+
+        options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async context =>
+        {
+            var userIdClaim = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (userIdClaim is null || !Guid.TryParse(userIdClaim, out var userId))
+            {
+                context.Fail("Token missing a valid user id.");
+                return;
+            }
+
+            var db = context.HttpContext.RequestServices.GetRequiredService<PosDbContext>();
+            var domainUser = await db.DomainUsers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (domainUser is null || !domainUser.IsActive)
+            {
+                context.Fail("This account has been deactivated.");
+                return;
+            }
+
+            var issuedAt = (context.SecurityToken as System.IdentityModel.Tokens.Jwt.JwtSecurityToken)?.IssuedAt;
+            if (domainUser.SessionsRevokedAt is not null &&
+                issuedAt is not null &&
+                issuedAt.Value.ToUniversalTime() < domainUser.SessionsRevokedAt.Value.UtcDateTime)
+            {
+                context.Fail("Session was revoked. Please log in again.");
+            }
+        },
+    };
     });
 
 builder.Services.AddAuthorization(options =>
@@ -129,6 +193,13 @@ using (var scope = app.Services.CreateScope())
     {
         app.Logger.LogWarning("Identity seeding skipped because no database connection string was configured.");
     }
+}
+
+// ---------- Swagger UI middleware (dev only) ----------
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
 app.UseSentryTracing();
