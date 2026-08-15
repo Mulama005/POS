@@ -13,6 +13,7 @@ using Pos.Infrastructure.Auth;
 using Pos.Infrastructure.Identity;
 using Pos.Infrastructure.Persistence;
 using Sentry;
+using Pos.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -66,8 +67,7 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-builder.Services.AddDbContext<PosDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddInfrastructure(builder.Configuration);
 
 // ---------- Identity ----------
 // AddIdentityCore (not AddIdentity) — AddIdentity also wires up cookie-based
@@ -156,10 +156,6 @@ builder.Services.AddScoped<IAuthorizationHandler, RegisterAccessHandler>();
 // ---------- App services ----------
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
-builder.Services.AddSingleton<IMemoryCache, MemoryCache>();
-builder.Services.AddSingleton<IMfaChallengeStore, MemoryCacheMfaChallengeStore>();
-builder.Services.AddSingleton<IMfaService, MfaService>();
-
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendDev", policy =>

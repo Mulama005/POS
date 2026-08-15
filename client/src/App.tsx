@@ -3,36 +3,44 @@ import { LoginPage } from './pages/LoginPage'
 import { PlaceholderPage } from './pages/PlaceholderPage'
 import { MfaSetupPage } from './pages/MfaSetupPage'
 import { ForbiddenPage } from './pages/ForbiddenPage'
+import { UserManagementPage } from './pages/UserManagementPage'
+import { AcceptInvitePage } from './pages/AcceptInvitePage'
 import { RequireAuth, RequireRole } from './components/RouteGuards'
-import { AuthProvider } from './store/AuthContext'   // ← add this
 
+// NOTE: AuthProvider wraps <App /> in main.tsx already — it must NOT also be
+// wrapped here. Two separate AuthProvider instances would mean every page
+// reads from whichever one is nearer in the tree, completely disconnected
+// from the other, and since refresh tokens are single-use/rotating, both
+// firing their own /api/auth/refresh on mount would race and randomly log
+// people out. If you're adding providers (query client, theme, etc.), they
+// belong in main.tsx alongside AuthProvider, not duplicated in here.
 function App() {
   return (
-    <AuthProvider>                                    {/* ← wrap everything */}
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/forbidden" element={<ForbiddenPage />} />
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/forbidden" element={<ForbiddenPage />} />
+      <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
-        <Route element={<RequireAuth />}>
-          <Route path="/checkout" element={<PlaceholderPage title="Checkout" />} />
-          <Route path="/repairs" element={<PlaceholderPage title="Repairs queue" />} />
-        </Route>
+      <Route element={<RequireAuth />}>
+        <Route path="/checkout" element={<PlaceholderPage title="Checkout" />} />
+        <Route path="/repairs" element={<PlaceholderPage title="Repairs queue" />} />
+      </Route>
 
-        <Route element={<RequireRole roles={['Manager']} />}>
-          <Route path="/dashboard/manager" element={<PlaceholderPage title="Manager dashboard" />} />
-        </Route>
-        <Route element={<RequireRole roles={['Admin']} />}>
-          <Route path="/dashboard/admin" element={<PlaceholderPage title="Admin dashboard" />} />
-        </Route>
+      <Route element={<RequireRole roles={['Manager']} />}>
+        <Route path="/dashboard/manager" element={<PlaceholderPage title="Manager dashboard" />} />
+      </Route>
+      <Route element={<RequireRole roles={['Admin']} />}>
+        <Route path="/dashboard/admin" element={<PlaceholderPage title="Admin dashboard" />} />
+        <Route path="/users" element={<UserManagementPage />} />
+      </Route>
 
-        <Route element={<RequireRole roles={['Manager', 'Admin']} />}>
-          <Route path="/mfa/setup" element={<MfaSetupPage />} />
-        </Route>
+      <Route element={<RequireRole roles={['Manager', 'Admin']} />}>
+        <Route path="/mfa/setup" element={<MfaSetupPage />} />
+      </Route>
 
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </AuthProvider>
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
   )
 }
 
