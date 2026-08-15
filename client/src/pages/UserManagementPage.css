@@ -1,0 +1,160 @@
+.user-mgmt-screen {
+  padding: 40px;
+  font-family: var(--pos-font-body);
+  color: var(--pos-ink);
+  max-width: 900px;
+}
+
+.user-mgmt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.user-mgmt-title {
+  font-family: var(--pos-font-display);
+  font-size: 22px;
+  margin: 0;
+}
+
+.user-mgmt-invite-btn {
+  font-family: var(--pos-font-body);
+  font-weight: 600;
+  font-size: 14px;
+  color: #fff;
+  background: var(--pos-accent);
+  border: none;
+  border-radius: 6px;
+  padding: 9px 16px;
+  cursor: pointer;
+}
+
+.user-mgmt-invite-btn:hover {
+  background: var(--pos-accent-hover);
+}
+
+.user-mgmt-invite-form {
+  background: var(--pos-surface);
+  border: 1px solid var(--pos-border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.user-mgmt-invite-fields {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.user-mgmt-invite-fields input,
+.user-mgmt-invite-fields select {
+  font-family: var(--pos-font-body);
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--pos-border);
+  border-radius: 6px;
+  background: var(--pos-bg);
+  color: var(--pos-ink);
+}
+
+.user-mgmt-invite-fields button {
+  font-family: var(--pos-font-body);
+  font-weight: 600;
+  font-size: 14px;
+  color: #fff;
+  background: var(--pos-accent);
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.user-mgmt-invite-link-note {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--pos-ink-muted);
+}
+
+.user-mgmt-invite-link-note code {
+  font-family: var(--pos-font-mono);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.user-mgmt-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--pos-surface);
+  border: 1px solid var(--pos-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.user-mgmt-table th,
+.user-mgmt-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--pos-border);
+  font-size: 14px;
+}
+
+.user-mgmt-table th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--pos-ink-muted);
+  background: var(--pos-bg);
+}
+
+.user-mgmt-table select {
+  font-family: var(--pos-font-body);
+  font-size: 13px;
+  padding: 4px 6px;
+  border: 1px solid var(--pos-border);
+  border-radius: 5px;
+  background: var(--pos-bg);
+  color: var(--pos-ink);
+}
+
+.user-mgmt-row--inactive {
+  opacity: 0.55;
+}
+
+.user-mgmt-table button {
+  font-family: var(--pos-font-body);
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--pos-border);
+  border-radius: 6px;
+  background: var(--pos-surface);
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.user-mgmt-danger-btn {
+  color: var(--pos-danger);
+  border-color: rgba(192, 57, 43, 0.35) !important;
+}
+
+.user-mgmt-hint {
+  font-size: 14px;
+  color: var(--pos-ink-muted);
+}
+
+.user-mgmt-error {
+  font-size: 13px;
+  color: var(--pos-danger);
+  background: rgba(192, 57, 43, 0.08);
+  border: 1px solid rgba(192, 57, 43, 0.2);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-top: 8px;
+}
+
+.user-mgmt-error--row {
+  margin-top: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+}

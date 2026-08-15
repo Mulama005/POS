@@ -54,6 +54,16 @@ export function PlaceholderPage({ title }: { title: string }) {
         )}
       </RoleGate>
 
+      {/* RoleGate checks the actual logged-in user's role, so this correctly
+          stays hidden even if a Manager ever lands on this same component. */}
+      <RoleGate roles={['Admin']}>
+        <p style={{ marginTop: 16 }}>
+          <Link to="/users" style={{ color: 'var(--pos-accent)', fontWeight: 600 }}>
+            Manage users →
+          </Link>
+        </p>
+      </RoleGate>
+
       <button
         type="button"
         onClick={() => void handleSignOut()}

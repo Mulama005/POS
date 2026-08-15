@@ -23,7 +23,7 @@ public static class DependencyInjection
         // --- MFA / auth helpers ---
         services.AddDataProtection();
         services.AddMemoryCache();
-        services.AddScoped<IMfaService, MfaService>();
+        services.AddSingleton<IMfaService, MfaService>();
         services.AddSingleton<IMfaChallengeStore, MemoryCacheMfaChallengeStore>();
 
         // --- File storage ---
