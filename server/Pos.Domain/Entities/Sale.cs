@@ -8,6 +8,14 @@ public class Sale : BaseEntity
     public Guid RegisterId { get; set; }
     public Register Register { get; set; } = null!;
 
+    /// <summary>The till session this sale was completed under — used at till-close time
+    /// to compute expected cash without any fragile time-range inference. Nullable only
+    /// because it didn't exist before Step 25; SalesController now requires an open
+    /// session to exist before a sale can complete, so this is effectively always set
+    /// going forward.</summary>
+    public Guid? TillSessionId { get; set; }
+    public TillSession? TillSession { get; set; }
+
     public Guid CashierId { get; set; }
     public User Cashier { get; set; } = null!;
 

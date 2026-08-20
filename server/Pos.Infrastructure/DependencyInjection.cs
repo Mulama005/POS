@@ -25,6 +25,7 @@ public static class DependencyInjection
         services.AddMemoryCache();
         services.AddSingleton<IMfaService, MfaService>();
         services.AddSingleton<IMfaChallengeStore, MemoryCacheMfaChallengeStore>();
+        services.AddSingleton<IDiscountApprovalStore, MemoryCacheDiscountApprovalStore>();
 
         // --- File storage ---
         services.AddSupabaseStorage(configuration);
