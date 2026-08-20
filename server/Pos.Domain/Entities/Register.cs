@@ -8,9 +8,9 @@ public class Register : BaseEntity
     public string? Location { get; set; }
     public bool IsActive { get; set; } = true;
 
-    /// <summary>Set when a cashier opens the till for a shift; null when closed.</summary>
-    public bool IsTillOpen { get; set; }
-    public decimal? ExpectedCashAtOpen { get; set; }
-
     public ICollection<Sale> Sales { get; set; } = new List<Sale>();
+    /// <summary>Full open/close history. Whether the till is currently open is derived
+    /// from whether any of these has Status == Open — see TillSession for why this
+    /// replaced a plain IsTillOpen boolean.</summary>
+    public ICollection<TillSession> TillSessions { get; set; } = new List<TillSession>();
 }

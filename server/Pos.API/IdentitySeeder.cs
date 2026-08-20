@@ -54,6 +54,43 @@ public static class IdentitySeeder
                 logger.LogInformation("Seeded Dev Test Register with Id {RegisterId}", testRegister.Id);
             }
 
+            // Seed an open TillSession for the test register — without this, checkout
+            // (Step 24) is untestable out of the box since a sale can't complete against
+            // a closed till, and there'd be no way to open one via the UI on a totally
+            // fresh database until someone manually calls POST /api/till/open. Dev-only
+            // (same isDevelopment gate as this whole method), self-healing on every
+            // startup (checks for an existing open session first), and requires the
+            // Admin dev account to already be seeded above since it needs a real
+            // OpenedByUserId to satisfy the FK.
+            var hasOpenSession = await db.TillSessions
+                .AnyAsync(t => t.RegisterId == testRegister.Id && t.Status == TillSessionStatus.Open);
+            if (!hasOpenSession)
+            {
+                var adminEmail = config["DevSeed:AdminEmail"];
+                var adminUserId = string.IsNullOrEmpty(adminEmail)
+                    ? (Guid?)null
+                    : await db.DomainUsers.Where(u => u.Email == adminEmail).Select(u => (Guid?)u.Id).FirstOrDefaultAsync();
+
+                if (adminUserId is Guid openedByUserId)
+                {
+                    db.TillSessions.Add(new TillSession
+                    {
+                        RegisterId = testRegister.Id,
+                        OpenedByUserId = openedByUserId,
+                        OpenedAt = DateTime.UtcNow,
+                        OpeningFloat = 5000m, // a plausible KES opening float for dev testing
+                        Status = TillSessionStatus.Open,
+                    });
+                    await db.SaveChangesAsync();
+                    logger.LogInformation("Opened a dev TillSession on Dev Test Register {RegisterId}", testRegister.Id);
+                }
+                else
+                {
+                    logger.LogWarning(
+                        "Could not seed an open TillSession for Dev Test Register — DevSeed:AdminEmail is missing or that user hasn't been seeded yet. Open the till manually via POST /api/till/open.");
+                }
+            }
+
             await SeedDevUserAsync(
                 userManager, db, logger,
                 email: cashierEmail,
