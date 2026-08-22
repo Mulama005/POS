@@ -31,6 +31,10 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<InventoryAdjustment> InventoryAdjustments => Set<InventoryAdjustment>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<RepairJob> RepairJobs => Set<RepairJob>();
+    public DbSet<RepairStatusHistory> RepairStatusHistories => Set<RepairStatusHistory>();
+    public DbSet<RepairPartUsed> RepairPartsUsed => Set<RepairPartUsed>();
+    public DbSet<CreditTransaction> CreditTransactions => Set<CreditTransaction>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
