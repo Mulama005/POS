@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Pos.Application.Common.Interfaces;
 using Pos.Infrastructure.Auth;
 using Pos.Infrastructure.Email;
+using Pos.Infrastructure.Messaging;
 using Pos.Infrastructure.Persistence;
 using Pos.Infrastructure.Storage;
 
@@ -32,6 +33,10 @@ public static class DependencyInjection
 
         // --- Email ---
         services.AddScoped<IEmailSender, ConsoleEmailSender>();
+
+        // --- WhatsApp Cloud API ---
+        services.Configure<WhatsAppOptions>(configuration.GetSection(WhatsAppOptions.SectionName));
+        services.AddHttpClient<IWhatsAppService, WhatsAppCloudApiService>();
 
         return services;
     }

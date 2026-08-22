@@ -48,16 +48,7 @@ public enum CreditLedgerEntryType
     Payment     // customer payment reduces balance owed
 }
 
-public enum RepairStatus
-{
-    Received,
-    Diagnosing,
-    AwaitingParts,
-    InRepair,
-    Ready,
-    Collected,
-    Cancelled
-}
+
 
 public enum InventoryAdjustmentType
 {

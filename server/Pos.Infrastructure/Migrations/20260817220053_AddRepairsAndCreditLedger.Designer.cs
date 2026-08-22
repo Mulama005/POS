@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Pos.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using Pos.Infrastructure.Persistence;
 namespace Pos.Infrastructure.Migrations
 {
     [DbContext(typeof(PosDbContext))]
-    partial class PosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260817220053_AddRepairsAndCreditLedger")]
+    partial class AddRepairsAndCreditLedger
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -531,7 +534,13 @@ namespace Pos.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<decimal?>("ExpectedCashAtOpen")
+                        .HasColumnType("numeric");
+
                     b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsTillOpen")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Location")
@@ -763,9 +772,6 @@ namespace Pos.Infrastructure.Migrations
                     b.Property<decimal>("TaxTotal")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<Guid?>("TillSessionId")
-                        .HasColumnType("uuid");
-
                     b.Property<decimal>("Total")
                         .HasColumnType("decimal(18,2)");
 
@@ -783,8 +789,6 @@ namespace Pos.Infrastructure.Migrations
                     b.HasIndex("EtimsInvoiceNumber");
 
                     b.HasIndex("RegisterId");
-
-                    b.HasIndex("TillSessionId");
 
                     b.ToTable("Sales");
                 });
@@ -834,61 +838,6 @@ namespace Pos.Infrastructure.Migrations
                     b.HasIndex("UnitId");
 
                     b.ToTable("SaleItems");
-                });
-
-            modelBuilder.Entity("Pos.Domain.Entities.TillSession", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("ClosedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("ClosedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal?>("CountedCashAtClose")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal?>("ExpectedCashAtClose")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime>("OpenedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("OpenedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("OpeningFloat")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<Guid>("RegisterId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal?>("VarianceAtClose")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClosedByUserId");
-
-                    b.HasIndex("OpenedByUserId");
-
-                    b.HasIndex("RegisterId")
-                        .IsUnique()
-                        .HasFilter("\"Status\" = 0");
-
-                    b.ToTable("TillSessions");
                 });
 
             modelBuilder.Entity("Pos.Domain.Entities.Unit", b =>
@@ -1328,11 +1277,6 @@ namespace Pos.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Pos.Domain.Entities.TillSession", "TillSession")
-                        .WithMany("Sales")
-                        .HasForeignKey("TillSessionId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("Cashier");
 
                     b.Navigation("Customer");
@@ -1340,8 +1284,6 @@ namespace Pos.Infrastructure.Migrations
                     b.Navigation("DiscountApprovedByUser");
 
                     b.Navigation("Register");
-
-                    b.Navigation("TillSession");
                 });
 
             modelBuilder.Entity("Pos.Domain.Entities.SaleItem", b =>
@@ -1368,32 +1310,6 @@ namespace Pos.Infrastructure.Migrations
                     b.Navigation("Sale");
 
                     b.Navigation("Unit");
-                });
-
-            modelBuilder.Entity("Pos.Domain.Entities.TillSession", b =>
-                {
-                    b.HasOne("Pos.Domain.Entities.User", "ClosedByUser")
-                        .WithMany()
-                        .HasForeignKey("ClosedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Pos.Domain.Entities.User", "OpenedByUser")
-                        .WithMany()
-                        .HasForeignKey("OpenedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Pos.Domain.Entities.Register", "Register")
-                        .WithMany("TillSessions")
-                        .HasForeignKey("RegisterId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ClosedByUser");
-
-                    b.Navigation("OpenedByUser");
-
-                    b.Navigation("Register");
                 });
 
             modelBuilder.Entity("Pos.Domain.Entities.Unit", b =>
@@ -1463,8 +1379,6 @@ namespace Pos.Infrastructure.Migrations
             modelBuilder.Entity("Pos.Domain.Entities.Register", b =>
                 {
                     b.Navigation("Sales");
-
-                    b.Navigation("TillSessions");
                 });
 
             modelBuilder.Entity("Pos.Domain.Entities.Repair", b =>
@@ -1484,11 +1398,6 @@ namespace Pos.Infrastructure.Migrations
                     b.Navigation("Items");
 
                     b.Navigation("Payments");
-                });
-
-            modelBuilder.Entity("Pos.Domain.Entities.TillSession", b =>
-                {
-                    b.Navigation("Sales");
                 });
 
             modelBuilder.Entity("Pos.Domain.Entities.User", b =>
