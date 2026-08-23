@@ -5,6 +5,9 @@ import { MfaSetupPage } from './pages/MfaSetupPage'
 import { ForbiddenPage } from './pages/ForbiddenPage'
 import { UserManagementPage } from './pages/UserManagementPage'
 import { AcceptInvitePage } from './pages/AcceptInvitePage'
+import { RepairsPage } from './pages/RepairsPage'
+import { CustomersPage } from './pages/CustomersPage'
+import { RepairTrackingPage } from './pages/RepairTrackingPage'
 import { RequireAuth, RequireRole } from './components/RouteGuards'
 
 // NOTE: AuthProvider wraps <App /> in main.tsx already — it must NOT also be
@@ -20,10 +23,12 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/forbidden" element={<ForbiddenPage />} />
       <Route path="/accept-invite" element={<AcceptInvitePage />} />
+      <Route path="/track-repair" element={<RepairTrackingPage />} />
 
       <Route element={<RequireAuth />}>
         <Route path="/checkout" element={<PlaceholderPage title="Checkout" />} />
-        <Route path="/repairs" element={<PlaceholderPage title="Repairs queue" />} />
+        <Route path="/repairs" element={<RepairsPage />} />
+        <Route path="/customers" element={<CustomersPage />} />
       </Route>
 
       <Route element={<RequireRole roles={['Manager']} />}>
