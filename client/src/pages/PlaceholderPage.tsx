@@ -64,6 +64,16 @@ export function PlaceholderPage({ title }: { title: string }) {
         </p>
       </RoleGate>
 
+      <p style={{ marginTop: 16 }}>
+        <Link to="/repairs" style={{ color: 'var(--pos-accent)', fontWeight: 600 }}>
+          Open repairs →
+        </Link>
+        {' · '}
+        <Link to="/customers" style={{ color: 'var(--pos-accent)', fontWeight: 600 }}>
+          Open customer ledger →
+        </Link>
+      </p>
+
       <button
         type="button"
         onClick={() => void handleSignOut()}
