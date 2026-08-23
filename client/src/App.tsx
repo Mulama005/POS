@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { LoginPage } from './pages/LoginPage'
 import { PlaceholderPage } from './pages/PlaceholderPage'
+import { CheckoutPage } from './pages/CheckoutPage'
 import { MfaSetupPage } from './pages/MfaSetupPage'
 import { ForbiddenPage } from './pages/ForbiddenPage'
 import { UserManagementPage } from './pages/UserManagementPage'
@@ -26,7 +27,7 @@ function App() {
       <Route path="/track-repair" element={<RepairTrackingPage />} />
 
       <Route element={<RequireAuth />}>
-        <Route path="/checkout" element={<PlaceholderPage title="Checkout" />} />
+        <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/repairs" element={<RepairsPage />} />
         <Route path="/customers" element={<CustomersPage />} />
       </Route>

@@ -70,3 +70,9 @@ public enum RegisterUserRole
     Admin,
     Technician
 }
+
+public enum TillSessionStatus
+{
+    Open,
+    Closed
+}

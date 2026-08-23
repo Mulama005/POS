@@ -179,6 +179,7 @@ using (var scope = app.Services.CreateScope())
         try
         {
             await IdentitySeeder.SeedAsync(scope.ServiceProvider, app.Configuration, app.Environment.IsDevelopment());
+            await DevProductSeeder.SeedAsync(scope.ServiceProvider, app.Environment.IsDevelopment());
         }
         catch (Exception ex)
         {

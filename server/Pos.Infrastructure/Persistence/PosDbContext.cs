@@ -24,6 +24,7 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<SaleItem> SaleItems => Set<SaleItem>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Register> Registers => Set<Register>();
+    public DbSet<TillSession> TillSessions => Set<TillSession>();
     public DbSet<User> DomainUsers => Set<User>(); // named to avoid colliding with IdentityDbContext's own Users (DbSet<ApplicationUser>)
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<CreditLedger> CreditLedgers => Set<CreditLedger>();
@@ -110,6 +111,38 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             e.Property(x => x.Name).IsRequired().HasMaxLength(100);
         });
 
+        // ---------- TillSession ----------
+        modelBuilder.Entity<TillSession>(e =>
+        {
+            e.Property(x => x.OpeningFloat).HasColumnType("decimal(18,2)");
+            e.Property(x => x.ExpectedCashAtClose).HasColumnType("decimal(18,2)");
+            e.Property(x => x.CountedCashAtClose).HasColumnType("decimal(18,2)");
+            e.Property(x => x.VarianceAtClose).HasColumnType("decimal(18,2)");
+
+            // Partial unique index: at most one Open session per register at a time.
+            // This is the actual DB-level guarantee behind "at most one open till per
+            // register" — TillController's own check is a courtesy for a clean error
+            // message, this index is what stops a race from creating two.
+            e.HasIndex(x => x.RegisterId)
+                .IsUnique()
+                .HasFilter("\"Status\" = 0"); // TillSessionStatus.Open
+
+            e.HasOne(x => x.Register)
+                .WithMany(x => x.TillSessions)
+                .HasForeignKey(x => x.RegisterId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.OpenedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.OpenedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.ClosedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.ClosedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         // ---------- User ----------
         // Id is NOT auto-generated here — it is expected to be set to match the
         // corresponding Identity ApplicationUser.Id (shared primary key, see User.cs).
@@ -158,6 +191,11 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
                 .WithMany(x => x.Sales)
                 .HasForeignKey(x => x.CustomerId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            e.HasOne(x => x.TillSession)
+                .WithMany(x => x.Sales)
+                .HasForeignKey(x => x.TillSessionId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // ---------- SaleItem ----------
