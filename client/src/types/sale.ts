@@ -40,6 +40,7 @@ export interface PaymentInput {
 }
 
 export interface CompleteSaleRequest {
+  clientTransactionId: string
   registerId: string
   customerId: string | null
   items: {

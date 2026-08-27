@@ -11,13 +11,6 @@ import { CustomersPage } from './pages/CustomersPage'
 import { RepairTrackingPage } from './pages/RepairTrackingPage'
 import { RequireAuth, RequireRole } from './components/RouteGuards'
 
-// NOTE: AuthProvider wraps <App /> in main.tsx already — it must NOT also be
-// wrapped here. Two separate AuthProvider instances would mean every page
-// reads from whichever one is nearer in the tree, completely disconnected
-// from the other, and since refresh tokens are single-use/rotating, both
-// firing their own /api/auth/refresh on mount would race and randomly log
-// people out. If you're adding providers (query client, theme, etc.), they
-// belong in main.tsx alongside AuthProvider, not duplicated in here.
 function App() {
   return (
     <Routes>
@@ -35,6 +28,7 @@ function App() {
       <Route element={<RequireRole roles={['Manager']} />}>
         <Route path="/dashboard/manager" element={<PlaceholderPage title="Manager dashboard" />} />
       </Route>
+
       <Route element={<RequireRole roles={['Admin']} />}>
         <Route path="/dashboard/admin" element={<PlaceholderPage title="Admin dashboard" />} />
         <Route path="/users" element={<UserManagementPage />} />
