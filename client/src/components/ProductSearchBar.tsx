@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { lookupProductByBarcode, searchProducts } from '../services/ProductsService'
+import { searchLocalProducts, lookupLocalProductByBarcode } from '../offline/catalogCache'
+import { isNetworkError } from '../utils/networkError'
 import type { ProductSummary } from '../types/product'
 
 interface ProductSearchBarProps {
@@ -30,10 +32,21 @@ export function ProductSearchBar({ onAdd, disabled }: ProductSearchBarProps) {
 
     const timeout = setTimeout(() => {
       setLoading(true)
-      searchProducts(trimmed)
-        .then(setResults)
-        .catch(() => setResults([]))
-        .finally(() => setLoading(false))
+      ;(async () => {
+        try {
+          setResults(await searchProducts(trimmed))
+        } catch (err) {
+          if (isNetworkError(err)) {
+            // Server unreachable — fall back to whatever's in the local catalog cache
+            // rather than showing an empty "no results" the cashier can't act on.
+            setResults(await searchLocalProducts(trimmed))
+          } else {
+            setResults([])
+          }
+        } finally {
+          setLoading(false)
+        }
+      })()
     }, 250)
 
     return () => clearTimeout(timeout)
@@ -57,12 +70,25 @@ export function ProductSearchBar({ onAdd, disabled }: ProductSearchBarProps) {
     if (looksLikeBarcode(trimmed)) {
       setLoading(true)
       try {
-        const product = await lookupProductByBarcode(trimmed)
+        let product: ProductSummary | null
+        try {
+          product = await lookupProductByBarcode(trimmed)
+        } catch (err) {
+          if (!isNetworkError(err)) throw err
+          // Server unreachable — same idea as the search fallback above: check the
+          // local cache before telling the cashier the scan failed outright.
+          product = await lookupLocalProductByBarcode(trimmed)
+        }
         if (product) {
           handleAdd(product)
         } else {
           setError(`No product found for barcode ${trimmed}.`)
         }
+      } catch {
+        // A genuine (non-network) failure from lookupProductByBarcode — rethrown by
+        // the inner catch above. Without this outer catch, it was propagating as an
+        // unhandled promise rejection and the cashier saw nothing at all.
+        setError('Could not look up that barcode. Try again.')
       } finally {
         setLoading(false)
       }

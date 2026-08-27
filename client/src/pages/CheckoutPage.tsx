@@ -26,6 +26,9 @@ import type { ProductSummary } from '../types/product'
 import type { ApiErrorBody } from '../types/auth'
 import type { TillReconciliation, TillSession } from '../types/till'
 import { formatKes } from '../utils/currency'
+import { queueSale } from '../offline/actionQueue'
+import { isNetworkError } from '../utils/networkError'
+import { buildProvisionalReceipt } from '../utils/buildProvisionalReceipt'
 import './CheckoutPage.css'
 
 function getErrorMessage(err: unknown, fallback: string): string {
@@ -53,7 +56,7 @@ export function CheckoutPage() {
   const [paymentModalOpen, setPaymentModalOpen] = useState(false)
   const [completing, setCompleting] = useState(false)
   const [completeError, setCompleteError] = useState<string | null>(null)
-  const [receipt, setReceipt] = useState<CompleteSaleResult | null>(null)
+  const [receipt, setReceipt] = useState<(CompleteSaleResult & { pending?: boolean }) | null>(null)
 
   const [pendingApproval, setPendingApproval] = useState<{ payments: PaymentInput[]; message: string } | null>(null)
   const [approving, setApproving] = useState(false)
@@ -225,23 +228,33 @@ export function CheckoutPage() {
   const totals = cart ? calculateCartTotals(cart) : null
 
   const submitSale = async (payments: PaymentInput[], discountApprovalToken: string | null) => {
-    if (!cart || !selectedRegisterId) return
+    if (!cart || !selectedRegisterId || !totals) return
     setCompleting(true)
     setCompleteError(null)
+
+    // Generated once per attempt, before the request goes out — not inside the catch
+    // branch — so completeSale and the offline queueSale fallback below share the exact
+    // same idempotency key. If completeSale's request actually reached the server and
+    // succeeded but the response was lost (a real possibility under isNetworkError),
+    // queueing under a different id would create a duplicate sale once it syncs.
+    const clientTransactionId = crypto.randomUUID()
+    const saleRequest = {
+      clientTransactionId,
+      registerId: selectedRegisterId,
+      customerId: cart.customerId,
+      items: cart.lines.map((l) => ({
+        productId: l.product.id,
+        unitId: l.unitId,
+        quantity: l.quantity,
+        discountAmount: l.discountAmount,
+      })),
+      cartDiscountAmount: cart.cartDiscountAmount,
+      discountApprovalToken,
+      payments,
+    }
+
     try {
-      const result = await completeSale({
-        registerId: selectedRegisterId,
-        customerId: cart.customerId,
-        items: cart.lines.map((l) => ({
-          productId: l.product.id,
-          unitId: l.unitId,
-          quantity: l.quantity,
-          discountAmount: l.discountAmount,
-        })),
-        cartDiscountAmount: cart.cartDiscountAmount,
-        discountApprovalToken,
-        payments,
-      })
+      const result = await completeSale(saleRequest)
 
       setReceipt(result)
       setPaymentModalOpen(false)
@@ -256,6 +269,21 @@ export function CheckoutPage() {
       if (err instanceof DiscountApprovalRequiredError) {
         setPendingApproval({ payments, message: err.message })
         setPaymentModalOpen(false)
+      } else if (isNetworkError(err)) {
+        // Genuinely couldn't reach the server — not a business-rule rejection (that's
+        // the branch above and the one below). Queue it and let the sync engine finish
+        // the job once connectivity returns; the cashier's flow continues normally.
+        await queueSale(saleRequest, selectedRegisterId)
+
+        setReceipt(buildProvisionalReceipt(cart, totals, payments, clientTransactionId))
+        setPaymentModalOpen(false)
+        setPendingApproval(null)
+        await deleteCart(cart.id)
+        if (user) {
+          const fresh = createEmptyCart(selectedRegisterId, user.id)
+          await saveCart(fresh)
+          setCart(fresh)
+        }
       } else {
         setCompleteError(getErrorMessage(err, 'Could not complete the sale. Try again.'))
       }
@@ -397,6 +425,11 @@ export function CheckoutPage() {
         <div className="checkout-modal-backdrop" role="dialog" aria-modal="true">
           <div className="checkout-modal">
             <h2>Sale complete</h2>
+            {receipt.pending && (
+              <p className="checkout-modal__offline-notice">
+                Saved on this register — no connection right now. It'll sync automatically once back online.
+              </p>
+            )}
             <p className="checkout-modal__subtitle">Total: {receipt.total.toFixed(2)} KES</p>
             <ul className="receipt-items">
               {receipt.items.map((item) => (
