@@ -11,7 +11,9 @@ namespace Pos.Infrastructure.Persistence
             var optionsBuilder = new DbContextOptionsBuilder<PosDbContext>();
 
             // ⚠️ Replace with your actual Supabase connection string
-            var connectionString = "Host=aws-0-eu-west-2.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.wwvjazbgvhoptqpwkaye;Password=YrD8bdzHAZPJuusx;SslMode=Require;TrustServerCertificate=true";
+            var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+                                   ?? throw new InvalidOperationException(
+                                       "Connection string not found. Set the environment variable 'ConnectionStrings__DefaultConnection'.");
 
             optionsBuilder.UseNpgsql(connectionString);
 

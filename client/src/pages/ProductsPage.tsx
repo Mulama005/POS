@@ -32,22 +32,26 @@ export const ProductsPage = () => {
         <div>
             <h1>Products</h1>
             <input type="text" placeholder="Search by SKU, name, barcode" value={search} onChange={e => setSearch(e.target.value)} />
-            <table>
-                <thead>
-                <tr><th>SKU</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th></tr>
-                </thead>
-                <tbody>
-                {products.map(p => (
-                    <tr key={p.id}>
-                        <td>{p.sku}</td>
-                        <td>{p.name}</td>
-                        <td>{p.categoryName}</td>
-                        <td>${p.salePrice}</td>
-                        <td>{p.stockCount}</td>
-                    </tr>
-                ))}
-                </tbody>
-            </table>
+            {loading ? (
+                <p>Loading products...</p>
+            ) : (
+                <table>
+                    <thead>
+                    <tr><th>SKU</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th></tr>
+                    </thead>
+                    <tbody>
+                    {products.map(p => (
+                        <tr key={p.id}>
+                            <td>{p.sku}</td>
+                            <td>{p.name}</td>
+                            <td>{p.categoryName}</td>
+                            <td>${p.salePrice}</td>
+                            <td>{p.stockCount}</td>
+                        </tr>
+                    ))}
+                    </tbody>
+                </table>
+            )}
         </div>
     );
 };
