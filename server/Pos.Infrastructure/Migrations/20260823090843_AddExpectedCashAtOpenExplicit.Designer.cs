@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Pos.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using Pos.Infrastructure.Persistence;
 namespace Pos.Infrastructure.Migrations
 {
     [DbContext(typeof(PosDbContext))]
-    partial class PosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260823090843_AddExpectedCashAtOpenExplicit")]
+    partial class AddExpectedCashAtOpenExplicit
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -209,9 +212,6 @@ namespace Pos.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("DefaultWarrantyMonths")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
@@ -223,18 +223,10 @@ namespace Pos.Infrastructure.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
-                    b.Property<Guid?>("ParentCategoryId")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("RequiresSerialTracking")
-                        .HasColumnType("boolean");
-
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("ParentCategoryId");
 
                     b.ToTable("Categories");
                 });
@@ -284,44 +276,6 @@ namespace Pos.Infrastructure.Migrations
                     b.HasIndex("SaleId");
 
                     b.ToTable("CreditLedgers");
-                });
-
-            modelBuilder.Entity("Pos.Domain.Entities.CreditTransaction", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("BalanceAfter")
-                        .HasColumnType("numeric");
-
-                    b.Property<Guid>("CustomerId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("text");
-
-                    b.Property<string>("PaymentMethod")
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("RecordedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("RelatedSaleId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("Timestamp")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("CreditTransactions");
                 });
 
             modelBuilder.Entity("Pos.Domain.Entities.Customer", b =>
@@ -393,11 +347,11 @@ namespace Pos.Infrastructure.Migrations
                     b.Property<Guid?>("RepairId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("StockUnitId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime>("Timestamp")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -410,7 +364,7 @@ namespace Pos.Infrastructure.Migrations
 
                     b.HasIndex("RepairId");
 
-                    b.HasIndex("StockUnitId");
+                    b.HasIndex("UnitId");
 
                     b.ToTable("InventoryAdjustments");
                 });
@@ -577,7 +531,13 @@ namespace Pos.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<decimal?>("ExpectedCashAtOpen")
+                        .HasColumnType("numeric");
+
                     b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsTillOpen")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Location")
@@ -650,117 +610,6 @@ namespace Pos.Infrastructure.Migrations
                     b.ToTable("Repairs");
                 });
 
-            modelBuilder.Entity("Pos.Domain.Entities.RepairJob", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("AssignedTechnicianId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset?>("CollectedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("CustomerId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("DeviceDescription")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("DiagnosisNotes")
-                        .HasColumnType("text");
-
-                    b.Property<decimal?>("FinalCost")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal?>("QuotedCost")
-                        .HasColumnType("numeric");
-
-                    b.Property<string>("ReportedFault")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("TicketNumber")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CustomerId");
-
-                    b.ToTable("RepairJobs");
-                });
-
-            modelBuilder.Entity("Pos.Domain.Entities.RepairPartUsed", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("ConsumedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("ProductId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Quantity")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("RepairJobId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("UnitCostAtTimeOfUse")
-                        .HasColumnType("numeric");
-
-                    b.Property<Guid?>("UnitId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RepairJobId");
-
-                    b.ToTable("RepairPartsUsed");
-                });
-
-            modelBuilder.Entity("Pos.Domain.Entities.RepairStatusHistory", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("ChangedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("ChangedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("FromStatus")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("RepairJobId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("ToStatus")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RepairJobId");
-
-                    b.ToTable("RepairStatusHistories");
-                });
-
             modelBuilder.Entity("Pos.Domain.Entities.Sale", b =>
                 {
                     b.Property<Guid>("Id")
@@ -809,9 +658,6 @@ namespace Pos.Infrastructure.Migrations
                     b.Property<decimal>("TaxTotal")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<Guid?>("TillSessionId")
-                        .HasColumnType("uuid");
-
                     b.Property<decimal>("Total")
                         .HasColumnType("decimal(18,2)");
 
@@ -829,8 +675,6 @@ namespace Pos.Infrastructure.Migrations
                     b.HasIndex("EtimsInvoiceNumber");
 
                     b.HasIndex("RegisterId");
-
-                    b.HasIndex("TillSessionId");
 
                     b.ToTable("Sales");
                 });
@@ -859,11 +703,11 @@ namespace Pos.Infrastructure.Migrations
                     b.Property<Guid>("SaleId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("StockUnitId")
-                        .HasColumnType("uuid");
-
                     b.Property<decimal>("TaxAmount")
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("UnitPrice")
                         .HasColumnType("decimal(18,2)");
@@ -877,7 +721,7 @@ namespace Pos.Infrastructure.Migrations
 
                     b.HasIndex("SaleId");
 
-                    b.HasIndex("StockUnitId");
+                    b.HasIndex("UnitId");
 
                     b.ToTable("SaleItems");
                 });
@@ -929,37 +773,31 @@ namespace Pos.Infrastructure.Migrations
                     b.ToTable("StockUnits");
                 });
 
-            modelBuilder.Entity("Pos.Domain.Entities.TillSession", b =>
+            modelBuilder.Entity("Pos.Domain.Entities.Unit", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime?>("ClosedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("ClosedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal?>("CountedCashAtClose")
-                        .HasColumnType("decimal(18,2)");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<decimal?>("ExpectedCashAtClose")
-                        .HasColumnType("decimal(18,2)");
+                    b.Property<string>("Imei")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
-                    b.Property<DateTime>("OpenedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("OpenedByUserId")
+                    b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
-                    b.Property<decimal>("OpeningFloat")
-                        .HasColumnType("decimal(18,2)");
+                    b.Property<DateTime>("PurchaseDate")
+                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("RegisterId")
+                    b.Property<string>("SerialNumber")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("SoldOnSaleItemId")
                         .HasColumnType("uuid");
 
                     b.Property<int>("Status")
@@ -968,20 +806,24 @@ namespace Pos.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<decimal?>("VarianceAtClose")
-                        .HasColumnType("decimal(18,2)");
+                    b.Property<DateTime?>("WarrantyExpiry")
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ClosedByUserId");
-
-                    b.HasIndex("OpenedByUserId");
-
-                    b.HasIndex("RegisterId")
+                    b.HasIndex("Imei")
                         .IsUnique()
-                        .HasFilter("\"Status\" = 0");
+                        .HasFilter("\"Imei\" IS NOT NULL");
 
-                    b.ToTable("TillSessions");
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("SerialNumber")
+                        .IsUnique();
+
+                    b.HasIndex("SoldOnSaleItemId")
+                        .IsUnique();
+
+                    b.ToTable("Units");
                 });
 
             modelBuilder.Entity("Pos.Domain.Entities.User", b =>
@@ -1207,16 +1049,6 @@ namespace Pos.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Pos.Domain.Entities.Category", b =>
-                {
-                    b.HasOne("Pos.Domain.Entities.Category", "ParentCategory")
-                        .WithMany("ChildCategories")
-                        .HasForeignKey("ParentCategoryId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("ParentCategory");
-                });
-
             modelBuilder.Entity("Pos.Domain.Entities.CreditLedger", b =>
                 {
                     b.HasOne("Pos.Domain.Entities.Customer", "Customer")
@@ -1252,7 +1084,7 @@ namespace Pos.Infrastructure.Migrations
                         .IsRequired();
 
                     b.HasOne("Pos.Domain.Entities.Product", "Product")
-                        .WithMany("InventoryAdjustments")
+                        .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -1262,9 +1094,9 @@ namespace Pos.Infrastructure.Migrations
                         .HasForeignKey("RepairId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("Pos.Domain.Entities.StockUnit", "StockUnit")
+                    b.HasOne("Pos.Domain.Entities.Unit", "Unit")
                         .WithMany()
-                        .HasForeignKey("StockUnitId")
+                        .HasForeignKey("UnitId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("AdjustedByUser");
@@ -1273,7 +1105,7 @@ namespace Pos.Infrastructure.Migrations
 
                     b.Navigation("Repair");
 
-                    b.Navigation("StockUnit");
+                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("Pos.Domain.Entities.Payment", b =>
@@ -1335,35 +1167,6 @@ namespace Pos.Infrastructure.Migrations
                     b.Navigation("Customer");
                 });
 
-            modelBuilder.Entity("Pos.Domain.Entities.RepairJob", b =>
-                {
-                    b.HasOne("Pos.Domain.Entities.Customer", "Customer")
-                        .WithMany()
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Customer");
-                });
-
-            modelBuilder.Entity("Pos.Domain.Entities.RepairPartUsed", b =>
-                {
-                    b.HasOne("Pos.Domain.Entities.RepairJob", null)
-                        .WithMany("PartsUsed")
-                        .HasForeignKey("RepairJobId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Pos.Domain.Entities.RepairStatusHistory", b =>
-                {
-                    b.HasOne("Pos.Domain.Entities.RepairJob", null)
-                        .WithMany("StatusHistory")
-                        .HasForeignKey("RepairJobId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("Pos.Domain.Entities.Sale", b =>
                 {
                     b.HasOne("Pos.Domain.Entities.User", "Cashier")
@@ -1387,11 +1190,6 @@ namespace Pos.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Pos.Domain.Entities.TillSession", "TillSession")
-                        .WithMany("Sales")
-                        .HasForeignKey("TillSessionId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("Cashier");
 
                     b.Navigation("Customer");
@@ -1399,14 +1197,12 @@ namespace Pos.Infrastructure.Migrations
                     b.Navigation("DiscountApprovedByUser");
 
                     b.Navigation("Register");
-
-                    b.Navigation("TillSession");
                 });
 
             modelBuilder.Entity("Pos.Domain.Entities.SaleItem", b =>
                 {
                     b.HasOne("Pos.Domain.Entities.Product", "Product")
-                        .WithMany("SaleItems")
+                        .WithMany()
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -1417,16 +1213,16 @@ namespace Pos.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Pos.Domain.Entities.StockUnit", "StockUnit")
+                    b.HasOne("Pos.Domain.Entities.Unit", "Unit")
                         .WithMany()
-                        .HasForeignKey("StockUnitId")
+                        .HasForeignKey("UnitId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Product");
 
                     b.Navigation("Sale");
 
-                    b.Navigation("StockUnit");
+                    b.Navigation("Unit");
                 });
 
             modelBuilder.Entity("Pos.Domain.Entities.StockUnit", b =>
@@ -1440,30 +1236,22 @@ namespace Pos.Infrastructure.Migrations
                     b.Navigation("Product");
                 });
 
-            modelBuilder.Entity("Pos.Domain.Entities.TillSession", b =>
+            modelBuilder.Entity("Pos.Domain.Entities.Unit", b =>
                 {
-                    b.HasOne("Pos.Domain.Entities.User", "ClosedByUser")
+                    b.HasOne("Pos.Domain.Entities.Product", "Product")
                         .WithMany()
-                        .HasForeignKey("ClosedByUserId")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Pos.Domain.Entities.SaleItem", "SoldOnSaleItem")
+                        .WithOne()
+                        .HasForeignKey("Pos.Domain.Entities.Unit", "SoldOnSaleItemId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Pos.Domain.Entities.User", "OpenedByUser")
-                        .WithMany()
-                        .HasForeignKey("OpenedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                    b.Navigation("Product");
 
-                    b.HasOne("Pos.Domain.Entities.Register", "Register")
-                        .WithMany("TillSessions")
-                        .HasForeignKey("RegisterId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ClosedByUser");
-
-                    b.Navigation("OpenedByUser");
-
-                    b.Navigation("Register");
+                    b.Navigation("SoldOnSaleItem");
                 });
 
             modelBuilder.Entity("Pos.Domain.Entities.User", b =>
@@ -1489,8 +1277,6 @@ namespace Pos.Infrastructure.Migrations
 
             modelBuilder.Entity("Pos.Domain.Entities.Category", b =>
                 {
-                    b.Navigation("ChildCategories");
-
                     b.Navigation("Products");
                 });
 
@@ -1510,10 +1296,6 @@ namespace Pos.Infrastructure.Migrations
 
             modelBuilder.Entity("Pos.Domain.Entities.Product", b =>
                 {
-                    b.Navigation("InventoryAdjustments");
-
-                    b.Navigation("SaleItems");
-
                     b.Navigation("StockUnits");
 
                     b.Navigation("TierPrices");
@@ -1522,8 +1304,6 @@ namespace Pos.Infrastructure.Migrations
             modelBuilder.Entity("Pos.Domain.Entities.Register", b =>
                 {
                     b.Navigation("Sales");
-
-                    b.Navigation("TillSessions");
                 });
 
             modelBuilder.Entity("Pos.Domain.Entities.Repair", b =>
@@ -1531,23 +1311,11 @@ namespace Pos.Infrastructure.Migrations
                     b.Navigation("PartsConsumed");
                 });
 
-            modelBuilder.Entity("Pos.Domain.Entities.RepairJob", b =>
-                {
-                    b.Navigation("PartsUsed");
-
-                    b.Navigation("StatusHistory");
-                });
-
             modelBuilder.Entity("Pos.Domain.Entities.Sale", b =>
                 {
                     b.Navigation("Items");
 
                     b.Navigation("Payments");
-                });
-
-            modelBuilder.Entity("Pos.Domain.Entities.TillSession", b =>
-                {
-                    b.Navigation("Sales");
                 });
 
             modelBuilder.Entity("Pos.Domain.Entities.User", b =>
