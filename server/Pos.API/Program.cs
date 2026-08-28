@@ -192,6 +192,8 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// Hangfire integration temporarily disabled until package/reference is added explicitly.
+
 // ---------- Swagger UI middleware (dev only) ----------
 if (app.Environment.IsDevelopment())
 {
