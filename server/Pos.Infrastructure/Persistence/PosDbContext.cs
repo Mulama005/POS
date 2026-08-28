@@ -19,7 +19,6 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
 
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Category> Categories => Set<Category>();
-    public DbSet<Unit> Units => Set<Unit>();
     public DbSet<StockUnit> StockUnits => Set<StockUnit>();
     public DbSet<Sale> Sales => Set<Sale>();
     public DbSet<SaleItem> SaleItems => Set<SaleItem>();
@@ -84,29 +83,7 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
                 .HasForeignKey(x => x.CategoryId)
                 .OnDelete(DeleteBehavior.Restrict); // a category with products in it shouldn't be deletable
         });
-
-        // ---------- Unit ----------
-        modelBuilder.Entity<Unit>(e =>
-        {
-            e.Property(x => x.SerialNumber).IsRequired().HasMaxLength(100);
-            e.Property(x => x.Imei).HasMaxLength(20);
-
-            e.HasIndex(x => x.SerialNumber).IsUnique();
-            e.HasIndex(x => x.Imei).IsUnique().HasFilter("\"Imei\" IS NOT NULL");
-
-            e.HasOne(x => x.Product)
-                .WithMany(x => x.Units)
-                .HasForeignKey(x => x.ProductId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            // A Unit references the SaleItem it was sold on; that item references
-            // the Unit back (Step 20/24 return-verification flow). Break the cycle for
-            // cascade-delete purposes on this side.
-            e.HasOne(x => x.SoldOnSaleItem)
-                .WithOne()
-                .HasForeignKey<Unit>(x => x.SoldOnSaleItemId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
+      
 
         // ---------- StockUnit ----------
         modelBuilder.Entity<StockUnit>(e =>
@@ -232,9 +209,9 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
                 .HasForeignKey(x => x.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            e.HasOne(x => x.Unit)
+            e.HasOne(x => x.StockUnit)
                 .WithMany()
-                .HasForeignKey(x => x.UnitId)
+                .HasForeignKey(x => x.StockUnitId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -300,9 +277,9 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
                 .HasForeignKey(x => x.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            e.HasOne(x => x.Unit)
+            e.HasOne(x => x.StockUnit)
                 .WithMany()
-                .HasForeignKey(x => x.UnitId)
+                .HasForeignKey(x => x.StockUnitId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             e.HasOne(x => x.Repair)

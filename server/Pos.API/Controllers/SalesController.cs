@@ -248,7 +248,7 @@ public sealed class SalesController : ControllerBase
                 : 0m;
             var finalLineAmount = Math.Round(afterLineDiscount - shareOfCartDiscount, 2, MidpointRounding.AwayFromZero);
 
-            var lineTax = product.TaxClass == TaxClass.Standard
+            var lineTax = product.TaxClass == "standard"
                 ? Math.Round(finalLineAmount - (finalLineAmount / (1 + StandardVatRate)), 2, MidpointRounding.AwayFromZero)
                 : 0m;
 
@@ -257,7 +257,7 @@ public sealed class SalesController : ControllerBase
             var saleItem = new SaleItem
             {
                 ProductId = product.Id,
-                UnitId = itemRequest.UnitId,
+                StockUnitId = itemRequest.StockUnitId,
                 Quantity = itemRequest.Quantity,
                 UnitPrice = product.SalePrice,
                 DiscountAmount = totalLineDiscount,
@@ -267,13 +267,13 @@ public sealed class SalesController : ControllerBase
             saleItems.Add(saleItem);
 
             itemResponses.Add(new SaleItemResponse(
-                product.Id, product.Name, itemRequest.UnitId, itemRequest.Quantity,
+                product.Id, product.Name, itemRequest.StockUnitId, itemRequest.Quantity,
                 product.SalePrice, totalLineDiscount, lineTax, finalLineAmount));
 
             saleTaxTotal += lineTax;
             saleTotal += finalLineAmount;
 
-            product.StockQuantity -= itemRequest.Quantity;
+            //product.StockQuantity -= itemRequest.Quantity;
         }
 
         // --- Payments ---

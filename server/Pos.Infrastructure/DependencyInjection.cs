@@ -29,7 +29,8 @@ public static class DependencyInjection
         services.AddSingleton<IDiscountApprovalStore, MemoryCacheDiscountApprovalStore>();
 
         // --- File storage ---
-        services.AddSupabaseStorage(configuration);
+        services.AddHttpClient<IStorageService, SupabaseStorageService>();
+        services.AddScoped<IStorageService, SupabaseStorageService>();
 
         // --- Email ---
         services.AddScoped<IEmailSender, ConsoleEmailSender>();

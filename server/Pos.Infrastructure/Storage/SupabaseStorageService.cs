@@ -1,129 +1,103 @@
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json.Serialization;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Pos.Application.Common.Interfaces;
-using SupabaseStorage = Supabase.Storage;
 
-namespace Pos.Infrastructure.Storage;
-
-/// <summary>
-/// IStorageService implementation backed by Supabase Storage. Talks to Storage using the
-/// service role key only — this class is the single choke point through which any file in the
-/// system is read or written, which is what lets access stay tied to the caller's role instead
-/// of a guessable public URL.
-/// </summary>
-public sealed class SupabaseStorageService : IStorageService
+namespace Pos.Infrastructure.Storage
 {
-    private readonly SupabaseStorage.Client _client;
-    private readonly string _bucket;
-    private readonly ILogger<SupabaseStorageService> _logger;
-
-    public SupabaseStorageService(
-        IOptions<SupabaseStorageOptions> options,
-        ILogger<SupabaseStorageService> logger)
+    public class SupabaseStorageService : IStorageService
     {
-        var settings = options.Value;
-        _bucket = settings.Bucket;
-        _logger = logger;
+        private readonly HttpClient _httpClient;
+        private readonly string _supabaseUrl;
+        private readonly string _supabaseKey;
+        private readonly string _bucketName;
 
-        var storageUrl = $"{settings.Url.TrimEnd('/')}/storage/v1";
-        var headers = new Dictionary<string, string>
+        public SupabaseStorageService(HttpClient httpClient, IConfiguration config)
         {
-            ["Authorization"] = $"Bearer {settings.ServiceRoleKey}",
-            ["apikey"] = settings.ServiceRoleKey,
-        };
-
-        _client = new SupabaseStorage.Client(storageUrl, headers);
-    }
-
-    public async Task<string> UploadAsync(
-        Stream fileStream,
-        string fileName,
-        string contentType,
-        string folder,
-        CancellationToken cancellationToken = default)
-    {
-        // Prefix with a GUID so two files with the same original name never collide,
-        // while keeping the original name readable for anyone browsing the bucket.
-        var storagePath = $"{folder}/{Guid.NewGuid():N}-{SanitizeFileName(fileName)}";
-
-        await using var memoryStream = new MemoryStream();
-        await fileStream.CopyToAsync(memoryStream, cancellationToken);
-        var bytes = memoryStream.ToArray();
-
-        try
-        {
-            await _client.From(_bucket).Upload(
-                bytes,
-                storagePath,
-                new SupabaseStorage.FileOptions
-                {
-                    ContentType = contentType,
-                    Upsert = false,
-                });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to upload {StoragePath} to bucket {Bucket}", storagePath, _bucket);
-            throw;
+            _httpClient = httpClient;
+            _supabaseUrl = config["Supabase:Url"] ?? throw new InvalidOperationException("Supabase:Url missing");
+            _supabaseKey = config["Supabase:ServiceRoleKey"] ?? throw new InvalidOperationException("Supabase:ServiceRoleKey missing");
+            _bucketName = config["Supabase:StorageBucket"] ?? "products";
         }
 
-        return storagePath;
-    }
+        public async Task<string> UploadFileAsync(Stream fileStream, string fileName, CancellationToken cancellationToken = default)
+        {
+            var url = $"{_supabaseUrl}/storage/v1/object/{_bucketName}/{fileName}";
 
-    public async Task<string> GetSignedUrlAsync(
-        string storagePath,
-        int expiresInSeconds = 300,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var signedUrl = await _client.From(_bucket).CreateSignedUrl(storagePath, expiresInSeconds);
-            return signedUrl;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to create signed URL for {StoragePath}", storagePath);
-            throw;
-        }
-    }
+            using var content = new StreamContent(fileStream);
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
 
-    public async Task DeleteAsync(string storagePath, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            await _client.From(_bucket).Remove(new List<string> { storagePath });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to delete {StoragePath}", storagePath);
-            throw;
-        }
-    }
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Add("apikey", _supabaseKey);
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _supabaseKey);
 
-    public async Task DeleteFolderAsync(string folderPrefix, CancellationToken cancellationToken = default)
-    {
-        try
+            var response = await _httpClient.PostAsync(url, content, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            return $"{_supabaseUrl}/storage/v1/object/public/{_bucketName}/{fileName}";
+        }
+        
+        public async Task DeleteFolderAsync(string folderPath, CancellationToken cancellationToken = default)
         {
-            var entries = await _client.From(_bucket).List(folderPrefix);
-            if (entries is null || entries.Count == 0)
+            // Ensure folder path ends with a slash for listing
+            var prefix = folderPath.EndsWith("/") ? folderPath : folderPath + "/";
+
+            // Step 1: List all files in the folder
+            var listUrl = $"{_supabaseUrl}/storage/v1/object/list/{_bucketName}?prefix={Uri.EscapeDataString(prefix)}";
+
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Add("apikey", _supabaseKey);
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _supabaseKey);
+
+            var listResponse = await _httpClient.GetAsync(listUrl, cancellationToken);
+            if (!listResponse.IsSuccessStatusCode)
             {
-                return;
+                // If the folder doesn't exist or is empty, treat as success
+                if (listResponse.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    return;
+                listResponse.EnsureSuccessStatusCode();
             }
 
-            var paths = entries.Select(e => $"{folderPrefix}/{e.Name}").ToList();
-            await _client.From(_bucket).Remove(paths);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to delete folder {FolderPrefix}", folderPrefix);
-            throw;
-        }
-    }
+            var files = await listResponse.Content.ReadFromJsonAsync<List<SupabaseFileInfo>>(cancellationToken: cancellationToken);
+            if (files == null || !files.Any())
+                return;
 
-    private static string SanitizeFileName(string fileName)
-    {
-        var invalid = Path.GetInvalidFileNameChars();
-        var cleaned = new string(fileName.Where(c => !invalid.Contains(c)).ToArray());
-        return string.IsNullOrWhiteSpace(cleaned) ? "file" : cleaned.Replace(' ', '-');
+            // Step 2: Delete each file
+            foreach (var file in files)
+            {
+                var deleteUrl = $"{_supabaseUrl}/storage/v1/object/{_bucketName}/{file.Name}";
+                var deleteResponse = await _httpClient.DeleteAsync(deleteUrl, cancellationToken);
+                // Ignore 404s – file might already be gone
+                if (deleteResponse.StatusCode != System.Net.HttpStatusCode.NotFound)
+                    deleteResponse.EnsureSuccessStatusCode();
+            }
+        }
+        
+        public async Task<string> GetSignedUrlAsync(string filePath, int expiresInSeconds = 60, CancellationToken cancellationToken = default)
+        {
+            // Supabase Storage signed URL endpoint
+            var url = $"{_supabaseUrl}/storage/v1/object/sign/{_bucketName}/{filePath}";
+
+            var payload = new { expiresIn = expiresInSeconds };
+
+            _httpClient.DefaultRequestHeaders.Clear();
+            _httpClient.DefaultRequestHeaders.Add("apikey", _supabaseKey);
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _supabaseKey);
+
+            var response = await _httpClient.PostAsJsonAsync(url, payload, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var result = await response.Content.ReadFromJsonAsync<SignedUrlResponse>(cancellationToken: cancellationToken);
+            return result?.SignedUrl ?? throw new InvalidOperationException("Failed to generate signed URL.");
+        }
+
+        private record SignedUrlResponse(string SignedUrl);
+
+// Helper record for deserializing the list response
+        private record SupabaseFileInfo(string Name, string Id, DateTime CreatedAt, DateTime UpdatedAt);
     }
 }

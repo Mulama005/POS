@@ -5,14 +5,16 @@ namespace Pos.Api.Controllers;
 /// contract Step 18's full product module should keep stable when it extends this
 /// controller, since the checkout screen (Step 24) is built against it.
 /// </summary>
-public sealed record ProductSummaryDto(
-    Guid Id,
-    string Sku,
-    string Barcode,
-    string Name,
-    Guid CategoryId,
-    string CategoryName,
-    decimal SalePrice,
-    string TaxClass,
-    int StockQuantity,
-    string? ImageUrl);
+public class ProductDtos
+{
+    public Guid Id { get; set; }
+    public string Sku { get; set; } = string.Empty;
+    public string Barcode { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public Guid CategoryId { get; set; }
+    public string CategoryName { get; set; } = string.Empty;
+    public decimal SalePrice { get; set; }
+    public string TaxClass { get; set; } = string.Empty;
+    public int StockQuantity { get; set; }
+    public string? ImageUrl { get; set; }
+}
