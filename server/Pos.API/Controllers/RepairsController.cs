@@ -155,7 +155,7 @@ public sealed class RepairsController : ControllerBase
                 return BadRequest("A serialized unit can only be consumed with quantity 1.");
             }
             
-        var unit = await _db.Units
+        var unit = await _db.StockUnits
         .FirstOrDefaultAsync(
             u => u.Id == request.UnitId && u.ProductId == request.ProductId,
             cancellationToken);
@@ -169,14 +169,14 @@ public sealed class RepairsController : ControllerBase
                 return BadRequest("Unknown unit or unit does not belong to the selected product.");
             }
             
-            if (unit.Status != UnitStatus.InStock)
+            if (unit.Status != "InStock")
             {
                 return BadRequest(
                     $"Unit is not available for consumption. Current status: {unit.Status}.");
             }
-            
-            unit.Status = UnitStatus.InRepair;
-            }
+
+            unit.Status = "InRepair";
+        }
             else
             {
     // Non-serialized part: decrement the normal product stock.
@@ -191,7 +191,7 @@ public sealed class RepairsController : ControllerBase
             $"Insufficient stock: {product.StockQuantity} available, {request.Quantity} requested.");
     }
 
-    product.StockQuantity -= request.Quantity;
+    //product.StockQuantity -= request.Quantity;
 }
 
 // --- end consume ---

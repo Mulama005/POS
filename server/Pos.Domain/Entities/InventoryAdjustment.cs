@@ -9,8 +9,8 @@ public class InventoryAdjustment : BaseEntity
     public Product Product { get; set; } = null!;
 
     /// Set for serialized products where the adjustment applies to a specific physical unit.
-    public Guid? UnitId { get; set; }
-    public Unit? Unit { get; set; }
+    public Guid? StockUnitId { get; set; }
+    public StockUnit? StockUnit { get; set; }
 
     public InventoryAdjustmentType AdjustmentType { get; set; }
     public int Quantity { get; set; }
