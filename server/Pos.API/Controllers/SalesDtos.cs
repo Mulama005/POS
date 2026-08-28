@@ -9,7 +9,7 @@ public sealed record ApproveDiscountRequest(string Email, string Password);
 
 public sealed record SaleItemRequest(
     Guid ProductId,
-    Guid? UnitId,
+    Guid? StockUnitId,
     int Quantity,
     /// <summary>Manager-applied markdown on this specific line, in KES. Server-validated —
     /// never trust a client-submitted price directly.</summary>

@@ -20,4 +20,7 @@ public class Product : BaseEntity
     public bool IsActive { get; set; } = true;
     public ICollection<StockUnit> StockUnits { get; set; } = new List<StockUnit>();
     public ICollection<ProductTierPrice> TierPrices { get; set; } = new List<ProductTierPrice>();
+    public ICollection<SaleItem> SaleItems { get; set; } = new List<SaleItem>();
+    public ICollection<InventoryAdjustment> InventoryAdjustments { get; set; } = new List<InventoryAdjustment>();
+	public int StockQuantity => StockUnits?.Count(u => u.Status == "InStock") ?? 0;
 }
