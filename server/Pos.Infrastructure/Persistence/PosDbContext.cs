@@ -20,6 +20,7 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Unit> Units => Set<Unit>();
+    public DbSet<StockUnit> StockUnits => Set<StockUnit>();
     public DbSet<Sale> Sales => Set<Sale>();
     public DbSet<SaleItem> SaleItems => Set<SaleItem>();
     public DbSet<Payment> Payments => Set<Payment>();
@@ -36,6 +37,8 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<RepairStatusHistory> RepairStatusHistories => Set<RepairStatusHistory>();
     public DbSet<RepairPartUsed> RepairPartsUsed => Set<RepairPartUsed>();
     public DbSet<CreditTransaction> CreditTransactions => Set<CreditTransaction>();
+    public DbSet<PricingTier> PricingTiers => Set<PricingTier>();
+    public DbSet<ProductTierPrice> ProductTierPrices => Set<ProductTierPrice>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -102,6 +105,19 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             e.HasOne(x => x.SoldOnSaleItem)
                 .WithOne()
                 .HasForeignKey<Unit>(x => x.SoldOnSaleItemId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ---------- StockUnit ----------
+        modelBuilder.Entity<StockUnit>(e =>
+        {
+            e.Property(x => x.SerialNumber).IsRequired().HasMaxLength(100);
+            e.HasIndex(x => x.SerialNumber).IsUnique();
+            e.Property(x => x.Status).IsRequired().HasMaxLength(30);
+
+            e.HasOne(x => x.Product)
+                .WithMany(p => p.StockUnits)
+                .HasForeignKey(x => x.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -298,6 +314,31 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
                 .WithMany()
                 .HasForeignKey(x => x.AdjustedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ---------- PricingTier ----------
+        modelBuilder.Entity<PricingTier>(e =>
+        {
+            e.Property(x => x.Name).IsRequired().HasMaxLength(100);
+            e.HasIndex(x => x.Name).IsUnique();
+        });
+
+        // ---------- ProductTierPrice ----------
+        modelBuilder.Entity<ProductTierPrice>(e =>
+        {
+            e.HasKey(x => new { x.ProductId, x.PricingTierId });
+
+            e.Property(x => x.Price).HasColumnType("decimal(18,2)");
+
+            e.HasOne(x => x.Product)
+                .WithMany(p => p.TierPrices)
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(x => x.Tier)
+                .WithMany(t => t.ProductTierPrices)
+                .HasForeignKey(x => x.PricingTierId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // ---------- AuditLog ----------
