@@ -13,7 +13,7 @@ public class Product : BaseEntity
     public Category Category { get; set; } = null!;
     public decimal CostPrice { get; set; }
     public decimal SalePrice { get; set; }
-    public string TaxClass { get; set; } = "standard"; // e.g., standard, reduced, zero
+    public TaxClass TaxClass { get; set; } = TaxClass.Standard;
     public string? ImageUrl { get; set; } // Supabase Storage URL
     public int ReorderThreshold { get; set; } = 5;
     public int WarrantyMonths { get; set; } = 12;
@@ -22,5 +22,17 @@ public class Product : BaseEntity
     public ICollection<ProductTierPrice> TierPrices { get; set; } = new List<ProductTierPrice>();
     public ICollection<SaleItem> SaleItems { get; set; } = new List<SaleItem>();
     public ICollection<InventoryAdjustment> InventoryAdjustments { get; set; } = new List<InventoryAdjustment>();
-	public int StockQuantity => StockUnits?.Count(u => u.Status == "InStock") ?? 0;
+
+    /// <summary>
+    /// On-hand quantity for products whose Category.RequiresSerialTracking is false (bulk
+    /// items — cables, chargers — where individual units aren't worth tracking one row
+    /// each). Written by StockController's bulk-receive endpoint and decremented directly
+    /// on sale. Stays 0 for serialized products; their quantity lives entirely in
+    /// StockUnits instead. Whether a product is bulk or serialized is decided by its
+    /// Category — the two tracking modes are never mixed for the same product.
+    /// </summary>
+    public int BulkQuantityOnHand { get; set; } = 0;
+
+    
+    public int StockQuantity => BulkQuantityOnHand + (StockUnits?.Count(u => u.Status == "InStock") ?? 0);
 }

@@ -1,3 +1,5 @@
+using Pos.Domain.Enums;
+
 namespace Pos.Api.Controllers;
 
 /// <summary>
@@ -14,7 +16,7 @@ public class ProductDtos
     public Guid CategoryId { get; set; }
     public string CategoryName { get; set; } = string.Empty;
     public decimal SalePrice { get; set; }
-    public string TaxClass { get; set; } = string.Empty;
+    public TaxClass TaxClass { get; set; }
     public int StockQuantity { get; set; }
     public string? ImageUrl { get; set; }
 }

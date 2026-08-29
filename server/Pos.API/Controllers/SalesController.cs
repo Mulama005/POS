@@ -148,8 +148,13 @@ public sealed class SalesController : ControllerBase
 
         // Load every requested product in one round trip; also catches duplicate-line
         // requests naturally since we key by ProductId below.
+        // Category is needed to tell bulk vs serialized products apart; StockUnits is
+        // needed both for the stock-sufficiency check (Product.StockQuantity reads it)
+        // and to actually select which unit(s) get marked Sold below.
         var productIds = request.Items.Select(i => i.ProductId).Distinct().ToList();
         var products = await _db.Products
+            .Include(p => p.Category)
+            .Include(p => p.StockUnits)
             .Where(p => productIds.Contains(p.Id))
             .ToDictionaryAsync(p => p.Id, cancellationToken);
 
@@ -174,6 +179,19 @@ public sealed class SalesController : ControllerBase
             if (item.DiscountAmount < 0)
             {
                 return BadRequest($"Discount cannot be negative for product {item.ProductId}.");
+            }
+
+            // Serialized products (phones, and anything else in a category with
+            // RequiresSerialTracking = true) are each an individually identified unit —
+            // "3 of this phone" on one line doesn't mean anything, since each one needs
+            // its own StockUnit marked Sold. The cashier should scan/add each unit as its
+            // own line instead.
+            var lineProduct = products[item.ProductId];
+            if (lineProduct.Category.RequiresSerialTracking && item.Quantity != 1)
+            {
+                return BadRequest(
+                    $"'{lineProduct.Name}' is serial-tracked — add each unit as its own line " +
+                    $"(quantity must be 1) instead of a quantity of {item.Quantity}.");
             }
         }
 
@@ -248,16 +266,51 @@ public sealed class SalesController : ControllerBase
                 : 0m;
             var finalLineAmount = Math.Round(afterLineDiscount - shareOfCartDiscount, 2, MidpointRounding.AwayFromZero);
 
-            var lineTax = product.TaxClass == "standard"
+            var lineTax = product.TaxClass == TaxClass.Standard
                 ? Math.Round(finalLineAmount - (finalLineAmount / (1 + StandardVatRate)), 2, MidpointRounding.AwayFromZero)
                 : 0m;
 
             var totalLineDiscount = rawAmount - finalLineAmount;
 
+            // Consume stock now, inside the same transaction the sale itself is saved in.
+            // Server picks which unit is sold rather than trusting itemRequest.StockUnitId —
+            // the client can't be relied on to pick a unit that's actually still InStock.
+            Guid? consumedStockUnitId = null;
+            if (product.Category.RequiresSerialTracking)
+            {
+                // Validated above to be exactly 1 for serialized lines.
+                var unitToSell = product.StockUnits
+                    .Where(u => u.Status == "InStock")
+                    .OrderBy(u => u.PurchaseDate ?? DateTime.MaxValue)
+                    .ThenBy(u => u.CreatedAt)
+                    .FirstOrDefault();
+
+                if (unitToSell is null)
+                {
+                    // The aggregate stock check above already confirmed enough units
+                    // exist — this only happens if two sales raced for the last unit of
+                    // the same product between that check and here.
+                    return Conflict(new
+                    {
+                        message = $"'{product.Name}' just sold out — no available unit left to sell.",
+                        productId = product.Id,
+                    });
+                }
+
+                unitToSell.Status = "Sold";
+                unitToSell.SaleDate = DateTime.UtcNow;
+                unitToSell.SalePrice = product.SalePrice;
+                consumedStockUnitId = unitToSell.Id;
+            }
+            else
+            {
+                product.BulkQuantityOnHand -= itemRequest.Quantity;
+            }
+
             var saleItem = new SaleItem
             {
                 ProductId = product.Id,
-                StockUnitId = itemRequest.StockUnitId,
+                StockUnitId = consumedStockUnitId,
                 Quantity = itemRequest.Quantity,
                 UnitPrice = product.SalePrice,
                 DiscountAmount = totalLineDiscount,
@@ -267,13 +320,11 @@ public sealed class SalesController : ControllerBase
             saleItems.Add(saleItem);
 
             itemResponses.Add(new SaleItemResponse(
-                product.Id, product.Name, itemRequest.StockUnitId, itemRequest.Quantity,
+                product.Id, product.Name, consumedStockUnitId, itemRequest.Quantity,
                 product.SalePrice, totalLineDiscount, lineTax, finalLineAmount));
 
             saleTaxTotal += lineTax;
             saleTotal += finalLineAmount;
-
-            //product.StockQuantity -= itemRequest.Quantity;
         }
 
         // --- Payments ---
