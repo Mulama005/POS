@@ -1,4 +1,6 @@
-﻿namespace Pos.Application.Features.Products;
+﻿using Pos.Domain.Enums;
+
+namespace Pos.Application.Features.Products;
 
 public class CreateProductRequest
 {
@@ -9,7 +11,7 @@ public class CreateProductRequest
     public Guid CategoryId { get; set; }
     public decimal CostPrice { get; set; }
     public decimal SalePrice { get; set; }
-    public string TaxClass { get; set; } = "standard";
+    public TaxClass TaxClass { get; set; } = TaxClass.Standard;
     public int ReorderThreshold { get; set; } = 5;
     public int WarrantyMonths { get; set; } = 12;
 }
