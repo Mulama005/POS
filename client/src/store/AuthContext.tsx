@@ -13,6 +13,7 @@ export interface AuthContextValue {
   status: AuthStatus
   user: AuthUser | null
   loginStage: LoginStage
+  accessToken: string | null
   pendingChallenge: LoginMfaRequiredResponse | null
   login: (email: string, password: string) => Promise<{ mfaRequired: boolean }>
   submitMfaCode: (code: string) => Promise<void>
@@ -136,12 +137,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     loginStage,
     pendingChallenge,
+    accessToken,
     login,
     submitMfaCode,
     cancelMfaStep,
     logout,
     refreshSession,
-  }), [status, user, loginStage, pendingChallenge, login, submitMfaCode, cancelMfaStep, logout, refreshSession])
+  }), [status, user, pendingChallenge, accessToken, login, submitMfaCode, cancelMfaStep, logout, refreshSession])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
