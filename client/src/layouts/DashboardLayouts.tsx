@@ -1,6 +1,7 @@
 ﻿import {type JSX, useState} from "react";
 import { Outlet, NavLink } from "react-router-dom";
-import { useAuth } from "../hooks/useAuth"; // adjust path to your actual AuthContext location
+import { useAuth } from "../hooks/useAuth";
+import LoadingScreen from "../components/LoadingScreen";
 import "./DashboardLayout.css";
 
 // ── Feather-style inline SVG icons ──────────────────────────────────────────
@@ -164,55 +165,54 @@ const NAV_BY_ROLE: Record<Role, NavGroup[]> = {
     ],
 };
 
-// ── Sidebar component ──────────────────────────────────────────────────────────
-function Sidebar({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
+// ── Sidebar component ──
+function Sidebar({ locked, onToggle, onHover }: { locked: boolean; onToggle: () => void; onHover: (hovering: boolean) => void }) {
     const { user } = useAuth();
     const rawRole = user?.role?.toLowerCase() ?? "cashier";
     const role: "cashier" | "manager" | "admin" = ["cashier", "manager", "admin"].includes(rawRole) ? (rawRole as any) : "cashier";
     const groups = NAV_BY_ROLE[role];
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+    const toggleGroup = (label: string) => setCollapsedGroups((prev) => ({ ...prev, [label]: !prev[label] }));
 
-    const toggleGroup = (label: string) =>
-        setCollapsedGroups((prev) => ({ ...prev, [label]: !prev[label] }));
+    // Determine dashboard path for logo link
+    const dashboardPath = role === "admin" ? "/dashboard/admin" : role === "manager" ? "/dashboard/manager" : "/checkout";
 
     return (
-        <aside className={`sidebar ${expanded ? "" : "collapsed"}`}>
-            <NavLink to={role === 'admin' ? '/dashboard/admin' : role === 'manager' ? '/dashboard/manager' : '/checkout'} className="logo-link">
-                <div className="logo-area">
-                    <div className="logo-icon"><Icon name="monitor" size={16} /></div>
-                    {expanded && (
-                        <div className="logo-text">
-                            <div className="brand">AyiyaPOS</div>
-                        </div>
-                    )}
+        <aside
+            className={`sidebar ${locked ? "locked" : ""}`}
+            onMouseEnter={() => onHover(true)}
+            onMouseLeave={() => onHover(false)}
+        >
+            {/* Logo area – wrapped in NavLink */}
+            <NavLink to={dashboardPath} className="logo-area" title="Go to Dashboard">
+                <div className="logo-icon"><Icon name="monitor" size={16} /></div>
+                <div className="logo-text">
+                    <div className="brand">AyiyaPOS</div>
+                    <div className="version">v4.2.1</div>
                 </div>
             </NavLink>
 
+            {/* Navigation */}
             <nav className="nav">
                 {groups.map((group) => {
                     const isCollapsed = collapsedGroups[group.label];
                     return (
                         <div key={group.label} className="group">
-                            {expanded && (
-                                <button className="group-label" onClick={() => toggleGroup(group.label)}>
-                                    {group.label}
-                                    <span className={`chevron ${isCollapsed ? "closed" : "open"}`}>
-                    <Icon name="chevronDown" size={12} />
-                  </span>
-                                </button>
-                            )}
-                            {(!isCollapsed || !expanded) &&
+                            <button className="group-label" onClick={() => toggleGroup(group.label)}>
+                                {group.label}
+                                <span className={`chevron ${isCollapsed ? "closed" : "open"}`}>
+                  <Icon name="chevronDown" size={12} />
+                </span>
+                            </button>
+                            {!isCollapsed &&
                                 group.items.map((item) => (
                                     <NavLink
                                         key={item.id}
                                         to={item.path}
-                                        title={!expanded ? item.label : undefined}
-                                        className={({ isActive }) =>
-                                            `nav-link ${isActive ? "active" : ""}`
-                                        }
+                                        className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
                                     >
                                         <span className="icon"><Icon name={item.icon} size={16} /></span>
-                                        {expanded && <span className="label">{item.label}</span>}
+                                        <span className="label">{item.label}</span>
                                     </NavLink>
                                 ))}
                         </div>
@@ -220,9 +220,10 @@ function Sidebar({ expanded, onToggle }: { expanded: boolean; onToggle: () => vo
                 })}
             </nav>
 
+            {/* Toggle button – locks/unlocks the sidebar */}
             <div className="toggle-area">
-                <button className="toggle-btn" onClick={onToggle} title={expanded ? "Collapse sidebar" : "Expand sidebar"}>
-                    <Icon name={expanded ? "chevronLeft" : "chevronRight"} size={14} />
+                <button className="toggle-btn" onClick={onToggle} title={locked ? "Collapse sidebar" : "Expand sidebar"}>
+                    <Icon name={locked ? "chevronLeft" : "chevronRight"} size={14} />
                 </button>
             </div>
         </aside>
@@ -263,13 +264,28 @@ function TopBar() {
 }
 
 export default function DashboardLayout() {
-    const [sidebarExpanded, setSidebarExpanded] = useState(true);
+    const [locked, setLocked] = useState(false); // false = auto‑hide; true = always expanded
+    const [hovering, setHovering] = useState(false);
+    const { status } = useAuth();
+
+    if (status === 'loading') {
+        return <LoadingScreen message="Authenticating..." />;
+    }
+
+    const isExpanded = locked || hovering;
+
     return (
         <div className="dashboard-layout">
-            <Sidebar expanded={sidebarExpanded} onToggle={() => setSidebarExpanded((v) => !v)} />
-            <div className="main">
+            <Sidebar
+                locked={locked}
+                onToggle={() => setLocked((v) => !v)}
+                onHover={setHovering}
+            />
+            <div className={`main ${isExpanded ? "sidebar-expanded" : "sidebar-collapsed"}`}>
                 <TopBar />
-                <main className="page-content"><Outlet /></main>
+                <main className="page-content">
+                    <Outlet />
+                </main>
             </div>
         </div>
     );

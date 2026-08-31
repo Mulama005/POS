@@ -29,6 +29,7 @@ import { formatKes } from '../utils/currency'
 import { queueSale } from '../offline/actionQueue'
 import { isNetworkError } from '../utils/networkError'
 import { buildProvisionalReceipt } from '../utils/buildProvisionalReceipt'
+import LoadingScreen from "../components/LoadingScreen";
 import './CheckoutPage.css'
 
 function getErrorMessage(err: unknown, fallback: string): string {
@@ -311,7 +312,7 @@ export function CheckoutPage() {
   }
 
   if (!cart || !totals) {
-    return <div className="checkout-screen">Loading checkout…</div>
+      return <LoadingScreen message="Loading checkout…" />;
   }
 
   return (

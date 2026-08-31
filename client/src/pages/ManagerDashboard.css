@@ -547,3 +547,13 @@
     font-family: var(--pos-font-mono, monospace);
     color: var(--pos-ink-muted);
 }
+/* ── Glass cards ── */
+.manager-dashboard .kpi-card,
+.manager-dashboard .panel {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}

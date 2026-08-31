@@ -1,5 +1,24 @@
 ﻿/* DashboardLayout.css – dark sidebar + light content */
+.page-content {
+    flex: 1;
+    overflow: auto;
+    padding: 24px 32px;
+    background-image: url('../../public/background.png'); /* change path as needed */
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    position: relative;
+    isolation: isolate;
+}
 
+/* Overlay to keep text readable */
+.page-content::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.15); /* adjust opacity to your liking */
+    z-index: -1;
+}
 .dashboard-layout {
     display: flex;
     height: 100%;
@@ -7,10 +26,10 @@
     font-family: 'Inter', system-ui, sans-serif;
 }
 
-/* --- Sidebar (dark) --- */
-.dashboard-layout .sidebar {
-    width: 240px;
-    min-width: 240px;
+/* ── Sidebar (dark) ── */
+.sidebar {
+    width: 64px;
+    min-width: 64px;
     background: #0f172a;
     border-right: 1px solid #1e293b;
     transition: width 200ms ease, min-width 200ms ease;
@@ -19,13 +38,29 @@
     overflow: hidden;
     position: relative;
     z-index: 20;
-}
-.dashboard-layout .sidebar.collapsed {
-    width: 64px;
-    min-width: 64px;
+    height: 100vh;
+    position: sticky;
+    top: 0;
 }
 
-.dashboard-layout .sidebar .logo-area {
+/* Expand on hover (when not locked) */
+.sidebar:hover {
+    width: 240px;
+    min-width: 240px;
+}
+
+/* But if locked, always expanded */
+.sidebar.locked {
+    width: 240px;
+    min-width: 240px;
+}
+.sidebar.locked:hover {
+    width: 240px;
+    min-width: 240px;
+}
+
+/* Logo area */
+.sidebar .logo-area {
     height: 64px;
     display: flex;
     align-items: center;
@@ -34,82 +69,32 @@
     gap: 10px;
     flex-shrink: 0;
 }
-.dashboard-layout .sidebar.collapsed .logo-area {
-    padding: 0;
-    justify-content: center;
-}
-.dashboard-layout .sidebar .logo-area .logo-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.sidebar .logo-area .logo-icon {
     flex-shrink: 0;
 }
-.dashboard-layout .sidebar .logo-area .logo-text {
+.sidebar .logo-area .logo-text {
     overflow: hidden;
+    white-space: nowrap;
 }
-.dashboard-layout .sidebar.collapsed .logo-area .logo-text {
+.sidebar:not(:hover):not(.locked) .logo-area .logo-text {
     display: none;
 }
-.dashboard-layout .sidebar .logo-area .logo-text .brand {
-    color: #f1f5f9;
-    font-weight: 700;
-    font-size: 15px;
-    letter-spacing: -0.02em;
-    white-space: nowrap;
-}
-.dashboard-layout .sidebar .logo-area .logo-text .version {
-    color: #475569;
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    white-space: nowrap;
-}
 
-.dashboard-layout .sidebar .nav {
+/* Navigation */
+.sidebar .nav {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
     padding: 12px 0;
 }
-.dashboard-layout .sidebar .nav .group {
-    margin-bottom: 4px;
+.sidebar .nav .group .group-label {
+    display: none; /* hide group labels when collapsed */
 }
-.dashboard-layout .sidebar .nav .group .group-label {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 16px;
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: #475569;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    margin-bottom: 2px;
+.sidebar:hover .nav .group .group-label,
+.sidebar.locked .nav .group .group-label {
+    display: flex; /* show on hover or locked */
 }
-.dashboard-layout .sidebar.collapsed .nav .group .group-label {
-    display: none;
-}
-.dashboard-layout .sidebar .nav .group .group-label .chevron {
-    color: #334155;
-    transition: transform 150ms;
-}
-.dashboard-layout .sidebar .nav .group .group-label .chevron.open {
-    transform: rotate(0deg);
-}
-.dashboard-layout .sidebar .nav .group .group-label .chevron.closed {
-    transform: rotate(-90deg);
-}
-
-.dashboard-layout .sidebar .nav .group .nav-link {
+.sidebar .nav .group .nav-link {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -129,37 +114,34 @@
     text-decoration: none;
     width: 100%;
 }
-.dashboard-layout .sidebar.collapsed .nav .group .nav-link {
-    padding: 9px 0;
-    justify-content: center;
+.sidebar .nav .group .nav-link .label {
+    display: none;
 }
-.dashboard-layout .sidebar .nav .group .nav-link:hover {
-    background: #1e293b;
-    color: #cbd5e1;
+.sidebar:hover .nav .group .nav-link .label,
+.sidebar.locked .nav .group .nav-link .label {
+    display: inline; /* show label on hover or locked */
 }
-.dashboard-layout .sidebar .nav .group .nav-link.active {
+.sidebar .nav .group .nav-link .icon {
+    flex-shrink: 0;
+}
+.sidebar .nav .group .nav-link.active {
     background: rgba(99, 102, 241, 0.15);
     color: #e0e7ff;
     border-left-color: #6366f1;
     font-weight: 600;
 }
-.dashboard-layout .sidebar .nav .group .nav-link .icon {
-    flex-shrink: 0;
-}
-.dashboard-layout .sidebar.collapsed .nav .group .nav-link .label {
-    display: none;
-}
 
-.dashboard-layout .sidebar .toggle-area {
+/* Toggle button */
+.sidebar .toggle-area {
     border-top: 1px solid #1e293b;
     padding: 12px 0;
     display: flex;
     justify-content: flex-end;
 }
-.dashboard-layout .sidebar.collapsed .toggle-area {
+.sidebar:not(:hover):not(.locked) .toggle-area {
     justify-content: center;
 }
-.dashboard-layout .sidebar .toggle-area .toggle-btn {
+.sidebar .toggle-area .toggle-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -173,13 +155,49 @@
     color: #475569;
     transition: background 150ms, color 150ms;
 }
-.dashboard-layout .sidebar.collapsed .toggle-area .toggle-btn {
+.sidebar:not(:hover):not(.locked) .toggle-area .toggle-btn {
     margin-right: 0;
 }
-.dashboard-layout .sidebar .toggle-area .toggle-btn:hover {
+.sidebar .toggle-area .toggle-btn:hover {
     background: #1e293b;
     color: #94a3b8;
 }
+.sidebar .logo-area {
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    height: 64px;
+    border-bottom: 1px solid #1e293b;
+    gap: 10px;
+    flex-shrink: 0;
+    text-decoration: none; /* remove underline */
+    color: inherit; /* keep text colour */
+}
+.sidebar .logo-area:hover {
+    background: rgba(255,255,255,0.05);
+}
+.sidebar:not(:hover):not(.locked) .logo-area .logo-text {
+    display: none;
+}
+
+/* ── Main content (light) ── */
+.main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+    transition: margin-left 200ms ease;
+}
+.main.sidebar-collapsed {
+    margin-left: 0;
+}
+.main.sidebar-expanded {
+    margin-left: 0; /* since sidebar is sticky and overlay, no margin needed */
+}
+
+/* Actually, since sidebar is sticky, we don't need margin – it overlays. 
+   We'll keep main with 100% width. */
 
 /* --- Main content (light) --- */
 .dashboard-layout .main {

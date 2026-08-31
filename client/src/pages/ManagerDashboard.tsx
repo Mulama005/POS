@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
+import LoadingScreen from "../components/LoadingScreen";
 import "./ManagerDashboard.css";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -244,11 +245,7 @@ export default function ManagerDashboard() {
     };
 
     if (loading) {
-        return (
-            <div className="min-h-full bg-[#080b10] flex items-center justify-center">
-                <div className="text-[#e8edf5] text-lg font-mono">Loading dashboard...</div>
-            </div>
-        );
+        return <LoadingScreen message="Loading manager dashboard..." />;
     }
 
     if (error || !summary) {
