@@ -334,3 +334,14 @@
 .admin-dashboard .audit-table tbody td .level-badge.info { color: #6b7280; }
 .admin-dashboard .audit-table tbody td .level-badge.warn { color: #f59e0b; }
 .admin-dashboard .audit-table tbody td .level-badge.error { color: #ef4444; }
+/* ── Glass cards ── */
+.admin-dashboard .health-score-panel,
+.admin-dashboard .service-card,
+.admin-dashboard .audit-panel {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}

@@ -1,3 +1,21 @@
+/* ── Background image for all pages ── */
+.page-content {
+    background-image: url('../public/background.png'); /* or external URL */
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed; /* fixed background */
+    position: relative;
+    isolation: isolate; /* create stacking context */
+}
+
+/* Overlay to make text readable */
+.page-content::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.85); /* adjust opacity as needed */
+    z-index: -1;
+}
 :root {
   --text: #6b6375;
   --text-h: #08060d;
@@ -127,4 +145,11 @@ code {
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);
+}
+.card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
 }

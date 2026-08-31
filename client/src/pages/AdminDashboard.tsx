@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
+import LoadingScreen from "../components/LoadingScreen";
 import "./AdminDashboard.css";
 
 type StatusLevel = "ok" | "warn" | "error";
@@ -204,7 +205,7 @@ export default function AdminDashboard() {
     const errCount = services.filter((s) => s.status === "error").length;
 
     if (loading) {
-        return <div className="dashboard-loader">Loading dashboard...</div>;
+        return <LoadingScreen message="Loading dashboard..." />;
     }
 
     if (error) {
