@@ -29,8 +29,13 @@ public static class DependencyInjection
         services.AddSingleton<IDiscountApprovalStore, MemoryCacheDiscountApprovalStore>();
 
         // --- File storage ---
+        // AddHttpClient<TClient,TImplementation> already fully registers IStorageService with
+        // a properly wired HttpClient — a second AddScoped<IStorageService, ...> here used to
+        // overwrite that registration ("last registration wins"), silently handing
+        // SupabaseStorageService a bare, unconfigured default HttpClient instead. That's what
+        // caused uploads to fail with "invalid request URI... BaseAddress must be set" even
+        // when Supabase:Url was configured correctly.
         services.AddHttpClient<IStorageService, SupabaseStorageService>();
-        services.AddScoped<IStorageService, SupabaseStorageService>();
 
         // --- Email ---
         services.AddScoped<IEmailSender, ConsoleEmailSender>();

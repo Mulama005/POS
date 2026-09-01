@@ -1,349 +1,344 @@
-﻿/* DashboardLayout.css – dark sidebar + light content */
-.page-content {
-    flex: 1;
-    overflow: auto;
-    padding: 24px 32px;
-    background-image: url('../../public/background.png'); /* change path as needed */
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    position: relative;
-    isolation: isolate;
-}
+/* DashboardLayout.css — the app shell. Deep forest green chrome (sidebar +
+   topbar unified as one dark band), brass/amber as the metal-trim accent,
+   light paper content underneath. The shell doesn't introduce a foreign
+   palette — it's the brand's own accent taken to its darkest register,
+   like a ledger's leather cover. One signature flourish (the brass
+   barcode mark) instead of scattered decoration. */
 
-/* Overlay to keep text readable */
-.page-content::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.15); /* adjust opacity to your liking */
-    z-index: -1;
-}
 .dashboard-layout {
-    display: flex;
-    height: 100%;
-    overflow: hidden;
-    font-family: 'Inter', system-ui, sans-serif;
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--pos-font-body);
 }
 
-/* ── Sidebar (dark) ── */
-.sidebar {
-    width: 64px;
-    min-width: 64px;
-    background: #0f172a;
-    border-right: 1px solid #1e293b;
-    transition: width 200ms ease, min-width 200ms ease;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    position: relative;
-    z-index: 20;
-    height: 100vh;
-    position: sticky;
-    top: 0;
+/* --- Sidebar --- */
+.dashboard-layout .sidebar {
+  width: 232px;
+  min-width: 232px;
+  background: var(--pos-shell-bg);
+  border-right: 1px solid var(--pos-shell-border);
+  transition: width 200ms ease, min-width 200ms ease;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  z-index: 20;
+}
+.dashboard-layout .sidebar.collapsed {
+  width: 64px;
+  min-width: 64px;
 }
 
-/* Expand on hover (when not locked) */
-.sidebar:hover {
-    width: 240px;
-    min-width: 240px;
+.dashboard-layout .sidebar .logo-link {
+  text-decoration: none;
+  color: inherit;
 }
 
-/* But if locked, always expanded */
-.sidebar.locked {
-    width: 240px;
-    min-width: 240px;
+.dashboard-layout .sidebar .logo-area {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--pos-shell-border);
+  gap: 12px;
+  flex-shrink: 0;
 }
-.sidebar.locked:hover {
-    width: 240px;
-    min-width: 240px;
+.dashboard-layout .sidebar.collapsed .logo-area {
+  padding: 0;
+  justify-content: center;
 }
-
-/* Logo area */
-.sidebar .logo-area {
-    height: 64px;
-    display: flex;
-    align-items: center;
-    padding: 0 16px;
-    border-bottom: 1px solid #1e293b;
-    gap: 10px;
-    flex-shrink: 0;
+.dashboard-layout .sidebar .logo-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
-.sidebar .logo-area .logo-icon {
-    flex-shrink: 0;
+.dashboard-layout .sidebar .logo-text {
+  overflow: hidden;
 }
-.sidebar .logo-area .logo-text {
-    overflow: hidden;
-    white-space: nowrap;
+.dashboard-layout .sidebar.collapsed .logo-text {
+  display: none;
 }
-.sidebar:not(:hover):not(.locked) .logo-area .logo-text {
-    display: none;
-}
-
-/* Navigation */
-.sidebar .nav {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 12px 0;
-}
-.sidebar .nav .group .group-label {
-    display: none; /* hide group labels when collapsed */
-}
-.sidebar:hover .nav .group .group-label,
-.sidebar.locked .nav .group .group-label {
-    display: flex; /* show on hover or locked */
-}
-.sidebar .nav .group .nav-link {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 9px 16px;
-    justify-content: flex-start;
-    background: transparent;
-    border: none;
-    border-left: 3px solid transparent;
-    cursor: pointer;
-    color: #94a3b8;
-    font-size: 14px;
-    font-weight: 400;
-    transition: background 150ms, color 150ms;
-    text-align: left;
-    white-space: nowrap;
-    overflow: hidden;
-    text-decoration: none;
-    width: 100%;
-}
-.sidebar .nav .group .nav-link .label {
-    display: none;
-}
-.sidebar:hover .nav .group .nav-link .label,
-.sidebar.locked .nav .group .nav-link .label {
-    display: inline; /* show label on hover or locked */
-}
-.sidebar .nav .group .nav-link .icon {
-    flex-shrink: 0;
-}
-.sidebar .nav .group .nav-link.active {
-    background: rgba(99, 102, 241, 0.15);
-    color: #e0e7ff;
-    border-left-color: #6366f1;
-    font-weight: 600;
+.dashboard-layout .sidebar .logo-text .brand {
+  font-family: var(--pos-font-display);
+  color: var(--pos-shell-ink);
+  font-weight: 700;
+  font-size: 15.5px;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
 }
 
-/* Toggle button */
-.sidebar .toggle-area {
-    border-top: 1px solid #1e293b;
-    padding: 12px 0;
-    display: flex;
-    justify-content: flex-end;
+/* --- Nav --- */
+.dashboard-layout .sidebar .nav {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 14px 0;
 }
-.sidebar:not(:hover):not(.locked) .toggle-area {
-    justify-content: center;
+.dashboard-layout .sidebar .nav .group {
+  margin-bottom: 6px;
 }
-.sidebar .toggle-area .toggle-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    margin-right: 12px;
-    border-radius: 6px;
-    background: none;
-    border: 1px solid #1e293b;
-    cursor: pointer;
-    color: #475569;
-    transition: background 150ms, color 150ms;
+.dashboard-layout .sidebar .nav .group-label {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: none;
+  border: none;
+  font-family: var(--pos-font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pos-shell-ink-muted);
+  padding: 8px 20px 6px;
+  cursor: pointer;
 }
-.sidebar:not(:hover):not(.locked) .toggle-area .toggle-btn {
-    margin-right: 0;
+.dashboard-layout .sidebar .nav .group-label .chevron {
+  display: inline-flex;
+  transition: transform 150ms ease;
 }
-.sidebar .toggle-area .toggle-btn:hover {
-    background: #1e293b;
-    color: #94a3b8;
-}
-.sidebar .logo-area {
-    display: flex;
-    align-items: center;
-    padding: 0 16px;
-    height: 64px;
-    border-bottom: 1px solid #1e293b;
-    gap: 10px;
-    flex-shrink: 0;
-    text-decoration: none; /* remove underline */
-    color: inherit; /* keep text colour */
-}
-.sidebar .logo-area:hover {
-    background: rgba(255,255,255,0.05);
-}
-.sidebar:not(:hover):not(.locked) .logo-area .logo-text {
-    display: none;
+.dashboard-layout .sidebar .nav .group-label .chevron.closed {
+  transform: rotate(-90deg);
 }
 
-/* ── Main content (light) ── */
-.main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    min-width: 0;
-    transition: margin-left 200ms ease;
+.dashboard-layout .sidebar .nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  margin: 2px 10px;
+  border-radius: 7px;
+  color: var(--pos-shell-ink-muted);
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 500;
+  border-left: 3px solid transparent;
+  transition: background 120ms ease, color 120ms ease;
 }
-.main.sidebar-collapsed {
-    margin-left: 0;
+.dashboard-layout .sidebar.collapsed .nav-link {
+  margin: 2px 10px;
+  padding: 10px 0;
+  justify-content: center;
 }
-.main.sidebar-expanded {
-    margin-left: 0; /* since sidebar is sticky and overlay, no margin needed */
+.dashboard-layout .sidebar .nav-link .icon {
+  display: flex;
+  flex-shrink: 0;
+}
+.dashboard-layout .sidebar .nav-link:hover {
+  background: rgba(240, 237, 227, 0.06);
+  color: var(--pos-shell-ink);
+}
+.dashboard-layout .sidebar .nav-link.active {
+  background: var(--pos-shell-accent-soft);
+  color: var(--pos-shell-ink);
+  font-weight: 600;
+  border-left-color: var(--pos-shell-accent);
+}
+.dashboard-layout .sidebar .nav-link.active .icon {
+  color: var(--pos-shell-accent);
 }
 
-/* Actually, since sidebar is sticky, we don't need margin – it overlays. 
-   We'll keep main with 100% width. */
+/* --- Sidebar collapse toggle --- */
+.dashboard-layout .sidebar .toggle-area {
+  border-top: 1px solid var(--pos-shell-border);
+  padding: 10px;
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+.dashboard-layout .sidebar.collapsed .toggle-area {
+  justify-content: center;
+}
+.dashboard-layout .sidebar .toggle-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--pos-shell-border);
+  background: transparent;
+  color: var(--pos-shell-ink-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.dashboard-layout .sidebar .toggle-btn:hover {
+  color: var(--pos-shell-ink);
+  border-color: var(--pos-shell-accent);
+}
 
-/* --- Main content (light) --- */
+/* --- Main column --- */
 .dashboard-layout .main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
 }
 
-/* Top bar (light) */
+/* --- Topbar — same dark chrome as the sidebar, so the shell reads as one
+   continuous band around the light content rather than two different
+   surfaces. --- */
 .dashboard-layout .topbar {
-    height: 64px;
-    min-height: 64px;
-    background: #ffffff;
-    border-bottom: 1px solid #e2e8f0;
-    display: flex;
-    align-items: center;
-    padding: 0 24px;
-    gap: 16px;
-    justify-content: space-between;
+  height: 60px;
+  flex-shrink: 0;
+  background: var(--pos-shell-bg);
+  border-bottom: 1px solid var(--pos-shell-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  position: relative;
 }
+/* Barcode-rhythm signature, echoed here in brass as the shell's one edge
+   flourish — the same motif as the sidebar logo mark. */
+.dashboard-layout .topbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 3px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--pos-shell-brass) 0px, var(--pos-shell-brass) 2px,
+    transparent 2px, transparent 6px,
+    var(--pos-shell-brass) 6px, var(--pos-shell-brass) 7px,
+    transparent 7px, transparent 12px,
+    var(--pos-shell-brass) 12px, var(--pos-shell-brass) 15px,
+    transparent 15px, transparent 19px
+  );
+  opacity: 0.6;
+}
+
 .dashboard-layout .topbar .left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
-.dashboard-layout .topbar .left .register-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: #f1f5f9;
-    border-radius: 6px;
-    padding: 4px 10px;
-    font-size: 13px;
-    font-weight: 500;
-    color: #475569;
+.dashboard-layout .topbar .register-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--pos-font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pos-shell-ink-muted);
+  background: var(--pos-shell-bg-raised);
+  border: 1px solid var(--pos-shell-border);
+  border-radius: 5px;
+  padding: 4px 9px;
 }
-.dashboard-layout .topbar .left .online-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: #f0fdf4;
-    border-radius: 6px;
-    padding: 4px 10px;
-    font-size: 12px;
-    font-weight: 600;
-    color: #15803d;
-    letter-spacing: 0.03em;
+.dashboard-layout .topbar .online-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pos-shell-accent);
 }
-.dashboard-layout .topbar .left .online-badge .dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #22c55e;
-    display: inline-block;
+.dashboard-layout .topbar .online-badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pos-shell-accent);
+  box-shadow: 0 0 6px rgba(52, 163, 95, 0.6);
 }
 
 .dashboard-layout .topbar .right {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
-.dashboard-layout .topbar .right .notif-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    background: none;
-    border: 1px solid #e2e8f0;
-    cursor: pointer;
-    color: #64748b;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
+.dashboard-layout .topbar .user-block {
+  display: flex;
+  align-items: center;
+  gap: 9px;
 }
-.dashboard-layout .topbar .right .notif-btn .notif-dot {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: #ef4444;
-    border: 1.5px solid #fff;
+.dashboard-layout .topbar .avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(209, 154, 58, 0.18);
+  color: var(--pos-shell-brass);
+  font-family: var(--pos-font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid rgba(209, 154, 58, 0.35);
 }
-.dashboard-layout .topbar .right .user-block {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+.dashboard-layout .topbar .user-info .name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pos-shell-ink);
+  line-height: 1.3;
 }
-.dashboard-layout .topbar .right .user-block .avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    flex-shrink: 0;
+.dashboard-layout .topbar .user-info .role {
+  font-size: 11px;
+  color: var(--pos-shell-ink-muted);
+  line-height: 1.3;
 }
-.dashboard-layout .topbar .right .user-block .user-info .name {
-    font-size: 13px;
-    font-weight: 600;
-    color: #1e293b;
-    line-height: 1.3;
+.dashboard-layout .topbar .divider {
+  width: 1px;
+  height: 24px;
+  background: var(--pos-shell-border);
 }
-.dashboard-layout .topbar .right .user-block .user-info .role {
-    font-size: 11px;
-    color: #94a3b8;
-    font-weight: 500;
-    text-transform: capitalize;
+.dashboard-layout .topbar .logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--pos-font-body);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pos-shell-ink-muted);
+  background: transparent;
+  border: 1px solid var(--pos-shell-border);
+  border-radius: 6px;
+  padding: 7px 12px;
+  cursor: pointer;
 }
-.dashboard-layout .topbar .right .divider {
-    width: 1px;
-    height: 28px;
-    background: #e2e8f0;
-}
-.dashboard-layout .topbar .right .logout-btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 14px;
-    border-radius: 7px;
-    background: none;
-    border: 1px solid #e2e8f0;
-    cursor: pointer;
-    color: #64748b;
-    font-size: 13px;
-    font-weight: 500;
-    transition: background 150ms, border-color 150ms, color 150ms;
-}
-.dashboard-layout .topbar .right .logout-btn:hover {
-    background: #fff1f2;
-    border-color: #fca5a5;
-    color: #ef4444;
+.dashboard-layout .topbar .logout-btn:hover {
+  color: #e8837a;
+  border-color: rgba(232, 131, 122, 0.4);
 }
 
-/* Page content */
+/* --- Page content --- */
+/* No padding here on purpose — every page manages its own top-level
+   padding already. */
 .dashboard-layout .page-content {
-    flex: 1;
-    overflow: auto;
-    background: var(--pos-bg);
-    padding: 24px 32px;
+  flex: 1;
+  overflow: auto;
+  background: var(--pos-bg);
+}
+
+/* --- Responsive --- */
+@media (max-width: 900px) {
+  .dashboard-layout .sidebar {
+    width: 64px;
+    min-width: 64px;
+  }
+  .dashboard-layout .sidebar .logo-text,
+  .dashboard-layout .sidebar .group-label,
+  .dashboard-layout .sidebar .nav-link .label {
+    display: none;
+  }
+  .dashboard-layout .sidebar .nav-link {
+    justify-content: center;
+    padding: 10px 0;
+  }
+  .dashboard-layout .topbar .user-info {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-layout .sidebar,
+  .dashboard-layout .sidebar .nav-link,
+  .dashboard-layout .sidebar .nav .group-label .chevron {
+    transition: none;
+  }
 }

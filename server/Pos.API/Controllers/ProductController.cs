@@ -118,7 +118,8 @@ public class ProductsController : ControllerBase
         {
             using var stream = image.OpenReadStream();
 			var fileName = $"{product.Id}_{Guid.NewGuid()}{Path.GetExtension(image.FileName)}";
-			product.ImageUrl = await _storageService.UploadFileAsync(stream, fileName);
+			product.ImageUrl = await _storageService.UploadFileAsync(
+				stream, fileName, string.IsNullOrWhiteSpace(image.ContentType) ? "application/octet-stream" : image.ContentType);
         }
 
         _context.Products.Add(product);

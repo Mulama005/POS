@@ -1,347 +1,155 @@
-﻿/* AdminDashboard.css – light theme, using --pos-* variables */
-
-.admin-dashboard {
-    min-height: 100%;
-    padding: 32px;
-    background: var(--pos-bg);
-    color: var(--pos-ink);
-    font-family: 'Inter', system-ui, sans-serif;
+﻿.admin-dashboard {
+  padding: 32px 40px 48px;
+  font-family: var(--pos-font-body);
+  color: var(--pos-ink);
+  max-width: 1000px;
 }
 
-.admin-dashboard .header {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 32px;
+.adm-loading,
+.adm-error-screen {
+  padding: 80px 40px;
+  text-align: center;
+  color: var(--pos-ink-muted);
 }
-@media (min-width: 640px) {
-    .admin-dashboard .header {
-        flex-direction: row;
-        align-items: center;
-        justify-content: space-between;
-    }
+.adm-error-screen p {
+  color: var(--pos-danger);
+  margin-bottom: 12px;
 }
-
-.admin-dashboard .header-left {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-.admin-dashboard .header-left .system-label {
-    font-size: 10px;
-    font-weight: 600;
-    font-family: var(--pos-font-mono, monospace);
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: var(--pos-ink-muted);
-}
-.admin-dashboard .header-left h1 {
-    font-size: 24px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    margin: 0;
-    color: var(--pos-ink);
+.adm-error-screen button {
+  font-family: var(--pos-font-body);
+  font-weight: 600;
+  font-size: 14px;
+  color: #fff;
+  background: var(--pos-accent);
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
 }
 
-.admin-dashboard .header-right {
-    display: flex;
-    align-items: center;
-    gap: 24px;
+.adm-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
 }
-.admin-dashboard .header-right .status-badges {
-    display: flex;
-    gap: 12px;
-    font-size: 11px;
-    font-family: var(--pos-font-mono, monospace);
+.adm-header h1 {
+  font-family: var(--pos-font-display);
+  font-size: 22px;
+  margin: 0;
 }
-.admin-dashboard .header-right .status-badges .badge {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-.admin-dashboard .header-right .status-badges .badge .dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    display: inline-block;
-}
-.admin-dashboard .header-right .status-badges .badge.ok .dot { background: #22c55e; }
-.admin-dashboard .header-right .status-badges .badge.ok { color: #22c55e; }
-.admin-dashboard .header-right .status-badges .badge.warn .dot { background: #f59e0b; }
-.admin-dashboard .header-right .status-badges .badge.warn { color: #f59e0b; }
-.admin-dashboard .header-right .status-badges .badge.err .dot { background: #ef4444; }
-.admin-dashboard .header-right .status-badges .badge.err { color: #ef4444; }
-
-.admin-dashboard .header-right .timestamp {
-    font-size: 10px;
-    font-family: var(--pos-font-mono, monospace);
-    color: var(--pos-ink-muted);
-    border: 1px solid var(--pos-border);
-    border-radius: 4px;
-    padding: 2px 8px;
-    background: var(--pos-surface);
+.adm-timestamp {
+  font-family: var(--pos-font-mono);
+  font-size: 12px;
+  color: var(--pos-ink-muted);
 }
 
-/* Health & services grid */
-.admin-dashboard .health-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 20px;
-    margin-bottom: 24px;
+.adm-summary-line {
+  padding: 14px 0 18px;
+  border-top: 2px solid var(--pos-ink);
+  border-bottom: 1px solid var(--pos-border);
+  margin-bottom: 28px;
+  font-family: var(--pos-font-mono);
+  font-size: 13px;
+  font-weight: 600;
 }
-@media (min-width: 1024px) {
-    .admin-dashboard .health-grid {
-        grid-template-columns: auto 1fr;
-    }
+.adm-summary-line .sep {
+  margin: 0 10px;
+  color: var(--pos-ink-muted);
+  font-weight: 400;
+  opacity: 0.6;
 }
-
-.admin-dashboard .health-score-panel {
-    background: var(--pos-surface);
-    border: 1px solid var(--pos-border);
-    border-radius: 8px;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    min-width: 180px;
-}
-.admin-dashboard .health-score-panel .label {
-    font-size: 10px;
-    font-weight: 600;
-    font-family: var(--pos-font-mono, monospace);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--pos-ink-muted);
-}
-.admin-dashboard .health-score-panel .score-wrapper {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 16px 0;
-}
-.admin-dashboard .health-score-panel .score-footer {
-    font-size: 10px;
-    font-family: var(--pos-font-mono, monospace);
-    color: var(--pos-ink-muted);
-    border-top: 1px solid var(--pos-border);
-    padding-top: 12px;
+.adm-summary-line > span:last-child {
+  color: var(--pos-ink-muted);
+  font-weight: 400;
 }
 
-.admin-dashboard .service-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+.tone-success { color: var(--pos-success); }
+.tone-warn { color: var(--pos-warn); }
+.tone-danger { color: var(--pos-danger); }
+
+.adm-section {
+  margin-bottom: 32px;
 }
-@media (min-width: 768px) {
-    .admin-dashboard .service-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
+.adm-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
 }
-@media (min-width: 1280px) {
-    .admin-dashboard .service-grid {
-        grid-template-columns: repeat(5, 1fr);
-    }
+.adm-section-header h2 {
+  font-family: var(--pos-font-display);
+  font-size: 14.5px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.adm-section-count {
+  font-family: var(--pos-font-mono);
+  font-size: 11.5px;
+  color: var(--pos-ink-muted);
+}
+.adm-empty {
+  font-size: 13px;
+  color: var(--pos-ink-muted);
+  padding: 8px 0;
 }
 
-.admin-dashboard .service-card {
-    background: var(--pos-surface);
-    border: 1px solid var(--pos-border);
-    border-radius: 8px;
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    transition: border-color 0.15s;
+/* --- Audit log: a running ledger, not a bordered table. Monospace
+   timestamps lead each row the way a logbook would. --- */
+.adm-log {
+  display: flex;
+  flex-direction: column;
 }
-.admin-dashboard .service-card:hover {
-    border-color: #d0ccc0;
+.adm-log-row {
+  display: grid;
+  grid-template-columns: 150px 120px 140px 1fr 56px;
+  gap: 12px;
+  align-items: baseline;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--pos-border);
+  font-size: 12.5px;
 }
-.admin-dashboard .service-card .card-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 8px;
+.adm-log-row:last-child {
+  border-bottom: none;
 }
-.admin-dashboard .service-card .card-header .service-label {
-    font-size: 11px;
-    font-weight: 600;
-    font-family: var(--pos-font-mono, monospace);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--pos-ink-muted);
-    line-height: 1.2;
+.adm-log-ts {
+  font-family: var(--pos-font-mono);
+  color: var(--pos-ink-muted);
+  font-size: 11.5px;
 }
-.admin-dashboard .service-card .card-header .icon {
-    flex-shrink: 0;
+.adm-log-user {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
 }
-.admin-dashboard .service-card .status-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: auto;
+.adm-log-action {
+  font-family: var(--pos-font-mono);
+  font-size: 11px;
+  color: var(--pos-ink-muted);
 }
-.admin-dashboard .service-card .status-row .pulsing-dot {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 10px;
-    height: 10px;
+.adm-log-details {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--pos-ink-muted);
 }
-.admin-dashboard .service-card .status-row .pulsing-dot .pulse {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    opacity: 0.4;
-    animation: pulse 2s infinite;
-}
-.admin-dashboard .service-card .status-row .pulsing-dot .dot {
-    position: relative;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-}
-@keyframes pulse {
-    0% { transform: scale(1); opacity: 0.4; }
-    100% { transform: scale(2); opacity: 0; }
-}
-.admin-dashboard .service-card .status-row .status-text {
-    font-size: 14px;
-    font-weight: 600;
-    font-family: var(--pos-font-mono, monospace);
-}
-.admin-dashboard .service-card .status-row .status-text.ok { color: #22c55e; }
-.admin-dashboard .service-card .status-row .status-text.warn { color: #f59e0b; }
-.admin-dashboard .service-card .status-row .status-text.err { color: #ef4444; }
-
-.admin-dashboard .service-card .card-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-top: 8px;
-    border-top: 1px solid var(--pos-border);
-    font-size: 10px;
-    font-family: var(--pos-font-mono, monospace);
-    color: var(--pos-ink-muted);
-}
-.admin-dashboard .service-card .card-footer .latency {
-    color: #3b82f6;
-    background: #eef2ff;
-    border: 1px solid #dbeafe;
-    border-radius: 4px;
-    padding: 0 6px;
-    font-weight: 500;
+.adm-log-level {
+  font-family: var(--pos-font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-align: right;
 }
 
-/* Audit log */
-.admin-dashboard .audit-panel {
-    background: var(--pos-surface);
-    border: 1px solid var(--pos-border);
-    border-radius: 8px;
-    overflow: hidden;
-}
-.admin-dashboard .audit-panel .audit-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--pos-border);
-    background: #f8f7f4;
-}
-.admin-dashboard .audit-panel .audit-header .left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-.admin-dashboard .audit-panel .audit-header .left .title {
-    font-size: 10px;
-    font-weight: 600;
-    font-family: var(--pos-font-mono, monospace);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--pos-ink-muted);
-}
-.admin-dashboard .audit-panel .audit-header .left .live-indicator {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 10px;
-    font-family: var(--pos-font-mono, monospace);
-    color: #22c55e;
-}
-.admin-dashboard .audit-panel .audit-header .left .live-indicator .pulse-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #22c55e;
-    animation: pulse 1.5s infinite;
-}
-.admin-dashboard .audit-panel .audit-header .count {
-    font-size: 10px;
-    font-family: var(--pos-font-mono, monospace);
-    color: var(--pos-ink-muted);
-}
-
-.admin-dashboard .audit-table-wrapper {
-    overflow: auto;
-    max-height: 400px;
-}
-.admin-dashboard .audit-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-    font-family: var(--pos-font-mono, monospace);
-}
-.admin-dashboard .audit-table thead {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-}
-.admin-dashboard .audit-table thead th {
-    text-align: left;
-    padding: 8px 12px;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--pos-ink-muted);
-    border-bottom: 1px solid var(--pos-border);
-    background: #f8f7f4;
-}
-.admin-dashboard .audit-table tbody tr {
-    border-bottom: 1px solid #f0efeb;
-    transition: background 0.1s;
-}
-.admin-dashboard .audit-table tbody tr:hover {
-    background: #f5f4f0;
-}
-.admin-dashboard .audit-table tbody tr:nth-child(even) {
-    background: #faf9f6;
-}
-.admin-dashboard .audit-table tbody tr:nth-child(even):hover {
-    background: #f5f4f0;
-}
-.admin-dashboard .audit-table tbody td {
-    padding: 8px 12px;
-    color: var(--pos-ink);
-}
-.admin-dashboard .audit-table tbody td .level-badge {
-    font-weight: 600;
-    letter-spacing: 0.05em;
-}
-.admin-dashboard .audit-table tbody td .level-badge.info { color: #6b7280; }
-.admin-dashboard .audit-table tbody td .level-badge.warn { color: #f59e0b; }
-.admin-dashboard .audit-table tbody td .level-badge.error { color: #ef4444; }
-/* ── Glass cards ── */
-.admin-dashboard .health-score-panel,
-.admin-dashboard .service-card,
-.admin-dashboard .audit-panel {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 12px;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+@media (max-width: 700px) {
+  .adm-log-row {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas: 'ts level' 'user user' 'action action' 'details details';
+  }
+  .adm-log-ts { grid-area: ts; }
+  .adm-log-level { grid-area: level; }
+  .adm-log-user { grid-area: user; }
+  .adm-log-action { grid-area: action; }
+  .adm-log-details { grid-area: details; }
 }

@@ -51,9 +51,12 @@ public class HealthController : ControllerBase
             });
         }
 
-        // 2. Supabase Storage – check configuration
+        // 2. Supabase Storage — check configuration. Bound from the "Supabase" section
+        // (see SupabaseStorageOptions) — Url + ServiceRoleKey, not "Key"; the previous
+        // version of this check read a config key that was never actually set, so it
+        // always reported "Not configured" regardless of the real state.
         var storageUrl = _config["Supabase:Url"];
-        var storageKey = _config["Supabase:Key"];
+        var storageKey = _config["Supabase:ServiceRoleKey"];
         var storageOk = !string.IsNullOrEmpty(storageUrl) && !string.IsNullOrEmpty(storageKey);
         services.Add(new
         {
@@ -65,7 +68,7 @@ public class HealthController : ControllerBase
             latency = ""
         });
 
-        // 3. eTIMS Integration – no real check yet, but we can later implement a ping
+        // 3. eTIMS Integration — no real check yet, but we can later implement a ping
         services.Add(new
         {
             name = "etims",
@@ -76,7 +79,7 @@ public class HealthController : ControllerBase
             latency = ""
         });
 
-        // 4. M-Pesa Integration – placeholder
+        // 4. M-Pesa Integration — placeholder
         services.Add(new
         {
             name = "mpesa",
@@ -87,7 +90,7 @@ public class HealthController : ControllerBase
             latency = ""
         });
 
-        // 5. Pesapal Integration – placeholder
+        // 5. Pesapal Integration — placeholder
         services.Add(new
         {
             name = "pesapal",
@@ -104,22 +107,30 @@ public class HealthController : ControllerBase
     [HttpGet("audit")]
     public async Task<IActionResult> GetAudit([FromQuery] int limit = 20)
     {
-        // Query real audit logs
+        // Resolve each entry's actual user name via DomainUsers rather than showing the
+        // raw UserId GUID — a name reads as finished, a UUID reads as a debug leftover.
+        // Left-joined so an entry survives even if the user was later deactivated/removed.
         var entries = await _context.AuditLogs
             .OrderByDescending(a => a.Timestamp)
             .Take(limit)
-            .Select(a => new
-            {
-                id = a.Id,
-                ts = a.Timestamp.ToString("yyyy-MM-dd HH:mm:ss"),
-                user = a.UserId.ToString(), // you can join with DomainUsers to get name later
-                action = a.ActionType,
-                details = a.Details ?? "",
-                level = a.ActionType == "ERROR" ? "error" : "info" // simplistic mapping
-            })
+            .GroupJoin(
+                _context.DomainUsers,
+                audit => audit.UserId,
+                user => user.Id,
+                (audit, users) => new { audit, users })
+            .SelectMany(
+                x => x.users.DefaultIfEmpty(),
+                (x, user) => new
+                {
+                    id = x.audit.Id,
+                    ts = x.audit.Timestamp.ToString("yyyy-MM-dd HH:mm:ss"),
+                    user = user != null ? user.FullName : x.audit.UserId.ToString(),
+                    action = x.audit.ActionType,
+                    details = x.audit.Details ?? "",
+                    level = x.audit.ActionType == "ERROR" ? "error" : "info" // simplistic mapping
+                })
             .ToListAsync();
 
-        // If no audit logs exist, return empty array
         return Ok(entries);
     }
 }
