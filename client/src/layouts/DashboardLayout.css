@@ -347,3 +347,100 @@
     background: var(--pos-bg);
     padding: 24px 32px;
 }
+
+/* Notification dropdown */
+.notification-wrapper {
+    position: relative;
+}
+
+.notification-dropdown {
+    position: absolute;
+    right: 0;
+    top: 44px;
+    width: 360px;
+    max-height: 400px;
+    overflow-y: auto;
+    background: #ffffff;
+    border: 1px solid var(--pos-border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    z-index: 100;
+    padding: 8px 0;
+}
+
+.notification-dropdown .dropdown-loading,
+.notification-dropdown .dropdown-empty {
+    padding: 16px;
+    text-align: center;
+    color: var(--pos-ink-muted);
+    font-size: 13px;
+}
+
+.dropdown-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.dropdown-item {
+    padding: 10px 16px;
+    border-bottom: 1px solid #f0f0ec;
+    transition: background 0.15s;
+}
+.dropdown-item:hover {
+    background: #f8f7f4;
+}
+
+.dropdown-item.priority-high {
+    border-left: 3px solid #ef4444;
+}
+.dropdown-item.priority-medium {
+    border-left: 3px solid #f59e0b;
+}
+
+.dropdown-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+}
+
+.dropdown-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--pos-ink);
+}
+
+.dropdown-message {
+    font-size: 12px;
+    color: var(--pos-ink-muted);
+    margin-top: 2px;
+    line-height: 1.4;
+}
+
+.dropdown-time {
+    font-size: 10px;
+    color: var(--pos-ink-muted);
+    margin-top: 4px;
+    font-family: var(--pos-font-mono, monospace);
+}
+
+/* Badge on bell */
+.notif-btn {
+    position: relative;
+}
+.notif-dot {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    background: #ef4444;
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #ffffff;
+}

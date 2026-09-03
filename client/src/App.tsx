@@ -11,8 +11,10 @@ import { RepairTrackingPage } from './pages/RepairTrackingPage'
 import AdminDashboard from './pages/AdminDashboard'
 import DashboardLayout from './layouts/DashboardLayouts'
 import { RequireAuth, RequireRole } from './components/RouteGuards'
-import ManagerDashboard from "./pages/ManagerDashboard.tsx";
-import {useAuth} from "./hooks/useAuth.ts";
+import ManagerDashboard from "./pages/ManagerDashboard.tsx"
+import AuditLogPage from "./pages/AuditLogPage"
+import ReportsPage from "./pages/ReportsPage"
+import {useAuth} from "./hooks/useAuth.ts"
 
 // Define a simple component
 function RootRedirect() {
@@ -52,7 +54,9 @@ function App() {
         
         <Route element={<RequireRole roles={['Manager', 'Admin']} />}>
             <Route element={<DashboardLayout />}>
+                <Route path="/audit" element={<AuditLogPage />} />
                 <Route path="/mfa/setup" element={<MfaSetupPage />} />
+                <Route path="/reports" element={<ReportsPage />} />
             </Route>
         </Route>
 

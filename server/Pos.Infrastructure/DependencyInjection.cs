@@ -7,6 +7,7 @@ using Pos.Infrastructure.Email;
 using Pos.Infrastructure.Messaging;
 using Pos.Infrastructure.Persistence;
 using Pos.Infrastructure.Storage;
+using Pos.Infrastructure.Services;
 
 namespace Pos.Infrastructure;
 
@@ -38,6 +39,9 @@ public static class DependencyInjection
         // --- WhatsApp Cloud API ---
         services.Configure<WhatsAppOptions>(configuration.GetSection(WhatsAppOptions.SectionName));
         services.AddHttpClient<IWhatsAppService, WhatsAppCloudApiService>();
+        
+        // --- Auditing ---
+        services.AddScoped<IAuditService, AuditService>();
 
         return services;
     }

@@ -22,7 +22,8 @@ public enum SaleStatus
     Held,       // parked sale, not yet completed
     Completed,
     Voided,
-    Refunded
+    Refunded,
+    PendingApproval
 }
 
 public enum PaymentMethod

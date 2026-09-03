@@ -1,4 +1,4 @@
-﻿import {type JSX, useState} from "react";
+﻿import {type JSX, useState, useEffect, useRef} from "react";
 import { Outlet, NavLink } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import LoadingScreen from "../components/LoadingScreen";
@@ -133,6 +133,12 @@ const NAV_BY_ROLE: Record<Role, NavGroup[]> = {
                 { id: "reports", label: "Reports", icon: "reports", path: "/reports" },
             ],
         },
+        {
+            label: "Monitoring",
+            items: [
+                { id: "audit", label: "Audit Log", icon: "list", path: "/audit" },
+            ],
+        }
     ],
     admin: [
         {
@@ -162,6 +168,12 @@ const NAV_BY_ROLE: Record<Role, NavGroup[]> = {
                 { id: "health", label: "System Health", icon: "health", path: "/health" },
             ],
         },
+        {
+            label: "Monitoring",
+            items: [
+                { id: "audit", label: "Audit Log", icon: "list", path: "/audit" },
+            ],
+        }
     ],
 };
 
@@ -231,13 +243,54 @@ function Sidebar({ locked, onToggle, onHover }: { locked: boolean; onToggle: () 
 }
 
 function TopBar() {
-    const { user, logout } = useAuth();
+    const { user, logout, accessToken } = useAuth();
     const displayName = user?.fullName || "User";
     const initials = displayName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
     const role = user?.role || "cashier";
     const register = user?.assignedRegisterId || "No Register";
+    
+    const [notifications, setNotifications] = useState<any[]>([]);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
 
     const handleLogout = async () => { await logout(); };
+
+    const fetchNotifications = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch("/api/notifications", {
+                headers: { Authorization: `Bearer ${accessToken}` },
+                credentials: "include",
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setNotifications(data);
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const toggleDropdown = () => {
+        if (!showDropdown) fetchNotifications();
+        setShowDropdown(!showDropdown);
+    };
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+                setShowDropdown(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const unreadCount = notifications.length; // or count of unread if you add a `read` flag
 
     return (
         <header className="topbar">
@@ -246,7 +299,39 @@ function TopBar() {
                 <div className="online-badge"><span className="dot" /> Online</div>
             </div>
             <div className="right">
-                <button className="notif-btn"><Icon name="bell" size={16} /><span className="notif-dot" /></button>
+                <div ref={dropdownRef} className="notification-wrapper">
+                    <button
+                        className="notif-btn"
+                        onClick={toggleDropdown}
+                        aria-label="Notifications"
+                    >
+                        <Icon name="bell" size={16} />
+                        {unreadCount > 0 && (
+                            <span className="notif-dot">{unreadCount}</span>
+                        )}
+                    </button>
+                    {showDropdown && (
+                        <div className="notification-dropdown">
+                            {loading ? (
+                                <div className="dropdown-loading">Loading...</div>
+                            ) : notifications.length === 0 ? (
+                                <div className="dropdown-empty">All clear – nothing needs your attention.</div>
+                            ) : (
+                                <ul className="dropdown-list">
+                                    {notifications.map((n) => (
+                                        <li key={n.id} className={`dropdown-item priority-${n.priority}`}>
+                                            <a href={n.link} className="dropdown-link" onClick={() => setShowDropdown(false)}>
+                                                <div className="dropdown-title">{n.title}</div>
+                                                <div className="dropdown-message">{n.message}</div>
+                                                <div className="dropdown-time">{new Date(n.timestamp).toLocaleString()}</div>
+                                            </a>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    )}
+                </div>
                 <div className="user-block">
                     <div className="avatar">{initials}</div>
                     <div className="user-info">

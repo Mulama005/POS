@@ -1,38 +1,169 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Pos.Application.Common.Interfaces;
+using Microsoft.EntityFrameworkCore;
+using Pos.Domain.Enums;
+using Pos.Infrastructure.Persistence;
 
 namespace Pos.Api.Controllers;
 
-// Illustrative — this is the shape that makes the "why this matters" note in Step 5 real:
-// the file itself is never public, and this endpoint (not the bucket) is what decides who
-// gets a link. [Authorize(Roles = ...)] becomes fully active once Phase 2 (auth/RBAC) is
-// built — until then this compiles and returns 401/403 for anyone unauthenticated by default.
-
 [ApiController]
 [Route("api/reports")]
-public sealed class ReportsController : ControllerBase
+[Authorize(Roles = "Manager,Admin")]
+public class ReportsController : ControllerBase
 {
-    private readonly IStorageService _storageService;
+    private readonly PosDbContext _context;
 
-    public ReportsController(IStorageService storageService)
+    public ReportsController(PosDbContext context)
     {
-        _storageService = storageService;
+        _context = context;
     }
 
-    /// <summary>
-    /// Returns a short-lived signed URL for a previously generated report. Only Manager and
-    /// Admin roles can call this — a cashier hitting this endpoint gets a 403, not a file.
-    /// </summary>
-    [HttpGet("{reportId}/download-link")]
-    [Authorize(Roles = "Manager,Admin")]
-    public async Task<ActionResult<string>> GetDownloadLink(string reportId, CancellationToken cancellationToken)
+    [HttpGet("sales")]
+    public async Task<IActionResult> SalesReport(
+        [FromQuery] DateTime? fromDate = null,
+        [FromQuery] DateTime? toDate = null)
     {
-        // storagePath would normally come from a Report entity lookup (report.StoragePath),
-        // not built from the ID directly — shown simplified here.
-        var storagePath = $"reports/{reportId}";
+        var from = fromDate ?? DateTime.UtcNow.AddDays(-30);
+        var to = toDate ?? DateTime.UtcNow;
 
-        var signedUrl = await _storageService.GetSignedUrlAsync(storagePath, expiresInSeconds: 300, cancellationToken);
-        return Ok(new { url = signedUrl, expiresInSeconds = 300 });
+        // Total sales
+        var sales = await _context.Sales
+            .Where(s => s.SaleDate.Date >= from.Date && s.SaleDate.Date <= to.Date && s.Status == SaleStatus.Completed)
+            .ToListAsync();
+
+        var totalSales = sales.Sum(s => s.Total);
+        var totalOrders = sales.Count;
+        var avgOrder = totalOrders > 0 ? totalSales / totalOrders : 0;
+
+        // Top selling products
+        var topProducts = await _context.SaleItems
+            .Where(si => si.Sale.SaleDate.Date >= from.Date && si.Sale.SaleDate.Date <= to.Date)
+            .GroupBy(si => si.ProductId)
+            .Select(g => new
+            {
+                ProductId = g.Key,
+                ProductName = g.First().Product.Name,
+                TotalSold = g.Sum(si => si.Quantity),
+                TotalRevenue = g.Sum(si => si.LineTotal)
+            })
+            .OrderByDescending(g => g.TotalSold)
+            .Take(10)
+            .ToListAsync();
+
+        // Daily trend (last 30 days)
+        var trend = Enumerable.Range(0, (to - from).Days + 1)
+            .Select(i => from.Date.AddDays(i))
+            .Select(d => new
+            {
+                Date = d,
+                Total = sales.Where(s => s.SaleDate.Date == d).Sum(s => s.Total),
+                Orders = sales.Count(s => s.SaleDate.Date == d)
+            })
+            .ToList();
+
+        return Ok(new
+        {
+            totalSales,
+            totalOrders,
+            avgOrderValue = avgOrder,
+            topProducts,
+            trend
+        });
+    }
+
+    [HttpGet("inventory")]
+    public async Task<IActionResult> InventoryReport()
+    {
+        // Inventory valuation
+        var products = await _context.Products
+            .Where(p => p.IsActive)
+            .Select(p => new
+            {
+                p.Name,
+                p.Sku,
+                Stock = p.StockUnits.Count(u => u.Status == "InStock"),
+                CostPrice = p.CostPrice,
+                SalePrice = p.SalePrice,
+                p.ReorderThreshold,
+                p.WarrantyMonths,
+                Units = p.StockUnits.Select(u => new { u.SerialNumber, u.Status, u.SaleDate })
+            })
+            .ToListAsync();
+
+        // Low stock items
+        var lowStock = products
+            .Where(p => p.Stock <= p.ReorderThreshold)
+            .ToList();
+
+        // Warranty status distribution
+        var warrantyStatus = products
+            .SelectMany(p => p.Units.Where(u => u.Status == "Sold" && u.SaleDate.HasValue))
+            .GroupBy(u =>
+            {
+                var expiry = u.SaleDate.Value.AddMonths(products.First(p => p.Units.Contains(u)).WarrantyMonths);
+                if (expiry < DateTime.UtcNow) return "Expired";
+                if (expiry < DateTime.UtcNow.AddMonths(3)) return "Expiring Soon";
+                return "Under Warranty";
+            })
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToList();
+
+        return Ok(new
+        {
+            totalItems = products.Sum(p => p.Stock),
+            totalValue = products.Sum(p => p.Stock * p.CostPrice),
+            lowStock,
+            warrantyStatus
+        });
+    }
+
+    [HttpGet("financial")]
+    public async Task<IActionResult> FinancialReport()
+    {
+        // Revenue
+        var completedSales = await _context.Sales
+            .Where(s => s.Status == SaleStatus.Completed)
+            .ToListAsync();
+
+        var totalRevenue = completedSales.Sum(s => s.Total);
+        var totalTax = completedSales.Sum(s => s.TaxTotal);
+        var totalDiscounts = completedSales.Sum(s => s.DiscountTotal);
+
+        // Credit ledger – outstanding balances
+        var outstandingCredit = await _context.Customers
+            .SumAsync(c => c.CurrentCreditBalance);
+
+        return Ok(new
+        {
+            totalRevenue,
+            totalTax,
+            totalDiscounts,
+            outstandingCredit,
+            netRevenue = totalRevenue - totalTax
+        });
+    }
+
+    [HttpGet("staff")]
+    public async Task<IActionResult> StaffReport([FromQuery] DateTime? fromDate = null, [FromQuery] DateTime? toDate = null)
+    {
+        var from = fromDate ?? DateTime.UtcNow.AddDays(-30);
+        var to = toDate ?? DateTime.UtcNow;
+
+        var staffPerformance = await _context.Sales
+            .Where(s => s.SaleDate.Date >= from.Date && s.SaleDate.Date <= to.Date && s.Status == SaleStatus.Completed)
+            .GroupBy(s => s.CashierId)
+            .Select(g => new
+            {
+                CashierId = g.Key,
+                CashierName = g.First().Cashier.FullName,
+                TotalSales = g.Sum(s => s.Total),
+                TotalOrders = g.Count(),
+                AvgOrder = g.Average(s => s.Total),
+                TotalItems = g.SelectMany(s => s.Items).Sum(si => si.Quantity)
+            })
+            .OrderByDescending(g => g.TotalSales)
+            .ToListAsync();
+
+        return Ok(staffPerformance);
     }
 }
