@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Pos.Api.Authorization;
-using Pos.Application.Common.Interfaces;
+using Pos.Application.Common.Interfaces;						
 using Pos.Domain.Entities;
 using Pos.Domain.Enums;
 using Pos.Infrastructure.Identity;
@@ -383,6 +383,17 @@ public sealed class SalesController : ControllerBase
                 entityId: payment.Id,
                 details: $"Payment of {payment.Amount} via {method} for sale {sale.Id}"
             );
+        }
+
+		foreach (var item in saleItems)
+        {
+            await _auditService.LogAsync(
+    		userId: cashierId,
+    		actionType: "UNIT_SOLD",
+    		entityName: "StockUnit",
+    		entityId: item.Id,
+    		details: $"Product {item.Id} sold on sale {sale.Id}"
+		);
         }
 
         _db.Sales.Add(sale);

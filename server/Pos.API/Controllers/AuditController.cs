@@ -34,7 +34,7 @@ public class AuditController : ControllerBase
             query = query.Where(a => a.UserId.ToString() == userId);
 
         if (!string.IsNullOrEmpty(actionType))
-            query = query.Where(a => a.ActionType.Contains(actionType));
+            query = query.Where(a => EF.Functions.ILike(a.ActionType, $"%{actionType}%"));
 
         if (fromDate.HasValue)
             query = query.Where(a => a.Timestamp >= fromDate.Value);

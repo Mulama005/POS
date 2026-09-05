@@ -1,6 +1,8 @@
 ﻿import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
+import LoadingScreen from "../components/LoadingScreen";
 
+// ── Types ────────────────────────────────────────────────────────────────
 interface SalesReport {
     totalSales: number;
     totalOrders: number;
@@ -32,6 +34,7 @@ interface StaffPerformance {
     totalItems: number;
 }
 
+// ── Main Component ────────────────────────────────────────────────────────
 export default function ReportsPage() {
     const { accessToken } = useAuth();
     const [salesData, setSalesData] = useState<SalesReport | null>(null);
@@ -39,8 +42,10 @@ export default function ReportsPage() {
     const [financialData, setFinancialData] = useState<FinancialReport | null>(null);
     const [staffData, setStaffData] = useState<StaffPerformance[]>([]);
     const [loading, setLoading] = useState(true);
+    const [exporting, setExporting] = useState<{ [key: string]: boolean }>({});
     const [dateRange, setDateRange] = useState({ from: "", to: "" });
 
+    // ── Data fetching ──────────────────────────────────────────────────────
     const fetchReports = async () => {
         setLoading(true);
         try {
@@ -82,32 +87,87 @@ export default function ReportsPage() {
         fetchReports();
     }, [dateRange]);
 
+    // ── Export handler ──────────────────────────────────────────────────────
+    const handleExport = async (endpoint: string, filename: string, format: "csv" | "pdf") => {
+        const key = `${endpoint}-${format}`;
+        setExporting((prev) => ({ ...prev, [key]: true }));
+
+        try {
+            const params = new URLSearchParams({ format });
+            if (dateRange.from) params.append("fromDate", dateRange.from);
+            if (dateRange.to) params.append("toDate", dateRange.to);
+
+            const response = await fetch(`/api/reports/export/${endpoint}?${params}`, {
+                headers: { Authorization: `Bearer ${accessToken}` },
+                credentials: "include",
+            });
+
+            if (!response.ok) throw new Error("Export failed");
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error(err);
+            alert("Failed to download report. Please try again.");
+        } finally {
+            setExporting((prev) => ({ ...prev, [key]: false }));
+        }
+    };
+
+    // ── Loading / error states ──────────────────────────────────────────────
     if (loading || !salesData || !inventoryData || !financialData) {
-        return <div>Loading reports...</div>;
+        return <LoadingScreen message="Loading reports..." />;
     }
 
+    // ── Render ──────────────────────────────────────────────────────────────
     return (
         <div className="reports-page">
-            <h1>Analytics & Reports</h1>
-
-            {/* Date range filter */}
-            <div className="date-filter">
-                <input
-                    type="date"
-                    value={dateRange.from}
-                    onChange={(e) => setDateRange((d) => ({ ...d, from: e.target.value }))}
-                />
-                <input
-                    type="date"
-                    value={dateRange.to}
-                    onChange={(e) => setDateRange((d) => ({ ...d, to: e.target.value }))}
-                />
-                <button onClick={fetchReports}>Apply</button>
+            <div className="page-header">
+                <h1>Analytics & Reports</h1>
+                <div className="date-filter">
+                    <input
+                        type="date"
+                        value={dateRange.from}
+                        onChange={(e) => setDateRange((d) => ({ ...d, from: e.target.value }))}
+                    />
+                    <input
+                        type="date"
+                        value={dateRange.to}
+                        onChange={(e) => setDateRange((d) => ({ ...d, to: e.target.value }))}
+                    />
+                    <button onClick={fetchReports}>Apply</button>
+                </div>
             </div>
 
-            {/* Sales Performance */}
+            {/* ── Sales Performance ── */}
             <section className="report-section">
-                <h2>Sales Performance</h2>
+                <div className="section-header">
+                    <h2>Sales Performance</h2>
+                    <div className="export-buttons">
+                        <button
+                            className="btn-export"
+                            onClick={() => handleExport("sales", `sales_report_${dateRange.from || "all"}.csv`, "csv")}
+                            disabled={exporting["sales-csv"]}
+                        >
+                            {exporting["sales-csv"] ? "Generating..." : "CSV"}
+                        </button>
+                        <button
+                            className="btn-export"
+                            onClick={() => handleExport("sales", `sales_report_${dateRange.from || "all"}.pdf`, "pdf")}
+                            disabled={exporting["sales-pdf"]}
+                        >
+                            {exporting["sales-pdf"] ? "Generating..." : "PDF"}
+                        </button>
+                    </div>
+                </div>
+
                 <div className="kpi-grid">
                     <div className="kpi-card">
                         <span className="label">Total Sales</span>
@@ -138,9 +198,22 @@ export default function ReportsPage() {
                 </table>
             </section>
 
-            {/* Inventory Report */}
+            {/* ── Inventory Report ── */}
             <section className="report-section">
-                <h2>Inventory</h2>
+                <div className="section-header">
+                    <h2>Inventory</h2>
+                    <div className="export-buttons">
+                        <div className="export-buttons">
+                            <button onClick={() => handleExport("inventory", `inventory_report_${dateRange.from || "all"}.csv`, "csv")}>
+                                CSV
+                            </button>
+                            <button onClick={() => handleExport("inventory", `inventory_report_${dateRange.from || "all"}.pdf`, "pdf")}>
+                                PDF
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <div className="kpi-grid">
                     <div className="kpi-card">
                         <span className="label">Total Items</span>
@@ -170,18 +243,29 @@ export default function ReportsPage() {
                         </tbody>
                     </table>
                 )}
-
-                <h3>Warranty Status</h3>
-                <ul>
-                    {inventoryData.warrantyStatus.map((w) => (
-                        <li key={w.status}>{w.status}: {w.count}</li>
-                    ))}
-                </ul>
             </section>
 
-            {/* Financial Report */}
+            {/* ── Financial Report ── */}
             <section className="report-section">
-                <h2>Financial</h2>
+                <div className="section-header">
+                    <h2>Financial</h2>
+                    <div className="export-buttons">
+                        <button
+                            className="btn-export"
+                            onClick={() => handleExport("financial", `financial_report_${dateRange.from || "all"}.csv`, "csv")}
+                            disabled={exporting["financial-csv"]}
+                        >
+                            {exporting["financial-csv"] ? "Generating..." : "CSV"}
+                        </button>
+                        <button
+                            className="btn-export"
+                            onClick={() => handleExport("financial", `financial_report_${dateRange.from || "all"}.pdf`, "pdf")}
+                            disabled={exporting["financial-pdf"]}
+                        >
+                            {exporting["financial-pdf"] ? "Generating..." : "PDF"}
+                        </button>
+                    </div>
+                </div>
                 <div className="kpi-grid">
                     <div className="kpi-card">
                         <span className="label">Total Revenue</span>
@@ -198,11 +282,24 @@ export default function ReportsPage() {
                 </div>
             </section>
 
-            {/* Staff Performance */}
+            {/* ── Staff Performance ── */}
             <section className="report-section">
-                <h2>Staff Performance</h2>
+                <div className="section-header">
+                    <h2>Staff Performance</h2>
+                    <div className="export-buttons">
+                        <button onClick={() => handleExport("staff", `staff_performance_${dateRange.from || "all"}.csv`, "csv")}>
+                            CSV
+                        </button>
+                        <button onClick={() => handleExport("staff", `staff_performance_${dateRange.from || "all"}.pdf`, "pdf")}>
+                            PDF
+                        </button>
+                    </div>
+                </div>
+
                 <table>
-                    <thead><tr><th>Cashier</th><th>Sales</th><th>Orders</th><th>Avg Order</th><th>Items Sold</th></tr></thead>
+                    <thead>
+                    <tr><th>Cashier</th><th>Sales</th><th>Orders</th><th>Avg Order</th><th>Items Sold</th></tr>
+                    </thead>
                     <tbody>
                     {staffData.map((staff) => (
                         <tr key={staff.cashierName}>
