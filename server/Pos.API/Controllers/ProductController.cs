@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Pos.Application.Features.Products;
 using Pos.Domain.Entities;
+using Pos.Domain.Enums;
 using Pos.Infrastructure.Persistence;
 using Pos.Api.Controllers;
 using Pos.Application.Common.Interfaces;
@@ -66,7 +67,7 @@ public class ProductsController : ControllerBase
                 ReorderThreshold = p.ReorderThreshold,
                 WarrantyMonths = p.WarrantyMonths,
                 IsActive = p.IsActive,
-                StockCount = p.StockUnits.Count(u => u.Status == "InStock")
+                StockCount = p.BulkQuantityOnHand + p.StockUnits.Count(u => u.Status == "InStock")
             })
             .ToListAsync();
 
@@ -227,7 +228,7 @@ public class ProductsController : ControllerBase
             ReorderThreshold = p.ReorderThreshold,
             WarrantyMonths = p.WarrantyMonths,
             IsActive = p.IsActive,
-            StockCount = p.StockUnits?.Count(u => u.Status == "InStock") ?? 0
+            StockCount = p.StockQuantity
         };
     }
 
@@ -263,7 +264,7 @@ public class ProductsController : ControllerBase
             	CategoryName = p.Category != null ? p.Category.Name : string.Empty,
             	SalePrice = p.SalePrice,
             	TaxClass = p.TaxClass,
-            	StockQuantity = p.StockUnits.Count(u => u.Status == "InStock"), // compute stock count
+            	StockQuantity = p.BulkQuantityOnHand + p.StockUnits.Count(u => u.Status == "InStock"),
             	ImageUrl = p.ImageUrl
         	})
         	.ToListAsync(cancellationToken);
@@ -295,7 +296,7 @@ public class ProductsController : ControllerBase
             	CategoryName = p.Category != null ? p.Category.Name : string.Empty,
             	SalePrice = p.SalePrice,
             	TaxClass = p.TaxClass,
-            	StockQuantity = p.StockUnits.Count(u => u.Status == "InStock"),
+            	StockQuantity = p.BulkQuantityOnHand + p.StockUnits.Count(u => u.Status == "InStock"),
             	ImageUrl = p.ImageUrl
         	})
         	.FirstOrDefaultAsync(cancellationToken);
@@ -359,7 +360,7 @@ public class ProductsController : ControllerBase
                 CategoryId = catId,
                 CostPrice = row.CostPrice,
                 SalePrice = row.SalePrice,
-                TaxClass = row.TaxClass ?? "standard",
+                TaxClass = ParseTaxClass(row.TaxClass),
                 ReorderThreshold = row.ReorderThreshold,
                 WarrantyMonths = row.WarrantyMonths,
                 IsActive = true,
@@ -371,6 +372,25 @@ public class ProductsController : ControllerBase
         await _context.Products.AddRangeAsync(products);
         await _context.SaveChangesAsync();
         return Ok(new { created = products.Count });
+    }
+
+    /// <summary>
+    /// CSV cells are always plain text (e.g. "Standard", "zero-rated", "2"), so this parses
+    /// leniently: matches the enum by name (case-insensitive) or by its underlying number,
+    /// and falls back to Standard for blank/unrecognised values rather than failing the
+    /// whole import over one bad cell.
+    /// </summary>
+    private static TaxClass ParseTaxClass(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return TaxClass.Standard;
+        }
+
+        var normalized = value.Trim().Replace("-", string.Empty).Replace(" ", string.Empty);
+        return Enum.TryParse<TaxClass>(normalized, ignoreCase: true, out var parsed)
+            ? parsed
+            : TaxClass.Standard;
     }
 
     [HttpGet("{productId}/price")]

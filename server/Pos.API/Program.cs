@@ -15,6 +15,7 @@ using Pos.Infrastructure.Persistence;
 using Sentry;
 using Pos.Infrastructure;
 using QuestPDF.Infrastructure;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,7 +36,14 @@ builder.WebHost.UseSentry(options =>
 
 // Add services to the container.
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    // TaxClass (and any future enum) serializes/deserializes as its name
+    // ("Standard", "ZeroRated", "Exempt") over the wire, matching the frontend's
+    // TaxClass union type in client/src/types/product.ts — not the raw int.
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 
 builder.Services.AddOpenApi();
 

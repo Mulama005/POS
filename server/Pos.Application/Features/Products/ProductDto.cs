@@ -1,4 +1,6 @@
-﻿namespace Pos.Application.Features.Products;
+﻿using Pos.Domain.Enums;
+
+namespace Pos.Application.Features.Products;
 
 public class ProductDto
 {
@@ -11,7 +13,7 @@ public class ProductDto
     public string CategoryName { get; set; } = string.Empty;
     public decimal CostPrice { get; set; }
     public decimal SalePrice { get; set; }
-    public string TaxClass { get; set; } = string.Empty;
+    public TaxClass TaxClass { get; set; }
     public string? ImageUrl { get; set; }
     public int ReorderThreshold { get; set; }
     public int WarrantyMonths { get; set; }
