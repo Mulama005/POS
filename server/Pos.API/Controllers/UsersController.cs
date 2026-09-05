@@ -9,6 +9,7 @@ using Pos.Domain.Entities;
 using Pos.Domain.Enums;
 using Pos.Infrastructure.Identity;
 using Pos.Infrastructure.Persistence;
+using System.Security.Claims;
 
 namespace Pos.Api.Controllers;
 
@@ -27,12 +28,14 @@ public sealed class UsersController : ControllerBase
     private readonly IEmailSender _emailSender;
     private readonly IConfiguration _config;
     private readonly ILogger<UsersController> _logger;
+    private readonly IAuditService _auditService;
 
     public UsersController(
         UserManager<ApplicationUser> userManager,
         PosDbContext db,
         IEmailSender emailSender,
         IConfiguration config,
+        IAuditService auditService,
         ILogger<UsersController> logger)
     {
         _userManager = userManager;
@@ -40,6 +43,7 @@ public sealed class UsersController : ControllerBase
         _emailSender = emailSender;
         _config = config;
         _logger = logger;
+        _auditService = auditService;
     }
 
     /// <summary>List every user for the admin panel table.</summary>
@@ -154,6 +158,18 @@ public sealed class UsersController : ControllerBase
 
         appUser.EmailConfirmed = true;
         await _userManager.UpdateAsync(appUser);
+        
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null) return Unauthorized();
+        var currentUserId = Guid.Parse(userId);
+        
+        await _auditService.LogAsync(
+            userId: currentUserId,
+            actionType: "USER_CREATED",
+            entityName: "User",
+            entityId: appUser.Id,
+            details: $"Created user {appUser.Email} with role"
+        );
 
         return Ok(new { message = "Account activated. You can now log in." });
     }
@@ -195,6 +211,18 @@ public sealed class UsersController : ControllerBase
 
         domainUser.Role = newRole;
         await _db.SaveChangesAsync(cancellationToken);
+        
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null) return Unauthorized();
+        var currentUserId = Guid.Parse(userId);
+        
+        await _auditService.LogAsync(
+            userId: currentUserId,
+            actionType: "USER_ROLE_CHANGED",
+            entityName: "User",
+            entityId: domainUser.Id,
+            details: $"Changed role from {currentRoles} to {domainUser.Role}"
+        );
 
         return Ok(new { message = $"Role updated to {newRole}." });
     }
@@ -239,6 +267,18 @@ public sealed class UsersController : ControllerBase
         }
 
         await _db.SaveChangesAsync(cancellationToken);
+        
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null) return Unauthorized();
+        var currentUserId = Guid.Parse(userId);
+        
+        await _auditService.LogAsync(
+            userId: currentUserId,
+            actionType: "USER_DEACTIVATED",
+            entityName: "User",
+            entityId: domainUser.Id,
+            details: $"User {domainUser.Email} status set to Deactivated"
+        );
 
         _logger.LogInformation("User {UserId} deactivated — all sessions revoked as of {RevokedAt}", id, domainUser.SessionsRevokedAt);
 
@@ -259,6 +299,18 @@ public sealed class UsersController : ControllerBase
         // Deliberately NOT clearing SessionsRevokedAt — they simply log in fresh and get a
         // new token issued after this point, which passes the check naturally.
         await _db.SaveChangesAsync(cancellationToken);
+        
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null) return Unauthorized();
+        var currentUserId = Guid.Parse(userId);
+        
+        await _auditService.LogAsync(
+            userId: currentUserId,
+            actionType: "USER_REACTIVATED",
+            entityName: "User",
+            entityId: domainUser.Id,
+            details: $"User {domainUser.Email} status set to Activated"
+        );
 
         return Ok(new { message = "User reactivated." });
     }

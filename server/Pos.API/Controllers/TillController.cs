@@ -5,6 +5,8 @@ using Pos.Api.Authorization;
 using Pos.Domain.Entities;
 using Pos.Domain.Enums;
 using Pos.Infrastructure.Persistence;
+using System.Security.Claims;
+using Pos.Application.Common.Interfaces;
 
 namespace Pos.Api.Controllers;
 
@@ -21,11 +23,13 @@ public sealed class TillController : ControllerBase
 {
     private readonly PosDbContext _db;
     private readonly IAuthorizationService _authorizationService;
+    private readonly IAuditService _auditService;
 
-    public TillController(PosDbContext db, IAuthorizationService authorizationService)
+    public TillController(IAuditService auditService, PosDbContext db, IAuthorizationService authorizationService)
     {
         _db = db;
         _authorizationService = authorizationService;
+        _auditService = auditService;
     }
 
     /// <summary>The currently open session for a register, or 204 No Content if the till
@@ -117,6 +121,14 @@ public sealed class TillController : ControllerBase
             .Where(u => u.Id == userId)
             .Select(u => u.FullName)
             .FirstOrDefaultAsync(cancellationToken) ?? "";
+        
+        await _auditService.LogAsync(
+            userId: userId,
+            actionType: "TILL_OPENED",
+            entityName: "TillSession",
+            entityId: session.Id,
+            details: $"Opened till on register {register.Id} with float {session.OpeningFloat}"
+        );
 
         return Ok(new TillSessionResponse(
             session.Id, register.Id, register.Name, userId, openedByName,
@@ -174,6 +186,14 @@ public sealed class TillController : ControllerBase
         session.Status = TillSessionStatus.Closed;
 
         await _db.SaveChangesAsync(cancellationToken);
+        
+        await _auditService.LogAsync(
+            userId: userId,
+            actionType: "TILL_CLOSED",
+            entityName: "TillSession",
+            entityId: session.Id,
+            details: $"Closed till on register {session.RegisterId}, expected: {expectedCash}, counted: {request.CountedCashAtClose}, variance: {variance}"
+        );
 
         return Ok(new TillReconciliationResponse(
             session.Id, session.RegisterId, session.OpenedAt, session.ClosedAt.Value,

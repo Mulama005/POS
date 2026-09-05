@@ -10,6 +10,7 @@ using Pos.Domain.Enums;
 using Pos.Infrastructure.Persistence;
 using Pos.Api.Controllers;
 using Pos.Application.Common.Interfaces;
+using System.Security.Claims;
 
 namespace Pos.Api.Controllers;
 
@@ -20,11 +21,13 @@ public class ProductsController : ControllerBase
 {
     private readonly PosDbContext _context;
     private readonly IStorageService _storageService;
+    private readonly IAuditService _auditService;
 
-    public ProductsController(PosDbContext context, IStorageService storageService)
+    public ProductsController(PosDbContext context, IAuditService auditService, IStorageService storageService)
     {
         _context = context;
         _storageService = storageService;
+        _auditService = auditService;
     }
 
     [HttpGet]
@@ -128,6 +131,18 @@ public class ProductsController : ControllerBase
         .Include(p => p.Category)
         .Include(p => p.StockUnits)
         .FirstOrDefaultAsync(p => p.Id == product.Id);
+        
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null) return Unauthorized();
+        var currentUserId = Guid.Parse(userId);
+        
+        await _auditService.LogAsync(
+	        userId: currentUserId,
+	        actionType: "PRODUCT_CREATED",
+	        entityName: "Product",
+	        entityId: product.Id,
+	        details: $"Created product {product.Sku} - {product.Name}"
+        );
 
     	var dto = MapToDto(createdProduct!);
     	return CreatedAtAction(nameof(Get), new { id = product.Id }, dto);
@@ -152,6 +167,18 @@ public class ProductsController : ControllerBase
         product.UpdatedAt = DateTime.UtcNow;
 
         // Handle image replacement if needed
+        
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null) return Unauthorized();
+        var currentUserId = Guid.Parse(userId);
+        
+        await _auditService.LogAsync(
+	        userId: currentUserId,
+	        actionType: "PRODUCT_UPDATED",
+	        entityName: "Product",
+	        entityId: product.Id,
+	        details: $"Updated product {product.Sku} at {product.UpdatedAt}"
+        );
 
         await _context.SaveChangesAsync();
         return Ok(MapToDto(product));
@@ -167,6 +194,19 @@ public class ProductsController : ControllerBase
         product.IsActive = false;
         product.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
+        
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null) return Unauthorized();
+        var currentUserId = Guid.Parse(userId);
+        
+        await _auditService.LogAsync(
+	        userId: currentUserId,
+	        actionType: "PRODUCT_DELETED",
+	        entityName: "Product",
+	        entityId: product.Id,
+	        details: $"Deactivated product {product.Sku} - {product.Name}"
+        );
+        
         return NoContent();
     }
 

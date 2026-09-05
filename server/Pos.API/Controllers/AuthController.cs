@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Pos.Application.Auth;
+using Pos.Application.Common.Interfaces;
+using System.Security.Claims;
 
 namespace Pos.Api.Controllers;
 
@@ -9,11 +11,13 @@ namespace Pos.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IAuditService _auditService;
     private const string RefreshCookieName = "posRefreshToken";
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, IAuditService auditService)
     {
         _authService = authService;
+        _auditService = auditService;
     }
 
     [HttpPost("login")]
@@ -49,6 +53,15 @@ public class AuthController : ControllerBase
                 }
             });
         }
+        
+        await _auditService.LogAsync(
+            userId: result.UserId,
+            actionType: "USER_LOGIN",
+            entityName: "User",
+            entityId: result.UserId,
+            details: $"IP: {ip}",
+            ipAddress: ip
+        );
 
         SetRefreshTokenCookie(result.RefreshToken!);
 
@@ -111,6 +124,17 @@ public class AuthController : ControllerBase
         if (!string.IsNullOrEmpty(refreshToken))
         {
             await _authService.LogoutAsync(refreshToken);
+        }
+        
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId != null)
+        {
+            await _auditService.LogAsync(
+                userId: Guid.Parse(userId),
+                actionType: "USER_LOGOUT",
+                entityName: "User",
+                entityId: Guid.Parse(userId)
+            );
         }
         Response.Cookies.Delete(RefreshCookieName);
         return Ok();
