@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using Pos.Application.Features.Products;
 using Pos.Infrastructure.Persistence;
 using Pos.Domain.Entities;
+using Pos.Application.Common.Interfaces;
+using System.Security.Claims;
 
 namespace Pos.Api.Controllers;
 
@@ -13,10 +15,12 @@ namespace Pos.Api.Controllers;
 public class StockController : ControllerBase
 {
     private readonly PosDbContext _context;
+    private readonly IAuditService _auditService;
 
-    public StockController(PosDbContext context)
+    public StockController(IAuditService auditService, PosDbContext context)
     {
         _context = context;
+        _auditService = auditService;
     }
 
     /// <summary>
@@ -59,6 +63,19 @@ public class StockController : ControllerBase
 
         _context.StockUnits.AddRange(units);
         await _context.SaveChangesAsync();
+        
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null) return Unauthorized();
+        var currentUserId = Guid.Parse(userId);
+        
+        /*await _auditService.LogAsync(
+            userId: currentUserId,
+            actionType: "STOCK_RECEIVED",
+            entityName: "Product",
+            entityId: units.ProductId,
+            details: $"Received {serialNumbers.Count} units for product {units.ProductId}"
+        );*/
+        
         return Ok(new { added = units.Count });
     }
 
