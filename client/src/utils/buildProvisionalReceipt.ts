@@ -37,6 +37,11 @@ export function buildProvisionalReceipt(
       lineTotal: finalLineAmount,
     })),
     payments: payments.map((p) => ({
+      // No real server-issued Payment id yet — this sale hasn't reached the backend.
+      // Safe to synthesize: a provisional receipt's payment lines are never used to
+      // call the M-Pesa initiate/status endpoints (that only makes sense once online
+      // and actually completed), so this id is purely a placeholder for display.
+      paymentId: crypto.randomUUID(),
       method: p.method,
       amount: p.amount,
       status: p.method === 'Cash' ? 'Success' : 'Pending',

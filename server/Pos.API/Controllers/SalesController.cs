@@ -401,7 +401,7 @@ public sealed class SalesController : ControllerBase
                 ProcessedAt = status == PaymentStatus.Success ? DateTime.UtcNow : null,
             };
             sale.Payments.Add(payment);
-            paymentResponses.Add(new PaymentResponse(method.ToString(), payment.Amount, payment.Status.ToString(), payment.ExternalReference));
+            paymentResponses.Add(new PaymentResponse(payment.Id, method.ToString(), payment.Amount, payment.Status.ToString(), payment.ExternalReference));
         }
 
         _db.Sales.Add(sale);
