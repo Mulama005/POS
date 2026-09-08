@@ -92,7 +92,7 @@ public class ManagerController : ControllerBase
                 id = p.Id,
                 name = p.Name,
                 sku = p.Sku,
-                current = p.StockUnits.Count(u => u.Status == "InStock"),
+                current = p.BulkQuantityOnHand + p.StockUnits.Count(u => u.Status == "InStock"),
                 threshold = p.ReorderThreshold
             })
             .Where(p => p.current <= p.threshold)
