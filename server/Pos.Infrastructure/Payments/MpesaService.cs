@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -55,6 +56,22 @@ public sealed class DarajaService : IDarajaService
             return new StkPushInitiationResult(false, null, null, "M-Pesa callback URL is not configured.");
         }
 
+        // Defensive trim — a pasted secret with an invisible trailing space/newline
+        // (common when copying from a screenshot, terminal, or hand-edited
+        // secrets.json) silently changes the Password hash without changing
+        // anything visible, and produces exactly this class of "looks right but
+        // isn't" failure.
+        var shortCode = _options.BusinessShortCode.Trim();
+        var passkey = _options.Passkey.Trim();
+        var consumerKey = _options.ConsumerKey.Trim();
+        var consumerSecret = _options.ConsumerSecret.Trim();
+
+        // Diagnostic only — logs lengths and the shortcode itself (not secret), so we
+        // can confirm exactly what's being sent without leaking real credentials.
+        _logger.LogInformation(
+            "Daraja request diagnostics: ShortCode='{ShortCode}' (len={ShortCodeLen}), Passkey len={PasskeyLen}, ConsumerKey len={KeyLen}, ConsumerSecret len={SecretLen}",
+            shortCode, shortCode.Length, passkey.Length, consumerKey.Length, consumerSecret.Length);
+
         var normalizedPhone = NormalizePhoneNumber(phoneNumber);
         if (normalizedPhone is null)
         {
@@ -79,26 +96,40 @@ public sealed class DarajaService : IDarajaService
         // same generic "Invalid BusinessShortCode" error as an actually-wrong shortcode.
         var eatNow = DateTime.UtcNow.AddHours(3);
         var timestamp = eatNow.ToString("yyyyMMddHHmmss");
-        var password = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{_options.BusinessShortCode}{_options.Passkey}{timestamp}"));
+        var password = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{shortCode}{passkey}{timestamp}"));
+
+        var requestBody = new StkPushRequestBody
+        {
+            BusinessShortCode = shortCode,
+            Password = password,
+            Timestamp = timestamp,
+            TransactionType = _options.TransactionType,
+            Amount = (long)Math.Round(amount, MidpointRounding.AwayFromZero), // Daraja expects a whole-shilling integer
+            PartyA = normalizedPhone,
+            PartyB = shortCode,
+            PhoneNumber = normalizedPhone,
+            CallBackURL = $"{_options.CallbackBaseUrl.TrimEnd('/')}/api/payment-callbacks/mpesa",
+            AccountReference = Truncate(accountReference, 12), // Daraja limits this field's length
+            TransactionDesc = Truncate(transactionDesc, 13),
+        };
 
         using var request = new HttpRequestMessage(HttpMethod.Post, $"{_options.BaseUrl}/mpesa/stkpush/v1/processrequest")
         {
-            Content = JsonContent.Create(new
-            {
-                BusinessShortCode = _options.BusinessShortCode,
-                Password = password,
-                Timestamp = timestamp,
-                TransactionType = _options.TransactionType,
-                Amount = (long)Math.Round(amount, MidpointRounding.AwayFromZero), // Daraja expects a whole-shilling integer
-                PartyA = normalizedPhone,
-                PartyB = _options.BusinessShortCode,
-                PhoneNumber = normalizedPhone,
-                CallBackURL = $"{_options.CallbackBaseUrl.TrimEnd('/')}/api/payment-callbacks/mpesa",
-                AccountReference = Truncate(accountReference, 12), // Daraja limits this field's length
-                TransactionDesc = Truncate(transactionDesc, 13),
-            }),
+            // Explicit JsonSerializerOptions here too, belt-and-braces: even with
+            // [JsonPropertyName] on every property (which wins regardless), this
+            // ensures no ambient naming policy can ever re-introduce this bug if the
+            // DTO is ever touched without noticing the attributes.
+            Content = JsonContent.Create(requestBody, options: new JsonSerializerOptions { PropertyNamingPolicy = null }),
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+        // Diagnostic — the literal outgoing JSON. Password is a derived hash (not a
+        // raw secret) so it's safe to log in full; everything else here is either
+        // non-sensitive or already-public sandbox data. Kept here permanently: this
+        // exact log line is what caught the camelCase bug that field-length checks
+        // and value verification both missed.
+        var outgoingJson = await request.Content!.ReadAsStringAsync(cancellationToken);
+        _logger.LogInformation("Daraja outgoing STK push body: {Json}", outgoingJson);
 
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -177,4 +208,50 @@ public sealed class DarajaService : IDarajaService
 
     private static string Truncate(string value, int maxLength) =>
         value.Length <= maxLength ? value : value[..maxLength];
+}
+
+/// <summary>
+/// Explicit [JsonPropertyName] on every field, deliberately not relying on any
+/// ambient JsonSerializerOptions naming policy. This is the fix for a real bug: an
+/// anonymous object passed to JsonContent.Create was silently serialized with
+/// camelCase field names (businessShortCode, partyA, ...), which Safaricom's API
+/// rejected — misleadingly, as the same generic "Invalid BusinessShortCode" error
+/// you'd get from an actually-wrong shortcode. Confirmed via direct wire-payload
+/// logging, diffed against a known-working example from the Daraja portal's own
+/// Simulate tool, which uses PascalCase field names.
+/// </summary>
+internal sealed class StkPushRequestBody
+{
+    [JsonPropertyName("BusinessShortCode")]
+    public string BusinessShortCode { get; set; } = string.Empty;
+
+    [JsonPropertyName("Password")]
+    public string Password { get; set; } = string.Empty;
+
+    [JsonPropertyName("Timestamp")]
+    public string Timestamp { get; set; } = string.Empty;
+
+    [JsonPropertyName("TransactionType")]
+    public string TransactionType { get; set; } = string.Empty;
+
+    [JsonPropertyName("Amount")]
+    public long Amount { get; set; }
+
+    [JsonPropertyName("PartyA")]
+    public string PartyA { get; set; } = string.Empty;
+
+    [JsonPropertyName("PartyB")]
+    public string PartyB { get; set; } = string.Empty;
+
+    [JsonPropertyName("PhoneNumber")]
+    public string PhoneNumber { get; set; } = string.Empty;
+
+    [JsonPropertyName("CallBackURL")]
+    public string CallBackURL { get; set; } = string.Empty;
+
+    [JsonPropertyName("AccountReference")]
+    public string AccountReference { get; set; } = string.Empty;
+
+    [JsonPropertyName("TransactionDesc")]
+    public string TransactionDesc { get; set; } = string.Empty;
 }

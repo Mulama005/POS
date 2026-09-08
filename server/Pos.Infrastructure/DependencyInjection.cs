@@ -48,6 +48,10 @@ public static class DependencyInjection
         services.Configure<DarajaOptions>(configuration.GetSection(DarajaOptions.SectionName));
         services.AddHttpClient<IDarajaService, DarajaService>();
 
+        // --- Daraja (M-Pesa STK Push), Step 27 ---
+        services.Configure<DarajaOptions>(configuration.GetSection(DarajaOptions.SectionName));
+        services.AddHttpClient<IDarajaService, DarajaService>();
+
         return services;
     }
 }
