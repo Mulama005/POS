@@ -5,6 +5,7 @@ using Pos.Application.Common.Interfaces;
 using Pos.Infrastructure.Auth;
 using Pos.Infrastructure.Email;
 using Pos.Infrastructure.Messaging;
+using Pos.Infrastructure.Payments;
 using Pos.Infrastructure.Persistence;
 using Pos.Infrastructure.Storage;
 
@@ -38,6 +39,10 @@ public static class DependencyInjection
         // --- WhatsApp Cloud API ---
         services.Configure<WhatsAppOptions>(configuration.GetSection(WhatsAppOptions.SectionName));
         services.AddHttpClient<IWhatsAppService, WhatsAppCloudApiService>();
+
+        // --- Daraja (M-Pesa STK Push), Step 27 ---
+        services.Configure<DarajaOptions>(configuration.GetSection(DarajaOptions.SectionName));
+        services.AddHttpClient<IDarajaService, DarajaService>();
 
         return services;
     }

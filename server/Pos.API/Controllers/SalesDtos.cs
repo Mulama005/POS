@@ -45,6 +45,7 @@ public sealed record SaleItemResponse(
     decimal LineTotal);
 
 public sealed record PaymentResponse(
+    Guid PaymentId,
     string Method,
     decimal Amount,
     string Status,
