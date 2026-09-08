@@ -17,11 +17,12 @@ import { ProductSearchBar } from '../components/ProductSearchBar'
 import { CartPanel } from '../components/CartPanel'
 import { HeldSalesList } from '../components/HeldSalesList'
 import { PaymentModal } from '../components/PaymentModal'
+import { MpesaWaitingModal } from '../components/MpesaWaitingModal'
 import { DiscountApprovalModal } from '../components/DiscountApprovalModal'
 import { TillOpenModal } from '../components/TillOpenModal'
 import { TillCloseModal } from '../components/TillCloseModal'
 import { DiscountApprovalRequiredError } from '../types/sale'
-import type { Cart, CompleteSaleResult, PaymentInput } from '../types/sale'
+import type { Cart, CompleteSaleResult, PaymentInput, PaymentResult } from '../types/sale'
 import type { ProductSummary } from '../types/product'
 import type { ApiErrorBody } from '../types/auth'
 import type { TillReconciliation, TillSession } from '../types/till'
@@ -29,6 +30,7 @@ import { formatKes } from '../utils/currency'
 import { queueSale } from '../offline/actionQueue'
 import { isNetworkError } from '../utils/networkError'
 import { buildProvisionalReceipt } from '../utils/buildProvisionalReceipt'
+import LoadingScreen from "../components/LoadingScreen";
 import './CheckoutPage.css'
 
 function getErrorMessage(err: unknown, fallback: string): string {
@@ -61,6 +63,12 @@ export function CheckoutPage() {
   const [pendingApproval, setPendingApproval] = useState<{ payments: PaymentInput[]; message: string } | null>(null)
   const [approving, setApproving] = useState(false)
   const [approvalError, setApprovalError] = useState<string | null>(null)
+
+  // Step 27: any Mpesa payment lines still Pending after completeSale() resolves get
+  // queued here and worked through one at a time — the receipt (below) only renders
+  // once this queue is empty, so the cashier sees "waiting for M-Pesa" before "sale
+  // complete", not both superimposed.
+  const [mpesaQueue, setMpesaQueue] = useState<PaymentResult[]>([])
 
   useEffect(() => {
     listRegisters()
@@ -256,7 +264,6 @@ export function CheckoutPage() {
     try {
       const result = await completeSale(saleRequest)
 
-      setReceipt(result)
       setPaymentModalOpen(false)
       setPendingApproval(null)
       await deleteCart(cart.id)
@@ -265,6 +272,14 @@ export function CheckoutPage() {
         await saveCart(fresh)
         setCart(fresh)
       }
+
+      // The sale itself is already finalized (stock decremented, Sale row Completed)
+      // regardless of Mpesa's outcome — this queue only gates *when the receipt
+      // renders*, not whether the sale happened. See MpesaWaitingModal's own comment
+      // for the known gap this leaves if a queued payment ultimately fails.
+      const stillPendingMpesa = result.payments.filter((p) => p.method === 'Mpesa' && p.status === 'Pending')
+      setMpesaQueue(stillPendingMpesa)
+      setReceipt(result)
     } catch (err) {
       if (err instanceof DiscountApprovalRequiredError) {
         setPendingApproval({ payments, message: err.message })
@@ -311,7 +326,7 @@ export function CheckoutPage() {
   }
 
   if (!cart || !totals) {
-    return <div className="checkout-screen">Loading checkout…</div>
+      return <LoadingScreen message="Loading checkout…" />;
   }
 
   return (
@@ -421,7 +436,15 @@ export function CheckoutPage() {
         />
       )}
 
-      {receipt && (
+      {receipt && mpesaQueue.length > 0 && (
+        <MpesaWaitingModal
+          saleId={receipt.saleId}
+          payment={mpesaQueue[0]}
+          onResolved={() => setMpesaQueue((q) => q.slice(1))}
+        />
+      )}
+
+      {receipt && mpesaQueue.length === 0 && (
         <div className="checkout-modal-backdrop" role="dialog" aria-modal="true">
           <div className="checkout-modal">
             <h2>Sale complete</h2>

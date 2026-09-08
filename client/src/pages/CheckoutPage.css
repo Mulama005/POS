@@ -610,3 +610,41 @@
   padding: 4px 0;
   border-bottom: 1px solid var(--pos-border);
 }
+
+/* ---------- M-Pesa waiting modal (Step 27) ---------- */
+.mpesa-waiting {
+  text-align: center;
+}
+
+.mpesa-waiting__hint {
+  font-size: 14px;
+  color: var(--pos-ink-muted);
+  line-height: 1.5;
+}
+
+.mpesa-waiting__hint--success {
+  color: var(--pos-accent);
+  font-weight: 600;
+}
+
+.mpesa-waiting__hint--error {
+  color: var(--pos-danger);
+  font-weight: 600;
+}
+
+.mpesa-waiting__countdown {
+  font-family: var(--pos-font-mono, monospace);
+  font-size: 22px;
+  font-weight: 700;
+  margin: 16px 0;
+}
+
+.mpesa-waiting__note {
+  font-size: 12px;
+  color: var(--pos-ink-muted);
+  background: rgba(201, 138, 31, 0.1);
+  border: 1px solid rgba(201, 138, 31, 0.3);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 10px 0;
+}

@@ -1,0 +1,155 @@
+﻿.admin-dashboard {
+  padding: 32px 40px 48px;
+  font-family: var(--pos-font-body);
+  color: var(--pos-ink);
+  max-width: 1000px;
+}
+
+.adm-loading,
+.adm-error-screen {
+  padding: 80px 40px;
+  text-align: center;
+  color: var(--pos-ink-muted);
+}
+.adm-error-screen p {
+  color: var(--pos-danger);
+  margin-bottom: 12px;
+}
+.adm-error-screen button {
+  font-family: var(--pos-font-body);
+  font-weight: 600;
+  font-size: 14px;
+  color: #fff;
+  background: var(--pos-accent);
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.adm-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.adm-header h1 {
+  font-family: var(--pos-font-display);
+  font-size: 22px;
+  margin: 0;
+}
+.adm-timestamp {
+  font-family: var(--pos-font-mono);
+  font-size: 12px;
+  color: var(--pos-ink-muted);
+}
+
+.adm-summary-line {
+  padding: 14px 0 18px;
+  border-top: 2px solid var(--pos-ink);
+  border-bottom: 1px solid var(--pos-border);
+  margin-bottom: 28px;
+  font-family: var(--pos-font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+.adm-summary-line .sep {
+  margin: 0 10px;
+  color: var(--pos-ink-muted);
+  font-weight: 400;
+  opacity: 0.6;
+}
+.adm-summary-line > span:last-child {
+  color: var(--pos-ink-muted);
+  font-weight: 400;
+}
+
+.tone-success { color: var(--pos-success); }
+.tone-warn { color: var(--pos-warn); }
+.tone-danger { color: var(--pos-danger); }
+
+.adm-section {
+  margin-bottom: 32px;
+}
+.adm-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.adm-section-header h2 {
+  font-family: var(--pos-font-display);
+  font-size: 14.5px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.adm-section-count {
+  font-family: var(--pos-font-mono);
+  font-size: 11.5px;
+  color: var(--pos-ink-muted);
+}
+.adm-empty {
+  font-size: 13px;
+  color: var(--pos-ink-muted);
+  padding: 8px 0;
+}
+
+/* --- Audit log: a running ledger, not a bordered table. Monospace
+   timestamps lead each row the way a logbook would. --- */
+.adm-log {
+  display: flex;
+  flex-direction: column;
+}
+.adm-log-row {
+  display: grid;
+  grid-template-columns: 150px 120px 140px 1fr 56px;
+  gap: 12px;
+  align-items: baseline;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--pos-border);
+  font-size: 12.5px;
+}
+.adm-log-row:last-child {
+  border-bottom: none;
+}
+.adm-log-ts {
+  font-family: var(--pos-font-mono);
+  color: var(--pos-ink-muted);
+  font-size: 11.5px;
+}
+.adm-log-user {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.adm-log-action {
+  font-family: var(--pos-font-mono);
+  font-size: 11px;
+  color: var(--pos-ink-muted);
+}
+.adm-log-details {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--pos-ink-muted);
+}
+.adm-log-level {
+  font-family: var(--pos-font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-align: right;
+}
+
+@media (max-width: 700px) {
+  .adm-log-row {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas: 'ts level' 'user user' 'action action' 'details details';
+  }
+  .adm-log-ts { grid-area: ts; }
+  .adm-log-level { grid-area: level; }
+  .adm-log-user { grid-area: user; }
+  .adm-log-action { grid-area: action; }
+  .adm-log-details { grid-area: details; }
+}

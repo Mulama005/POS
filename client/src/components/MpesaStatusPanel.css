@@ -1,0 +1,53 @@
+.mpesa-status-panel {
+  border: 1px solid var(--pos-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 10px 0;
+  background: var(--pos-bg);
+}
+
+.mpesa-status-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pos-ink);
+  margin-bottom: 8px;
+}
+
+.mpesa-status-amount {
+  font-family: var(--pos-font-mono);
+}
+
+.mpesa-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mpesa-status-hint {
+  font-size: 12.5px;
+  color: var(--pos-ink-muted);
+}
+
+.mpesa-status-mono {
+  font-family: var(--pos-font-mono);
+}
+
+.mpesa-status-retry {
+  margin-left: auto;
+  font-family: var(--pos-font-body);
+  font-size: 12.5px;
+  font-weight: 600;
+  border: 1px solid var(--pos-border);
+  border-radius: 6px;
+  background: var(--pos-surface);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.mpesa-status-retry:hover {
+  border-color: var(--pos-accent);
+  color: var(--pos-accent);
+}

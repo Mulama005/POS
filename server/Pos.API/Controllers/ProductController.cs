@@ -6,9 +6,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Pos.Application.Features.Products;
 using Pos.Domain.Entities;
+using Pos.Domain.Enums;
 using Pos.Infrastructure.Persistence;
 using Pos.Api.Controllers;
 using Pos.Application.Common.Interfaces;
+using System.Security.Claims;
 
 namespace Pos.Api.Controllers;
 
@@ -19,11 +21,13 @@ public class ProductsController : ControllerBase
 {
     private readonly PosDbContext _context;
     private readonly IStorageService _storageService;
+    private readonly IAuditService _auditService;
 
-    public ProductsController(PosDbContext context, IStorageService storageService)
+    public ProductsController(PosDbContext context, IAuditService auditService, IStorageService storageService)
     {
         _context = context;
         _storageService = storageService;
+        _auditService = auditService;
     }
 
     [HttpGet]
@@ -63,7 +67,7 @@ public class ProductsController : ControllerBase
                 ReorderThreshold = p.ReorderThreshold,
                 WarrantyMonths = p.WarrantyMonths,
                 IsActive = p.IsActive,
-                StockCount = p.StockUnits.Count(u => u.Status == "InStock")
+                StockCount = p.BulkQuantityOnHand + p.StockUnits.Count(u => u.Status == "InStock")
             })
             .ToListAsync();
 
@@ -117,7 +121,8 @@ public class ProductsController : ControllerBase
         {
             using var stream = image.OpenReadStream();
 			var fileName = $"{product.Id}_{Guid.NewGuid()}{Path.GetExtension(image.FileName)}";
-			product.ImageUrl = await _storageService.UploadFileAsync(stream, fileName);
+			product.ImageUrl = await _storageService.UploadFileAsync(
+				stream, fileName, string.IsNullOrWhiteSpace(image.ContentType) ? "application/octet-stream" : image.ContentType);
         }
 
         _context.Products.Add(product);
@@ -127,6 +132,18 @@ public class ProductsController : ControllerBase
         .Include(p => p.Category)
         .Include(p => p.StockUnits)
         .FirstOrDefaultAsync(p => p.Id == product.Id);
+        
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null) return Unauthorized();
+        var currentUserId = Guid.Parse(userId);
+        
+        await _auditService.LogAsync(
+	        userId: currentUserId,
+	        actionType: "PRODUCT_CREATED",
+	        entityName: "Product",
+	        entityId: product.Id,
+	        details: $"Created product {product.Sku} - {product.Name}"
+        );
 
     	var dto = MapToDto(createdProduct!);
     	return CreatedAtAction(nameof(Get), new { id = product.Id }, dto);
@@ -151,6 +168,18 @@ public class ProductsController : ControllerBase
         product.UpdatedAt = DateTime.UtcNow;
 
         // Handle image replacement if needed
+        
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null) return Unauthorized();
+        var currentUserId = Guid.Parse(userId);
+        
+        await _auditService.LogAsync(
+	        userId: currentUserId,
+	        actionType: "PRODUCT_UPDATED",
+	        entityName: "Product",
+	        entityId: product.Id,
+	        details: $"Updated product {product.Sku} at {product.UpdatedAt}"
+        );
 
         await _context.SaveChangesAsync();
         return Ok(MapToDto(product));
@@ -166,6 +195,19 @@ public class ProductsController : ControllerBase
         product.IsActive = false;
         product.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
+        
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null) return Unauthorized();
+        var currentUserId = Guid.Parse(userId);
+        
+        await _auditService.LogAsync(
+	        userId: currentUserId,
+	        actionType: "PRODUCT_DELETED",
+	        entityName: "Product",
+	        entityId: product.Id,
+	        details: $"Deactivated product {product.Sku} - {product.Name}"
+        );
+        
         return NoContent();
     }
 
@@ -187,7 +229,7 @@ public class ProductsController : ControllerBase
             ReorderThreshold = p.ReorderThreshold,
             WarrantyMonths = p.WarrantyMonths,
             IsActive = p.IsActive,
-            StockCount = p.StockUnits?.Count(u => u.Status == "InStock") ?? 0
+            StockCount = p.StockQuantity
         };
     }
 
@@ -223,7 +265,7 @@ public class ProductsController : ControllerBase
             	CategoryName = p.Category != null ? p.Category.Name : string.Empty,
             	SalePrice = p.SalePrice,
             	TaxClass = p.TaxClass,
-            	StockQuantity = p.StockUnits.Count(u => u.Status == "InStock"), // compute stock count
+            	StockQuantity = p.BulkQuantityOnHand + p.StockUnits.Count(u => u.Status == "InStock"),
             	ImageUrl = p.ImageUrl
         	})
         	.ToListAsync(cancellationToken);
@@ -255,7 +297,7 @@ public class ProductsController : ControllerBase
             	CategoryName = p.Category != null ? p.Category.Name : string.Empty,
             	SalePrice = p.SalePrice,
             	TaxClass = p.TaxClass,
-            	StockQuantity = p.StockUnits.Count(u => u.Status == "InStock"),
+            	StockQuantity = p.BulkQuantityOnHand + p.StockUnits.Count(u => u.Status == "InStock"),
             	ImageUrl = p.ImageUrl
         	})
         	.FirstOrDefaultAsync(cancellationToken);
@@ -319,7 +361,7 @@ public class ProductsController : ControllerBase
                 CategoryId = catId,
                 CostPrice = row.CostPrice,
                 SalePrice = row.SalePrice,
-                TaxClass = row.TaxClass ?? "standard",
+                TaxClass = ParseTaxClass(row.TaxClass),
                 ReorderThreshold = row.ReorderThreshold,
                 WarrantyMonths = row.WarrantyMonths,
                 IsActive = true,
@@ -331,6 +373,25 @@ public class ProductsController : ControllerBase
         await _context.Products.AddRangeAsync(products);
         await _context.SaveChangesAsync();
         return Ok(new { created = products.Count });
+    }
+
+    /// <summary>
+    /// CSV cells are always plain text (e.g. "Standard", "zero-rated", "2"), so this parses
+    /// leniently: matches the enum by name (case-insensitive) or by its underlying number,
+    /// and falls back to Standard for blank/unrecognised values rather than failing the
+    /// whole import over one bad cell.
+    /// </summary>
+    private static TaxClass ParseTaxClass(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return TaxClass.Standard;
+        }
+
+        var normalized = value.Trim().Replace("-", string.Empty).Replace(" ", string.Empty);
+        return Enum.TryParse<TaxClass>(normalized, ignoreCase: true, out var parsed)
+            ? parsed
+            : TaxClass.Standard;
     }
 
     [HttpGet("{productId}/price")]

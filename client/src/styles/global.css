@@ -1,0 +1,36 @@
+﻿/* ── Global gradient background for all page content ── */
+.page-content {
+    background: linear-gradient(145deg, var(--pos-bg) 0%, var(--pos-surface) 100%);
+    min-height: 100%;
+}
+
+/* ── Base card style with gradient and hover effect ── */
+.card {
+    background: linear-gradient(145deg, var(--pos-surface) 0%, #f8f7f4 100%);
+    border: 1px solid var(--pos-border);
+    border-radius: 12px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card:hover {
+    transform: scale(1.02);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+/* ── Variation with accent border (optional) ── */
+.card-accent {
+    border-left: 4px solid var(--pos-accent);
+}
+
+/* ── If you want a more pronounced gradient on cards ── */
+.card-strong {
+    background: linear-gradient(145deg, var(--pos-surface) 0%, #eef0ec 100%);
+}
+
+/* ── For stock rows, list items, etc. (subtle) ── */
+.list-item {
+    transition: transform 0.15s ease, background 0.2s ease;
+}
+.list-item:hover {
+    transform: scale(1.01);
+    background: linear-gradient(145deg, #ffffff 0%, #f0f0ea 100%);
+}

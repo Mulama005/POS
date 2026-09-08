@@ -30,6 +30,7 @@ export function LoginPage() {
   const [mfaSubmitting, setMfaSubmitting] = useState(false)
 
   useEffect(() => {
+    if (status === 'loading') return;
     if (status === 'authenticated' && user) {
       navigate(getLandingRouteForRole(user.role), { replace: true })
     }

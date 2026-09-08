@@ -1,0 +1,186 @@
+﻿.manager-dashboard {
+  padding: 32px 40px 48px;
+  font-family: var(--pos-font-body);
+  color: var(--pos-ink);
+  max-width: 1000px;
+}
+
+.mgr-loading,
+.mgr-error-screen {
+  padding: 80px 40px;
+  text-align: center;
+  color: var(--pos-ink-muted);
+}
+.mgr-error-screen p {
+  color: var(--pos-danger);
+  margin-bottom: 12px;
+}
+.mgr-error-screen button {
+  font-family: var(--pos-font-body);
+  font-weight: 600;
+  font-size: 14px;
+  color: #fff;
+  background: var(--pos-accent);
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.mgr-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.mgr-header h1 {
+  font-family: var(--pos-font-display);
+  font-size: 22px;
+  margin: 0;
+}
+.mgr-date {
+  font-family: var(--pos-font-mono);
+  font-size: 12px;
+  color: var(--pos-ink-muted);
+}
+
+/* --- Hero: the one big number, the way a receipt's total line is the
+   thing your eye goes to. No card, no shadow — a rule above and below,
+   like the total row on a ledger page. --- */
+.mgr-hero {
+  padding: 22px 0 20px;
+  border-top: 2px solid var(--pos-ink);
+  border-bottom: 1px solid var(--pos-border);
+  margin-bottom: 28px;
+}
+.mgr-hero-label {
+  display: block;
+  font-family: var(--pos-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pos-ink-muted);
+  margin-bottom: 4px;
+}
+.mgr-hero-value {
+  display: block;
+  font-family: var(--pos-font-mono);
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--pos-ink);
+  line-height: 1.1;
+}
+.mgr-hero-stats {
+  margin-top: 10px;
+  font-size: 13.5px;
+  color: var(--pos-ink-muted);
+}
+.mgr-hero-stats strong {
+  color: var(--pos-ink);
+  font-weight: 600;
+}
+.mgr-hero-stats .sep {
+  margin: 0 8px;
+  opacity: 0.5;
+}
+
+.mgr-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 40px;
+  margin-bottom: 28px;
+}
+
+.mgr-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.mgr-section-header h2 {
+  font-family: var(--pos-font-display);
+  font-size: 14.5px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.mgr-section-count {
+  font-family: var(--pos-font-mono);
+  font-size: 11.5px;
+  color: var(--pos-ink-muted);
+}
+
+.mgr-empty {
+  font-size: 13px;
+  color: var(--pos-ink-muted);
+  padding: 8px 0;
+}
+
+.tone-success { color: var(--pos-success); }
+.tone-warn { color: var(--pos-warn); }
+.tone-danger { color: var(--pos-danger); }
+
+.mgr-register-entry {
+  padding: 3px 0;
+}
+.mgr-register-sub {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--pos-font-mono);
+  font-size: 11.5px;
+  padding: 0 0 8px;
+  color: var(--pos-ink-muted);
+}
+
+.mgr-section--full {
+  margin-bottom: 0;
+}
+
+.mgr-approvals-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.mgr-approvals-table th,
+.mgr-approvals-table td {
+  text-align: left;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--pos-border);
+  font-size: 13.5px;
+}
+.mgr-approvals-table th {
+  font-family: var(--pos-font-mono);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--pos-ink-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--pos-ink);
+}
+.mgr-mono {
+  font-family: var(--pos-font-mono);
+  font-size: 12.5px;
+}
+.mgr-approval-actions {
+  display: flex;
+  gap: 8px;
+}
+.mgr-approval-actions button {
+  font-family: var(--pos-font-body);
+  font-size: 12.5px;
+  font-weight: 600;
+  border: 1px solid var(--pos-border);
+  border-radius: 6px;
+  background: var(--pos-surface);
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.mgr-approval-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.mgr-reject-btn {
+  color: var(--pos-danger);
+  border-color: rgba(192, 57, 43, 0.35) !important;
+}

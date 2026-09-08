@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using Pos.Application.Features.Products;
 using Pos.Infrastructure.Persistence;
 using Pos.Domain.Entities;
+using Pos.Application.Common.Interfaces;
+using System.Security.Claims;
 
 namespace Pos.Api.Controllers;
 
@@ -13,18 +15,40 @@ namespace Pos.Api.Controllers;
 public class StockController : ControllerBase
 {
     private readonly PosDbContext _context;
+    private readonly IAuditService _auditService;
 
-    public StockController(PosDbContext context)
+    public StockController(IAuditService auditService, PosDbContext context)
     {
         _context = context;
+        _auditService = auditService;
     }
 
+    /// <summary>
+    /// Serial-tracked receiving — one StockUnit row per physical item, each with its own
+    /// serial number (and optionally IMEI). Only valid for categories with
+    /// RequiresSerialTracking = true; bulk categories use POST /api/stock/receive-bulk
+    /// instead, since tracking individual serials for a box of cables isn't meaningful.
+    /// </summary>
     [HttpPost("receive")]
     [Authorize(Roles = "Manager,Admin")]
     public async Task<IActionResult> ReceiveStock([FromBody] ReceiveStockRequest request)
     {
-        var product = await _context.Products.FindAsync(request.ProductId);
+        var product = await _context.Products
+            .Include(p => p.Category)
+            .FirstOrDefaultAsync(p => p.Id == request.ProductId);
         if (product == null) return NotFound("Product not found");
+
+        if (!product.Category.RequiresSerialTracking)
+        {
+            return BadRequest(
+                $"'{product.Name}' is in a bulk-tracked category ({product.Category.Name}) — " +
+                "use POST /api/stock/receive-bulk instead of receiving individual serial numbers.");
+        }
+
+        if (request.SerialNumbers.Count == 0)
+        {
+            return BadRequest("At least one serial number is required.");
+        }
 
         var units = request.SerialNumbers.Select((sn, idx) => new StockUnit
         {
@@ -39,7 +63,53 @@ public class StockController : ControllerBase
 
         _context.StockUnits.AddRange(units);
         await _context.SaveChangesAsync();
+        
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null) return Unauthorized();
+        var currentUserId = Guid.Parse(userId);
+        
+        /*await _auditService.LogAsync(
+            userId: currentUserId,
+            actionType: "STOCK_RECEIVED",
+            entityName: "Product",
+            entityId: units.ProductId,
+            details: $"Received {serialNumbers.Count} units for product {units.ProductId}"
+        );*/
+        
         return Ok(new { added = units.Count });
+    }
+
+    /// <summary>
+    /// Bulk receiving for non-serialized categories (cables, chargers, and similar) — just
+    /// adds to Product.BulkQuantityOnHand. Only valid for categories with
+    /// RequiresSerialTracking = false; serialized categories use POST /api/stock/receive.
+    /// </summary>
+    [HttpPost("receive-bulk")]
+    [Authorize(Roles = "Manager,Admin")]
+    public async Task<IActionResult> ReceiveBulkStock([FromBody] ReceiveBulkStockRequest request)
+    {
+        var product = await _context.Products
+            .Include(p => p.Category)
+            .FirstOrDefaultAsync(p => p.Id == request.ProductId);
+        if (product == null) return NotFound("Product not found");
+
+        if (product.Category.RequiresSerialTracking)
+        {
+            return BadRequest(
+                $"'{product.Name}' is in a serial-tracked category ({product.Category.Name}) — " +
+                "use POST /api/stock/receive with per-unit serial numbers instead.");
+        }
+
+        if (request.Quantity <= 0)
+        {
+            return BadRequest("Quantity must be greater than zero.");
+        }
+
+        product.BulkQuantityOnHand += request.Quantity;
+        product.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        return Ok(new { productId = product.Id, newQuantity = product.BulkQuantityOnHand });
     }
 
     [HttpGet("warranty/{serialNumber}")]
