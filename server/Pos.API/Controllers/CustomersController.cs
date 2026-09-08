@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using Pos.Domain.Entities;
 using Pos.Domain.Enums;
 using Pos.Infrastructure.Persistence;
+using Pos.Application.Common.Interfaces;
+using System.Security.Claims;
 
 namespace Pos.Api.Controllers;
 
@@ -13,10 +15,12 @@ namespace Pos.Api.Controllers;
 public sealed class CustomersController : ControllerBase
 {
     private readonly PosDbContext _db;
+    private readonly IAuditService _auditService;
 
-    public CustomersController(PosDbContext db)
+    public CustomersController(IAuditService auditService, PosDbContext db)
     {
         _db = db;
+        _auditService = auditService;
     }
 
     private Guid CurrentUserId =>
@@ -34,6 +38,18 @@ public sealed class CustomersController : ControllerBase
         };
         _db.Customers.Add(customer);
         await _db.SaveChangesAsync(cancellationToken);
+        
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null) return Unauthorized();
+        var currentUserId = Guid.Parse(userId);
+        
+        await _auditService.LogAsync(
+            userId: currentUserId,
+            actionType: "CUSTOMER_CREATED",
+            entityName: "Customer",
+            entityId: customer.Id,
+            details: $"Created customer {customer.FullName} ({customer.Email})"
+        );
 
         return CreatedAtAction(nameof(GetById), new { id = customer.Id }, customer);
     }
@@ -84,6 +100,18 @@ public sealed class CustomersController : ControllerBase
                 t.Timestamp,
             })
             .ToListAsync(cancellationToken);
+        
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null) return Unauthorized();
+        var currentUserId = Guid.Parse(userId);
+        
+        await _auditService.LogAsync(
+            userId: currentUserId,
+            actionType: "CREDIT_LEDGER_ADJUSTMENT",
+            entityName: "Customer",
+            entityId: id,
+            details: $"Adjusted credit balance" /// by {transactions.Amount}, reason: {transactions.Notes}"
+        );
 
         return Ok(transactions);
     }
@@ -121,6 +149,14 @@ public sealed class CustomersController : ControllerBase
         });
 
         await _db.SaveChangesAsync(cancellationToken);
+        
+        await _auditService.LogAsync(
+            userId: CurrentUserId,
+            actionType: "CREDIT_SALE",
+            entityName: "Customer",
+            entityId: customer.Id,
+            details: $"Credit sale {request.RelatedSaleId} of {request.Amount} for customer {customer.Id}"
+        );
 
         return Ok(new { message = "Credit sale recorded.", newBalance = customer.CurrentCreditBalance });
     }
@@ -152,6 +188,14 @@ public sealed class CustomersController : ControllerBase
         });
 
         await _db.SaveChangesAsync(cancellationToken);
+        
+        await _auditService.LogAsync(
+            userId: CurrentUserId,
+            actionType: "CREDIT_PAYMENT",
+            entityName: "Customer",
+            entityId: customer.Id,
+            details: $"Credit payment of {request.Amount} received from customer {customer.Id}"
+        );
 
         return Ok(new { message = "Payment recorded.", newBalance = customer.CurrentCreditBalance });
     }

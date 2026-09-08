@@ -14,9 +14,12 @@ using Pos.Infrastructure.Identity;
 using Pos.Infrastructure.Persistence;
 using Sentry;
 using Pos.Infrastructure;
+using QuestPDF.Infrastructure;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
+
+QuestPDF.Settings.License = LicenseType.Evaluation;
 
 
 // --- Sentry (Step 7) ---

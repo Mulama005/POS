@@ -3,11 +3,12 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Pos.Api.Authorization;
-using Pos.Application.Common.Interfaces;
+using Pos.Application.Common.Interfaces;						
 using Pos.Domain.Entities;
 using Pos.Domain.Enums;
 using Pos.Infrastructure.Identity;
 using Pos.Infrastructure.Persistence;
+using System.Security.Claims;
 
 namespace Pos.Api.Controllers;
 
@@ -43,6 +44,7 @@ public sealed class SalesController : ControllerBase
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly IConfiguration _config;
     private readonly ILogger<SalesController> _logger;
+    private readonly IAuditService _auditService;
 
     public SalesController(
         PosDbContext db,
@@ -51,6 +53,7 @@ public sealed class SalesController : ControllerBase
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         IConfiguration config,
+        IAuditService auditService,
         ILogger<SalesController> logger)
     {
         _db = db;
@@ -60,6 +63,7 @@ public sealed class SalesController : ControllerBase
         _signInManager = signInManager;
         _config = config;
         _logger = logger;
+        _auditService = auditService;
     }
 
     /// <summary>
@@ -101,6 +105,15 @@ public sealed class SalesController : ControllerBase
         }
 
         var token = _approvalStore.CreateApproval(domainUser.Id);
+        
+        /*await _auditService.LogAsync(
+            userId: domainUser.Id,
+            actionType: "SALE_APPROVED",
+            entityName: "Sale",
+            entityId: sale.Id,
+            details: $"Approved discount for sale {sale.Id}"
+        );*/
+        
         return Ok(new { approvalToken = token });
     }
 
@@ -249,6 +262,8 @@ public sealed class SalesController : ControllerBase
                 });
             }
             discountApprovedByUserId = approverId;
+            
+            
         }
 
         // Distribute the cart-level discount proportionally across lines (by each line's
@@ -375,6 +390,15 @@ public sealed class SalesController : ControllerBase
             DiscountApprovedByUserId = discountApprovedByUserId,
             IsSynced = true,
         };
+        
+        await _auditService.LogAsync(
+            userId: cashierId,
+            actionType: "DISCOUNT_APPLIED",
+            entityName: "Sale",
+            entityId: sale.Id,
+            details: $"Discount of {totalDiscount/rawSubtotal}% applied to sale {sale.Id} by {discountApprovedByUserId}, amount: {totalDiscount}"
+        );
+        
         sale.Items = saleItems;
         foreach (var item in saleItems)
         {
@@ -401,7 +425,7 @@ public sealed class SalesController : ControllerBase
                 ProcessedAt = status == PaymentStatus.Success ? DateTime.UtcNow : null,
             };
             sale.Payments.Add(payment);
-            paymentResponses.Add(new PaymentResponse(method.ToString(), payment.Amount, payment.Status.ToString(), payment.ExternalReference));
+            paymentResponses.Add(new PaymentResponse(payment.Id, method.ToString(), payment.Amount, payment.Status.ToString(), payment.ExternalReference));
         }
 
         _db.Sales.Add(sale);
@@ -421,6 +445,14 @@ public sealed class SalesController : ControllerBase
         _logger.LogInformation(
             "Sale {SaleId} completed at register {RegisterId} by cashier {CashierId} — total {Total}",
             sale.Id, register.Id, cashierId, sale.Total);
+        
+        await _auditService.LogAsync(
+            userId: cashierId,
+            actionType: "SALE_CREATED",
+            entityName: "Sale",
+            entityId: sale.Id,
+            details: $"Sale {sale.Id} total: {sale.Total}"
+        );
 
         return Ok(new CompleteSaleResponse(
             sale.Id, sale.SaleDate, sale.Subtotal, sale.DiscountTotal, sale.TaxTotal, sale.Total,

@@ -20,13 +20,15 @@ public sealed class MfaController : ControllerBase
     private readonly IMfaService _mfaService;
     private readonly IMfaChallengeStore _challengeStore;
     private readonly IAuthService _authService;
+    private readonly IAuditService _auditService;
 
-    public MfaController(PosDbContext db, IMfaService mfaService, IMfaChallengeStore challengeStore, IAuthService authService)
+    public MfaController(PosDbContext db, IMfaService mfaService, IMfaChallengeStore challengeStore, IAuthService authService, IAuditService auditService)
     {
         _db = db;
         _mfaService = mfaService;
         _challengeStore = challengeStore;
         _authService = authService;
+        _auditService = auditService;
     }
 
     /// <summary>
@@ -97,6 +99,14 @@ public sealed class MfaController : ControllerBase
 
         user.MfaEnabled = true;
         await _db.SaveChangesAsync(cancellationToken);
+        
+        await _auditService.LogAsync(
+            userId: userId.Value,
+            actionType: "MFA_ENABLED",
+            entityName: "User",
+            entityId: userId.Value,
+            details: $"MFA enabled for user {user.Email}"
+        );
 
         return Ok(new { mfaEnabled = true });
     }
@@ -160,6 +170,14 @@ public sealed class MfaController : ControllerBase
         user.MfaEnabled = false;
         user.MfaSecret = null;
         await _db.SaveChangesAsync(cancellationToken);
+        
+        await _auditService.LogAsync(
+            userId: userId.Value,
+            actionType: "MFA_DISABLED",
+            entityName: "User",
+            entityId: userId.Value,
+            details: $"MFA disabled for user {user.Email}"
+        );
 
         return Ok(new { mfaEnabled = false });
     }
