@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+import { scheduleSyncOnReconnect, runSync } from './offline/syncEngine'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { LoginPage } from './pages/LoginPage'
 import { CheckoutPage } from './pages/CheckoutPage'
@@ -22,6 +24,17 @@ function RootRedirect() {
 }
 
 function App() {
+    const { status } = useAuth()
+
+  useEffect(() => {
+    const cleanup = scheduleSyncOnReconnect()
+    // Run once on load too — covers the case where the app starts already online
+    // with sales still queued from a previous offline session.
+    if (status === 'authenticated') {
+      runSync().catch((e) => console.error('Initial sync failed:', e))
+    }
+    return cleanup
+  }, [status])
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
