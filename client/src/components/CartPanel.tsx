@@ -24,7 +24,28 @@ export function CartPanel({
   return (
     <div className="cart-panel">
       {cart.lines.length === 0 ? (
-        <div className="cart-panel__empty">Scan or search to add items.</div>
+        <div className="cart-panel__empty">
+          <svg
+            className="cart-panel__empty-icon"
+            width="32"
+            height="32"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3" />
+            <line x1="7" y1="9" x2="7" y2="15" />
+            <line x1="10" y1="9" x2="10" y2="15" />
+            <line x1="13" y1="9" x2="13" y2="15" />
+            <line x1="16" y1="9" x2="16" y2="15" />
+            <line x1="18.5" y1="9" x2="18.5" y2="15" />
+          </svg>
+          <span>Scan a barcode or search above to start this sale.</span>
+        </div>
       ) : (
         <ul className="cart-panel__lines">
           {cart.lines.map((line) => (
