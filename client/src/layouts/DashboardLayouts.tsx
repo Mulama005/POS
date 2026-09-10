@@ -255,6 +255,7 @@ function Sidebar({ expanded, onToggle }: { expanded: boolean; onToggle: () => vo
                     <Icon name={expanded ? 'chevronLeft' : 'chevronRight'} size={14} />
                 </button>
             </div>
+        </aside>
     )
 }
 
