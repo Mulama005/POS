@@ -127,7 +127,13 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
     {
       label: 'Lookups',
       items: [{ id: 'warranty', label: 'Warranty lookup', icon: 'warranty', path: '/warranty-lookup' }],
-    },
+    }, 
+      {
+          label: "Monitoring",
+          items: [
+              { id: "audit", label: "Audit Log", icon: "list", path: "/audit" },
+          ],
+      }
   ],
   Admin: [
     {
@@ -152,6 +158,12 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
       label: 'Administration',
       items: [{ id: 'users', label: 'Users', icon: 'users', path: '/users' }],
     },
+      {
+          label: "Monitoring",
+          items: [
+              { id: "audit", label: "Audit Log", icon: "list", path: "/audit" },
+          ],
+      }
   ],
   // Technician is blocked from register/till access entirely (Step 9 RBAC) — their world is
   // repairs, plus warranty lookup to answer a customer's "is this still covered" on the spot.
