@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Pos.Application.Common.Interfaces;
 using Pos.Infrastructure.Auth;
 using Pos.Infrastructure.Email;
+using Pos.Infrastructure.Etims;
 using Pos.Infrastructure.Messaging;
 using Pos.Infrastructure.Payments;
 using Pos.Infrastructure.Persistence;
@@ -45,12 +46,17 @@ public static class DependencyInjection
         services.AddScoped<IAuditService, AuditService>();
 
         // --- Daraja (M-Pesa STK Push), Step 27 ---
+        // (Note: this section was accidentally duplicated verbatim in a previous
+        // session's edit — harmless since AddHttpClient/Configure are idempotent here,
+        // but removed the second copy while touching this file for Step 26.)
         services.Configure<DarajaOptions>(configuration.GetSection(DarajaOptions.SectionName));
         services.AddHttpClient<IDarajaService, DarajaService>();
 
-        // --- Daraja (M-Pesa STK Push), Step 27 ---
-        services.Configure<DarajaOptions>(configuration.GetSection(DarajaOptions.SectionName));
-        services.AddHttpClient<IDarajaService, DarajaService>();
+        // --- eTIMS (KRA VSCU), Step 26 ---
+        // Talks to a locally-running VSCU JAR, not a remote KRA server — see
+        // EtimsOptions for why BaseUrl is a local address.
+        services.Configure<EtimsOptions>(configuration.GetSection(EtimsOptions.SectionName));
+        services.AddHttpClient<IEtimsService, EtimsService>();
 
         return services;
     }

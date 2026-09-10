@@ -69,6 +69,9 @@ export function CheckoutPage() {
   // once this queue is empty, so the cashier sees "waiting for M-Pesa" before "sale
   // complete", not both superimposed.
   const [mpesaQueue, setMpesaQueue] = useState<PaymentResult[]>([])
+  // mpesaQueue shrinks as each payment resolves — this stays fixed at the original
+  // count so the modal can show "Payment 1 of 2" rather than losing that context.
+  const [mpesaQueueTotal, setMpesaQueueTotal] = useState(0)
 
   useEffect(() => {
     listRegisters()
@@ -279,6 +282,7 @@ export function CheckoutPage() {
       // for the known gap this leaves if a queued payment ultimately fails.
       const stillPendingMpesa = result.payments.filter((p) => p.method === 'Mpesa' && p.status === 'Pending')
       setMpesaQueue(stillPendingMpesa)
+      setMpesaQueueTotal(stillPendingMpesa.length)
       setReceipt(result)
     } catch (err) {
       if (err instanceof DiscountApprovalRequiredError) {
@@ -440,6 +444,8 @@ export function CheckoutPage() {
         <MpesaWaitingModal
           saleId={receipt.saleId}
           payment={mpesaQueue[0]}
+          queuePosition={mpesaQueueTotal - mpesaQueue.length + 1}
+          queueTotal={mpesaQueueTotal}
           onResolved={() => setMpesaQueue((q) => q.slice(1))}
         />
       )}

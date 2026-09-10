@@ -1,6 +1,8 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Diagnostics;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Pos.Application.Common.Interfaces;
 using Pos.Infrastructure.Persistence;
 
 namespace Pos.Api.Controllers;
@@ -12,11 +14,13 @@ public class HealthController : ControllerBase
 {
     private readonly PosDbContext _context;
     private readonly IConfiguration _config;
+    private readonly IEtimsService _etimsService;
 
-    public HealthController(PosDbContext context, IConfiguration config)
+    public HealthController(PosDbContext context, IConfiguration config, IEtimsService etimsService)
     {
         _context = context;
         _config = config;
+        _etimsService = etimsService;
     }
 
     [HttpGet("health")]
@@ -68,16 +72,46 @@ public class HealthController : ControllerBase
             latency = ""
         });
 
-        // 3. eTIMS Integration — no real check yet, but we can later implement a ping
-        services.Add(new
+        // 3. eTIMS Integration — Step 26, device-init slice only. This makes a real call
+        // to the locally-running VSCU JAR every time the health dashboard loads, which is
+        // fine for an Admin-only diagnostic page hit occasionally, but don't reuse this
+        // pattern for anything called per-request — device-init doesn't need to run that
+        // often, this is just the cheapest place to expose "is the JAR reachable right now."
+        try
         {
-            name = "etims",
-            label = "eTIMS Integration",
-            status = "warn",
-            detail = "Not implemented",
-            meta = "Placeholder",
-            latency = ""
-        });
+            var sw = Stopwatch.StartNew();
+            var etimsResult = await _etimsService.InitDeviceAsync();
+            sw.Stop();
+            services.Add(new
+            {
+                name = "etims",
+                label = "eTIMS Integration",
+                status = etimsResult.Success ? "ok" : "error",
+                // TaxpayerName is only populated on a "000" fresh handshake — a "902"
+                // (already installed) response comes back with no data payload but is
+                // still a genuine success, so fall back to the descriptive message rather
+                // than showing a blank/placeholder name.
+                detail = etimsResult.Success
+                    ? (etimsResult.TaxpayerName ?? etimsResult.ResultMessage ?? "Connected")
+                    : (etimsResult.ErrorMessage ?? "Device init failed"),
+                meta = etimsResult.Success
+                    ? (etimsResult.BranchName is not null ? $"Branch: {etimsResult.BranchName}" : $"Code: {etimsResult.ResultCode}")
+                    : (etimsResult.ResultCode ?? "No response"),
+                latency = $"{sw.ElapsedMilliseconds} ms"
+            });
+        }
+        catch (Exception ex)
+        {
+            services.Add(new
+            {
+                name = "etims",
+                label = "eTIMS Integration",
+                status = "error",
+                detail = $"Unhandled error: {ex.Message}",
+                meta = "Exception",
+                latency = ""
+            });
+        }
 
         // 4. M-Pesa Integration — placeholder
         services.Add(new
