@@ -19,6 +19,7 @@ public class AuditController : ControllerBase
 
     [HttpGet]
     public async Task<IActionResult> GetAuditLog(
+        [FromQuery] string? userName = null,
         [FromQuery] string? userId = null,
         [FromQuery] string? actionType = null,
         [FromQuery] DateTime? fromDate = null,
@@ -30,8 +31,11 @@ public class AuditController : ControllerBase
             .Include(a => a.User)
             .AsNoTracking();
 
-        if (!string.IsNullOrEmpty(userId))
-            query = query.Where(a => a.UserId.ToString() == userId);
+        if (!string.IsNullOrWhiteSpace(userName))
+            query = query.Where(a => EF.Functions.ILike(a.User.FullName, $"%{userName.Trim()}%"));
+
+        if (!string.IsNullOrWhiteSpace(userId))
+            query = query.Where(a => a.UserId.ToString() == userId.Trim());
 
         if (!string.IsNullOrEmpty(actionType))
             query = query.Where(a => EF.Functions.ILike(a.ActionType, $"%{actionType}%"));
