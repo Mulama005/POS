@@ -66,6 +66,7 @@ export interface SaleItemResult {
 }
 
 export interface PaymentResult {
+  paymentId: string
   method: PaymentMethod
   amount: number
   status: string

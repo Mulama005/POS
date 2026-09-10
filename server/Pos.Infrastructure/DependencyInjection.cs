@@ -5,6 +5,7 @@ using Pos.Application.Common.Interfaces;
 using Pos.Infrastructure.Auth;
 using Pos.Infrastructure.Email;
 using Pos.Infrastructure.Messaging;
+using Pos.Infrastructure.Payments;
 using Pos.Infrastructure.Persistence;
 using Pos.Infrastructure.Storage;
 using Pos.Infrastructure.Services;
@@ -42,6 +43,14 @@ public static class DependencyInjection
         
         // --- Auditing ---
         services.AddScoped<IAuditService, AuditService>();
+
+        // --- Daraja (M-Pesa STK Push), Step 27 ---
+        services.Configure<DarajaOptions>(configuration.GetSection(DarajaOptions.SectionName));
+        services.AddHttpClient<IDarajaService, DarajaService>();
+
+        // --- Daraja (M-Pesa STK Push), Step 27 ---
+        services.Configure<DarajaOptions>(configuration.GetSection(DarajaOptions.SectionName));
+        services.AddHttpClient<IDarajaService, DarajaService>();
 
         return services;
     }

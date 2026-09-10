@@ -24,17 +24,17 @@ import type { UserRole } from './types/auth'
 // sync with DashboardLayouts.tsx's HOME_PATH — that one decides where the
 // sidebar logo links to, this one decides where auth lands you.
 const HOME_PATH: Record<UserRole, string> = {
-    Cashier: '/checkout',
-    Manager: '/dashboard/manager',
-    Admin: '/dashboard/admin',
-    Technician: '/repairs',
+  Cashier: '/checkout',
+  Manager: '/dashboard/manager',
+  Admin: '/dashboard/admin',
+  Technician: '/repairs',
 }
 
 function RootRedirect() {
-    const { status, user } = useAuth()
-    if (status === 'loading') return <div>Loading…</div>
-    if (status !== 'authenticated' || !user) return <Navigate to="/login" replace />
-    return <Navigate to={HOME_PATH[user.role]} replace />
+  const { status, user } = useAuth()
+  if (status === 'loading') return <div>Loading…</div>
+  if (status !== 'authenticated' || !user) return <Navigate to="/login" replace />
+  return <Navigate to={HOME_PATH[user.role]} replace />
 }
 
 function App() {

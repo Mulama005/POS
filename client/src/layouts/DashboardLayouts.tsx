@@ -254,6 +254,19 @@ function Sidebar({ expanded, onToggle }: { expanded: boolean; onToggle: () => vo
                 <button type="button" className="toggle-btn" onClick={onToggle} title={expanded ? 'Collapse sidebar' : 'Expand sidebar'}>
                     <Icon name={expanded ? 'chevronLeft' : 'chevronRight'} size={14} />
                 </button>
+              )}
+              {(!isCollapsed || !expanded) &&
+                group.items.map((item) => (
+                  <NavLink
+                    key={item.id}
+                    to={item.path}
+                    title={!expanded ? item.label : undefined}
+                    className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                  >
+                    <span className="icon"><Icon name={item.icon} size={16} /></span>
+                    {expanded && <span className="label">{item.label}</span>}
+                  </NavLink>
+                ))}
             </div>
         </aside>
     )

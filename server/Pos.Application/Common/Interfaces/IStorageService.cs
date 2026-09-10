@@ -6,7 +6,7 @@ namespace Pos.Application.Common.Interfaces
 {
     public interface IStorageService
     {
-        Task<string> UploadFileAsync(Stream fileStream, string fileName, CancellationToken cancellationToken = default);
+        Task<string> UploadFileAsync(Stream fileStream, string fileName, string contentType = "application/octet-stream", CancellationToken cancellationToken = default);
         Task DeleteFolderAsync(string folderPath, CancellationToken cancellationToken = default);
         Task<string> GetSignedUrlAsync(string filePath, int expiresInSeconds = 60, CancellationToken cancellationToken = default);
     }

@@ -425,26 +425,7 @@ public sealed class SalesController : ControllerBase
                 ProcessedAt = status == PaymentStatus.Success ? DateTime.UtcNow : null,
             };
             sale.Payments.Add(payment);
-            paymentResponses.Add(new PaymentResponse(method.ToString(), payment.Amount, payment.Status.ToString(), payment.ExternalReference));
-            
-            await _auditService.LogAsync(
-                userId: cashierId,
-                actionType: "PAYMENT_RECEIVED",
-                entityName: "Payment",
-                entityId: payment.Id,
-                details: $"Payment of {payment.Amount} via {method} for sale {sale.Id}"
-            );
-        }
-
-		foreach (var item in saleItems)
-        {
-            await _auditService.LogAsync(
-    		userId: cashierId,
-    		actionType: "UNIT_SOLD",
-    		entityName: "StockUnit",
-    		entityId: item.Id,
-    		details: $"Product {item.Id} sold on sale {sale.Id}"
-		);
+            paymentResponses.Add(new PaymentResponse(payment.Id, method.ToString(), payment.Amount, payment.Status.ToString(), payment.ExternalReference));
         }
 
         _db.Sales.Add(sale);
