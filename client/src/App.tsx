@@ -1,3 +1,5 @@
+import  AuditLogPage  from './pages/AuditLogPage'
+import  ReportsPage  from './pages/ReportsPage'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { LoginPage } from './pages/LoginPage'
 import { CheckoutPage } from './pages/CheckoutPage'
@@ -14,6 +16,7 @@ import { WarrantyLookupPage } from './pages/WarrantyLookupPage'
 import { AdminDashboard } from './pages/AdminDashboard'
 import { ManagerDashboard } from './pages/ManagerDashboard'
 import { DashboardLayout } from './layouts/DashboardLayouts'
+
 import { RequireAuth, RequireRole } from './components/RouteGuards'
 import { useAuth } from './hooks/useAuth'
 import type { UserRole } from './types/auth'

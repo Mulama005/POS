@@ -38,6 +38,10 @@ public sealed class RepairsController : ControllerBase
         {
             return BadRequest("Unknown customer. Create the customer record first.");
         }
+        if (request.AssignedTechnicianId is not null && !await IsActiveTechnicianAsync(request.AssignedTechnicianId.Value, cancellationToken))
+        {
+            return BadRequest("Assigned user must be an active Technician.");
+        }
 
         var job = new RepairJob
         {
@@ -65,6 +69,10 @@ public sealed class RepairsController : ControllerBase
     {
         var job = await _db.RepairJobs.FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
         if (job is null) return NotFound();
+        if (!await IsActiveTechnicianAsync(request.TechnicianId, cancellationToken))
+        {
+            return BadRequest("Assigned user must be an active Technician.");
+        }
 
         job.AssignedTechnicianId = request.TechnicianId;
         job.UpdatedAt = DateTimeOffset.UtcNow;
@@ -236,7 +244,12 @@ public sealed class RepairsController : ControllerBase
     {
         var jobs = await _db.RepairJobs
             .OrderByDescending(r => r.CreatedAt)
-            .Select(r => new { r.Id, r.TicketNumber, r.DeviceDescription, Status = r.Status.ToString(), r.AssignedTechnicianId, r.CreatedAt })
+            .Select(r => new
+            {
+                r.Id, r.TicketNumber, r.DeviceDescription, r.ReportedFault,
+                Status = r.Status.ToString(), r.AssignedTechnicianId, r.CreatedAt,
+                AssignedTechnicianName = _db.DomainUsers.Where(u => u.Id == r.AssignedTechnicianId).Select(u => u.FullName).FirstOrDefault(),
+            })
             .ToListAsync(cancellationToken);
 
         return Ok(jobs);
@@ -287,4 +300,7 @@ public sealed class RepairsController : ControllerBase
         var countToday = await _db.RepairJobs.CountAsync(r => r.CreatedAt.Date == today.Date, cancellationToken);
         return $"RPR-{today:yyyyMMdd}-{(countToday + 1):D3}"; // e.g. RPR-20260814-004
     }
+
+    private Task<bool> IsActiveTechnicianAsync(Guid userId, CancellationToken cancellationToken) =>
+        _db.DomainUsers.AnyAsync(u => u.Id == userId && u.IsActive && u.Role == RegisterUserRole.Technician, cancellationToken);
 }

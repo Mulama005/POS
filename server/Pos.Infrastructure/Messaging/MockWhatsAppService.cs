@@ -26,13 +26,13 @@ public sealed class MockWhatsAppService : IWhatsAppService
 
     public Task SendReceiptDeliveryAsync(
     string phoneNumber,
-    string receiptNumber,
-    decimal totalAmount,
+    decimal amount,
+    string receiptUrl,
     CancellationToken cancellationToken = default)
     => LogAndSaveAsync(
         phoneNumber,
         "receipt_delivery",
-        $"Thank you for your purchase. Receipt {receiptNumber}; total paid: KES {totalAmount:N2}.",
+        $"Thank you for your purchase. We received KES {amount:N2}. View your receipt: {receiptUrl}",
         cancellationToken);
 
     public Task SendMpesaPaymentConfirmationAsync(

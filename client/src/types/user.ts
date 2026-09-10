@@ -3,16 +3,18 @@ import type { UserRole } from './auth'
 export interface ManagedUser {
   id: string
   fullName: string
-  email: string
+  email: string | null
+  phoneNumber?: string | null
   role: UserRole
   isActive: boolean
   mfaEnabled: boolean
 }
 
 export interface InviteUserRequest {
-  email: string
+  email?: string
   fullName: string
   role: UserRole
+  phoneNumber?: string
 }
 
 export interface InviteUserResponse {

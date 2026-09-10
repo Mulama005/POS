@@ -1,5 +1,5 @@
 import { apiClient } from './apiClient'
-import type { Customer, LedgerEntry, PublicRepairStatus, Repair, RepairStatus } from '../types/phase6'
+import type { Customer, LedgerEntry, PublicRepairStatus, Repair, RepairStatus, TechnicianSummary } from '../types/phase6'
 
 export const listCustomers = async () => (await apiClient.get<Customer[]>('/api/customers')).data
 export const createCustomer = async (payload: { fullName: string; phoneNumber: string; email?: string }) =>
@@ -19,5 +19,6 @@ export const updateRepairStatus = (id: string, newStatus: RepairStatus, diagnosi
   apiClient.put(`/api/repairs/${id}/status`, { newStatus, diagnosisNotes: diagnosisNotes || null })
 export const assignRepair = (id: string, technicianId: string) =>
   apiClient.put(`/api/repairs/${id}/assign`, { technicianId })
+export const listTechnicians = async () => (await apiClient.get<TechnicianSummary[]>('/api/staff/technicians')).data
 export const trackRepair = async (ticketNumber: string, phoneLast4: string) =>
   (await apiClient.get<PublicRepairStatus>(`/api/repairs/track/${encodeURIComponent(ticketNumber)}`, { params: { phoneLast4 } })).data

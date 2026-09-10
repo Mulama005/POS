@@ -156,7 +156,7 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
         },
         {
             label: 'Administration',
-            items: [{ id: 'users', label: 'Users', icon: 'users', path: '/users' }],
+            items: [{ id: 'users', label: 'Staff', icon: 'users', path: '/users' }],
         },
         {
             label: "Monitoring",

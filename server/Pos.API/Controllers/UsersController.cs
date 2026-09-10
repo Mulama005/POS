@@ -56,7 +56,8 @@ public sealed class UsersController : ControllerBase
             {
                 u.Id,
                 u.FullName,
-                u.Email,
+                Email = u.Email.EndsWith("@local.invalid") ? null : u.Email,
+                u.PhoneNumber,
                 Role = u.Role.ToString(),
                 u.IsActive,
                 u.MfaEnabled,
@@ -81,16 +82,22 @@ public sealed class UsersController : ControllerBase
             return BadRequest($"Unknown role '{request.Role}'.");
         }
 
-        if (await _userManager.FindByEmailAsync(request.Email) is not null)
+        var email = request.Email?.Trim();
+        if (!string.IsNullOrWhiteSpace(email) && await _userManager.FindByEmailAsync(email) is not null)
         {
             return Conflict("A user with this email already exists.");
         }
 
+        var userId = Guid.NewGuid();
+        // A staff profile may be recorded before the employee has an email address.
+        // Identity still needs a unique username, so keep an internal placeholder until
+        // the administrator adds an email and sends an invite in a later update.
+        var identityEmail = string.IsNullOrWhiteSpace(email) ? $"staff-{userId:N}@local.invalid" : email;
         var appUser = new ApplicationUser
         {
-            Id = Guid.NewGuid(),
-            UserName = request.Email,
-            Email = request.Email,
+            Id = userId,
+            UserName = identityEmail,
+            Email = identityEmail,
             EmailConfirmed = false,
         };
 
@@ -109,29 +116,32 @@ public sealed class UsersController : ControllerBase
         {
             Id = appUser.Id,
             FullName = request.FullName,
-            Email = request.Email,
+            Email = identityEmail,
+            PhoneNumber = request.PhoneNumber?.Trim(),
             Role = role,
             IsActive = true,
         });
         await _db.SaveChangesAsync(cancellationToken);
 
-        var resetToken = await _userManager.GeneratePasswordResetTokenAsync(appUser);
-        var encodedToken = HttpUtility.UrlEncode(resetToken);
-
-        var frontendBaseUrl = _config["Frontend:BaseUrl"] ?? "http://localhost:5173";
-        var inviteLink = $"{frontendBaseUrl}/accept-invite?userId={appUser.Id}&token={encodedToken}";
-
-        await _emailSender.SendAsync(
-            request.Email,
-            "You've been invited to the POS system",
-            $"<p>Hi {request.FullName},</p><p>You've been invited as {role}. " +
-            $"<a href=\"{inviteLink}\">Click here to set your password</a> and get started.</p>" +
-            $"<p>This link expires in 24 hours.</p>",
-            cancellationToken);
+        string? inviteLink = null;
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            var resetToken = await _userManager.GeneratePasswordResetTokenAsync(appUser);
+            var encodedToken = HttpUtility.UrlEncode(resetToken);
+            var frontendBaseUrl = _config["Frontend:BaseUrl"] ?? "http://localhost:5173";
+            inviteLink = $"{frontendBaseUrl}/accept-invite?userId={appUser.Id}&token={encodedToken}";
+            await _emailSender.SendAsync(
+                email,
+                "You've been invited to the POS system",
+                $"<p>Hi {request.FullName},</p><p>You've been invited as {role}. " +
+                $"<a href=\"{inviteLink}\">Click here to set your password</a> and get started.</p>" +
+                $"<p>This link expires in 24 hours.</p>",
+                cancellationToken);
+        }
 
         // Returned only because no real email provider exists yet — remove this once one does,
         // so invite links only ever reach the intended inbox, never an API response body.
-        return Ok(new { message = "Invite created.", inviteLink });
+        return Ok(new { message = inviteLink is null ? "Staff profile created. Add an email before inviting them to sign in." : "Invite created.", inviteLink });
     }
 
     
@@ -159,18 +169,6 @@ public sealed class UsersController : ControllerBase
         appUser.EmailConfirmed = true;
         await _userManager.UpdateAsync(appUser);
         
-        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userId == null) return Unauthorized();
-        var currentUserId = Guid.Parse(userId);
-        
-        await _auditService.LogAsync(
-            userId: currentUserId,
-            actionType: "USER_CREATED",
-            entityName: "User",
-            entityId: appUser.Id,
-            details: $"Created user {appUser.Email} with role"
-        );
-
         return Ok(new { message = "Account activated. You can now log in." });
     }
 
