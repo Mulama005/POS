@@ -318,7 +318,7 @@ public sealed class EtimsService : IEtimsService
                     i.UseYn == "Y"))
                 .ToList();
 
-            return new EtimsItemClassesFetchResult(true, parsed.ResultCd, null, items);
+            return new EtimsItemClassesFetchResult(true, parsed.ResultCd, null, items, parsed.ResultDt);
         }
         catch (HttpRequestException ex)
         {
@@ -444,6 +444,7 @@ public sealed class EtimsService : IEtimsService
     {
         [JsonPropertyName("resultCd")] public string? ResultCd { get; set; }
         [JsonPropertyName("resultMsg")] public string? ResultMsg { get; set; }
+        [JsonPropertyName("resultDt")] public string? ResultDt { get; set; }
         [JsonPropertyName("data")] public ItemClassesData? Data { get; set; }
     }
 

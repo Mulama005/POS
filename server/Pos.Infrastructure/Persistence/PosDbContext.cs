@@ -38,6 +38,11 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<CreditTransaction> CreditTransactions => Set<CreditTransaction>();
     public DbSet<PricingTier> PricingTiers => Set<PricingTier>();
     public DbSet<ProductTierPrice> ProductTierPrices => Set<ProductTierPrice>();
+    public DbSet<EtimsCodeClass> EtimsCodeClasses => Set<EtimsCodeClass>();
+    public DbSet<EtimsCode> EtimsCodes => Set<EtimsCode>();
+    public DbSet<EtimsItemClass> EtimsItemClasses => Set<EtimsItemClass>();
+    public DbSet<EtimsSyncState> EtimsSyncStates => Set<EtimsSyncState>();
+
     public DbSet<SentWhatsAppMessage> SentWhatsAppMessages => Set<SentWhatsAppMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
