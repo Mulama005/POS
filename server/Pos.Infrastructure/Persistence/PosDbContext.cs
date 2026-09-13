@@ -38,6 +38,10 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<CreditTransaction> CreditTransactions => Set<CreditTransaction>();
     public DbSet<PricingTier> PricingTiers => Set<PricingTier>();
     public DbSet<ProductTierPrice> ProductTierPrices => Set<ProductTierPrice>();
+    public DbSet<EtimsCodeClass> EtimsCodeClasses => Set<EtimsCodeClass>();
+    public DbSet<EtimsCode> EtimsCodes => Set<EtimsCode>();
+    public DbSet<EtimsItemClass> EtimsItemClasses => Set<EtimsItemClass>();
+    public DbSet<EtimsSyncState> EtimsSyncStates => Set<EtimsSyncState>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -330,6 +334,53 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
                 .WithMany(x => x.AuditLogEntries)
                 .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ---------- EtimsCodeClass / EtimsCode ----------
+        // Populated by syncing against KRA's /code/selectCodes — CdCls/Cd are KRA's own
+        // natural keys, not arbitrary local values, so both are unique.
+        modelBuilder.Entity<EtimsCodeClass>(e =>
+        {
+            e.Property(x => x.CdCls).IsRequired().HasMaxLength(2);
+            e.Property(x => x.CdClsNm).IsRequired().HasMaxLength(200);
+            e.HasIndex(x => x.CdCls).IsUnique();
+        });
+
+        modelBuilder.Entity<EtimsCode>(e =>
+        {
+            e.Property(x => x.Cd).IsRequired().HasMaxLength(5);
+            e.Property(x => x.CdNm).IsRequired().HasMaxLength(200);
+            e.HasIndex(x => new { x.EtimsCodeClassId, x.Cd }).IsUnique();
+
+            // Cascade here (unlike most of this schema's deliberate Restrict default) is
+            // intentional: a code with no parent class is meaningless data, not an
+            // orphaned business record — if a class is ever removed, its codes should go
+            // with it.
+            e.HasOne(x => x.EtimsCodeClass)
+                .WithMany(x => x.Codes)
+                .HasForeignKey(x => x.EtimsCodeClassId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ---------- EtimsItemClass ----------
+        // Populated by syncing against /itemClass/selectItemsClass. Expect this table to
+        // be large (KRA's full product taxonomy) — ItemClsCd is KRA's natural key.
+        modelBuilder.Entity<EtimsItemClass>(e =>
+        {
+            e.Property(x => x.ItemClsCd).IsRequired().HasMaxLength(10);
+            e.Property(x => x.ItemClsNm).IsRequired().HasMaxLength(200);
+            e.Property(x => x.TaxTyCd).HasMaxLength(5);
+            e.HasIndex(x => x.ItemClsCd).IsUnique();
+            // Supports the "browse/search KRA's taxonomy while assigning a Product's
+            // classification" flow that Step 26's next slice needs.
+            e.HasIndex(x => x.ItemClsNm);
+        });
+
+        // ---------- EtimsSyncState ----------
+        modelBuilder.Entity<EtimsSyncState>(e =>
+        {
+            e.Property(x => x.SyncKey).IsRequired().HasMaxLength(50);
+            e.HasIndex(x => x.SyncKey).IsUnique();
         });
     }
 }

@@ -16,11 +16,18 @@ export interface Repair {
   reportedFault: string
   quotedCost: number | null
   assignedTechnicianId: string | null
+  assignedTechnicianName?: string | null
   status: RepairStatus
   diagnosisNotes: string | null
   createdAt: string
   collectedAt: string | null
   statusHistory?: RepairStatusHistory[]
+}
+
+export interface TechnicianSummary {
+  id: string
+  fullName: string
+  openRepairCount: number
 }
 
 export interface RepairStatusHistory {

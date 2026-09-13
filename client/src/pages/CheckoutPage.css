@@ -611,40 +611,264 @@
   border-bottom: 1px solid var(--pos-border);
 }
 
-/* ---------- M-Pesa waiting modal (Step 27) ---------- */
+/* ---------- M-Pesa waiting modal (Step 27) — see new rules below ---------- */
+/* ---------- M-Pesa waiting modal, reworked ---------- */
+.mpesa-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 33, 25, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.mpesa-modal {
+  background: var(--pos-surface);
+  border-radius: 12px;
+  padding: 26px;
+  width: 420px;
+  max-width: 90vw;
+  box-shadow: var(--pos-shadow-lg);
+}
+
+.mpesa-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.mpesa-modal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mpesa-modal-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--pos-accent-soft);
+  color: var(--pos-accent);
+  flex-shrink: 0;
+}
+
+.mpesa-modal-header h2 {
+  font-family: var(--pos-font-display);
+  font-size: 17px;
+  margin: 0;
+}
+
+.mpesa-modal-amount {
+  font-family: var(--pos-font-mono);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--pos-ink);
+  margin: 10px 0 18px;
+}
+
+.mpesa-modal-label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--pos-ink-muted);
+  margin-bottom: 4px;
+}
+
+.mpesa-modal-label input {
+  font-family: var(--pos-font-mono);
+  font-size: 15px;
+  padding: 10px 12px;
+  border: 1px solid var(--pos-border);
+  border-radius: 7px;
+  background: var(--pos-bg);
+  color: var(--pos-ink);
+}
+
+.mpesa-modal-error {
+  color: var(--pos-danger);
+  font-size: 13px;
+  margin: 10px 0 0;
+}
+
+.mpesa-modal-note {
+  font-size: 12px;
+  color: var(--pos-ink-muted);
+  background: var(--pos-warn-soft);
+  border: 1px solid rgba(201, 138, 31, 0.3);
+  border-radius: 6px;
+  padding: 9px 11px;
+  margin: 4px 0 0;
+  text-align: left;
+}
+
+.mpesa-modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.mpesa-modal-actions--split button {
+  flex: 1;
+}
+
+.mpesa-modal-primary-btn {
+  flex: 1;
+  font-family: var(--pos-font-body);
+  font-weight: 600;
+  font-size: 14px;
+  padding: 11px;
+  border-radius: 7px;
+  border: none;
+  background: var(--pos-accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+.mpesa-modal-primary-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.mpesa-modal-secondary-btn {
+  font-family: var(--pos-font-body);
+  font-weight: 600;
+  font-size: 14px;
+  padding: 11px;
+  border-radius: 7px;
+  border: 1px solid var(--pos-border);
+  background: var(--pos-surface);
+  color: var(--pos-ink);
+  cursor: pointer;
+}
+
+/* --- Waiting stage --- */
 .mpesa-waiting {
   text-align: center;
 }
 
-.mpesa-waiting__hint {
-  font-size: 14px;
+.mpesa-waiting-hint {
+  font-size: 13.5px;
   color: var(--pos-ink-muted);
   line-height: 1.5;
+  margin: 0 0 18px;
 }
 
-.mpesa-waiting__hint--success {
-  color: var(--pos-accent);
+.mpesa-waiting-hint strong {
+  color: var(--pos-ink);
+  font-family: var(--pos-font-mono);
   font-weight: 600;
 }
 
-.mpesa-waiting__hint--error {
-  color: var(--pos-danger);
+/* A linear countdown, not a circular gauge — deliberately consistent with the rest of
+   the app's restraint (the Admin dashboard dropped its donut-chart treatment for the
+   same reason: it reads as decoration, not information). */
+.mpesa-progress-track {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--pos-bg);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.mpesa-progress-fill {
+  height: 100%;
+  background: var(--pos-accent);
+  border-radius: 3px;
+  transition: width 1s linear;
+}
+
+.mpesa-progress-track.urgent .mpesa-progress-fill {
+  background: var(--pos-danger);
+}
+
+.mpesa-countdown {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--pos-font-mono);
+  font-size: 15px;
   font-weight: 600;
-}
-
-.mpesa-waiting__countdown {
-  font-family: var(--pos-font-mono, monospace);
-  font-size: 22px;
-  font-weight: 700;
-  margin: 16px 0;
-}
-
-.mpesa-waiting__note {
-  font-size: 12px;
   color: var(--pos-ink-muted);
-  background: rgba(201, 138, 31, 0.1);
-  border: 1px solid rgba(201, 138, 31, 0.3);
-  border-radius: 6px;
-  padding: 8px 10px;
-  margin: 10px 0;
+}
+
+.mpesa-countdown.urgent {
+  color: var(--pos-danger);
+}
+
+.mpesa-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pos-accent);
+  box-shadow: 0 0 0 0 var(--pos-accent-soft);
+  animation: mpesa-pulse 1.6s ease-out infinite;
+}
+
+.mpesa-countdown.urgent .mpesa-pulse-dot {
+  background: var(--pos-danger);
+  animation: mpesa-pulse-danger 1s ease-out infinite;
+}
+
+@keyframes mpesa-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(15, 107, 63, 0.35); }
+  70% { box-shadow: 0 0 0 8px rgba(15, 107, 63, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(15, 107, 63, 0); }
+}
+
+@keyframes mpesa-pulse-danger {
+  0% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.4); }
+  70% { box-shadow: 0 0 0 8px rgba(192, 57, 43, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mpesa-pulse-dot {
+    animation: none;
+  }
+  .mpesa-progress-fill {
+    transition: none;
+  }
+}
+
+/* --- Resolved stage --- */
+.mpesa-resolved {
+  text-align: center;
+}
+
+.mpesa-resolved-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 4px auto 14px;
+}
+
+.mpesa-resolved-icon.success {
+  background: var(--pos-success-soft);
+  color: var(--pos-success);
+}
+
+.mpesa-resolved-icon.failed {
+  background: var(--pos-danger-soft);
+  color: var(--pos-danger);
+}
+
+.mpesa-resolved-hint {
+  margin: 0 0 8px;
+}
+
+.mpesa-resolved-detail {
+  font-size: 13.5px;
+  color: var(--pos-ink-muted);
+  margin: 0 0 14px;
 }

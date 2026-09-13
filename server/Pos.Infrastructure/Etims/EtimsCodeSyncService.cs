@@ -135,18 +135,98 @@ public sealed class EtimsCodeSyncService : IEtimsCodeSyncService
         }
 
         var lastReqDt = state.LastSuccessfulSyncAt ?? EtimsSyncKeys.EpochLastReqDt;
-        var fetch = await _etimsService.FetchItemClassesAsync(lastReqDt, cancellationToken);
 
-        if (!fetch.Success)
+        // /itemClass/selectItemsClass caps each response at 1000 records — confirmed
+        // against a sibling tax authority's spec for the same underlying platform, since
+        // KRA's own PDF doesn't document the limit. There's no documented offset/page
+        // parameter, only lastReqDt, so paging works by re-calling with each response's
+        // own resultDt as the next lastReqDt. Because this dataset is bulk reference
+        // data (likely with many records sharing the same original timestamp), this
+        // approach isn't guaranteed to reach the true end — the loop below detects and
+        // reports that rather than assuming success. iterationCap is a hard safety
+        // limit, not an expected real count.
+        const int pageSize = 1000;
+        const int iterationCap = 200; // 200k records — comfortably above any plausible real count
+        var seenCodes = new HashSet<string>();
+        var allItems = new List<EtimsItemClassDto>();
+        var iterations = 0;
+        var stoppedReason = "complete";
+
+        while (iterations < iterationCap)
         {
-            state.LastAttemptAt = requestStartedAt;
-            state.LastAttemptSucceeded = false;
-            state.LastAttemptMessage = fetch.ErrorMessage ?? $"Failed with result code {fetch.ResultCode}";
-            state.LastAttemptRecordCount = 0;
-            await _context.SaveChangesAsync(cancellationToken);
+            iterations++;
+            var fetch = await _etimsService.FetchItemClassesAsync(lastReqDt, cancellationToken);
 
-            _logger.LogWarning("eTIMS item-class sync failed: {Message}", state.LastAttemptMessage);
-            return new EtimsSyncSummary(false, 0, state.LastAttemptMessage, null);
+            if (!fetch.Success)
+            {
+                // A failure partway through a multi-page pull still has earlier pages'
+                // worth of real data sitting in allItems — but persisting a partial
+                // dataset silently would be worse than persisting nothing, since a
+                // caller can't tell "fully synced" from "stopped halfway" just by
+                // looking at the table. Bail out without writing anything this run;
+                // the watermark stays where it was, so the next attempt starts over
+                // from the same point rather than resuming from a half-known state.
+                state.LastAttemptAt = requestStartedAt;
+                state.LastAttemptSucceeded = false;
+                state.LastAttemptMessage = $"Failed on page {iterations} ({allItems.Count} items fetched before failure): " +
+                    (fetch.ErrorMessage ?? $"result code {fetch.ResultCode}");
+                state.LastAttemptRecordCount = 0;
+                await _context.SaveChangesAsync(cancellationToken);
+
+                _logger.LogWarning("eTIMS item-class sync failed: {Message}", state.LastAttemptMessage);
+                return new EtimsSyncSummary(false, 0, state.LastAttemptMessage, null);
+            }
+
+            var newInThisPage = fetch.ItemClasses.Count(i => seenCodes.Add(i.ItemClsCd));
+            allItems.AddRange(fetch.ItemClasses);
+
+            _logger.LogInformation(
+                "eTIMS item-class page {Page}: {Count} returned, {New} new, {Total} total so far.",
+                iterations, fetch.ItemClasses.Count, newInThisPage, allItems.Count);
+
+            if (fetch.ItemClasses.Count < pageSize)
+            {
+                // Fewer than a full page came back — the documented end-of-data signal.
+                break;
+            }
+
+            if (newInThisPage == 0)
+            {
+                // Got a full page, but every record was one we already have — advancing
+                // lastReqDt via resultDt isn't making progress. This is the "date-based
+                // paging can't slice a same-timestamp backlog" scenario flagged above;
+                // stop rather than loop until iterationCap for no reason.
+                stoppedReason = "no-progress";
+                _logger.LogWarning(
+                    "eTIMS item-class sync stopped after {Total} records: got a full page with no new codes. " +
+                    "The dataset may have more than this endpoint's lastReqDt-based paging can reach — see the " +
+                    "comment on SyncItemClassesAsync.", allItems.Count);
+                break;
+            }
+
+            if (string.IsNullOrWhiteSpace(fetch.ResultDt) ||
+                !DateTime.TryParseExact(fetch.ResultDt, "yyyyMMddHHmmss", null,
+                    System.Globalization.DateTimeStyles.None, out var nextReqDt))
+            {
+                // Can't page further without a valid resultDt to advance from — same
+                // "stop and report clearly" approach as the no-progress case.
+                stoppedReason = "no-resultDt";
+                _logger.LogWarning(
+                    "eTIMS item-class sync stopped after {Total} records: response had no usable resultDt to page from.",
+                    allItems.Count);
+                break;
+            }
+
+            lastReqDt = nextReqDt;
+        }
+
+        if (iterations >= iterationCap)
+        {
+            stoppedReason = "iteration-cap";
+            _logger.LogWarning(
+                "eTIMS item-class sync stopped after hitting the {Cap}-page safety cap ({Total} records) — " +
+                "this almost certainly means something is wrong (e.g. resultDt not actually advancing), not that " +
+                "the real dataset is this large.", iterationCap, allItems.Count);
         }
 
         await using var tx = await _context.Database.BeginTransactionAsync(cancellationToken);
@@ -160,7 +240,7 @@ public sealed class EtimsCodeSyncService : IEtimsCodeSyncService
         var existing = await _context.EtimsItemClasses.ToDictionaryAsync(i => i.ItemClsCd, cancellationToken);
 
         var upserted = 0;
-        foreach (var dto in fetch.ItemClasses)
+        foreach (var dto in allItems)
         {
             if (!existing.TryGetValue(dto.ItemClsCd, out var entity))
             {
@@ -178,17 +258,29 @@ public sealed class EtimsCodeSyncService : IEtimsCodeSyncService
             upserted++;
         }
 
-        state.LastSuccessfulSyncAt = requestStartedAt;
+        // Only advance the watermark on a clean "complete" stop. A no-progress or
+        // resultDt-failure stop means we genuinely don't know if everything was
+        // retrieved — advancing the watermark in that case would make the gap
+        // permanent (a later sync would only ever ask for records after this point,
+        // never going back to find whatever was missed). Leaving it where it was means
+        // the next sync attempt starts over and gets a fresh chance.
+        var advanceWatermark = stoppedReason == "complete";
+
+        state.LastSuccessfulSyncAt = advanceWatermark ? requestStartedAt : state.LastSuccessfulSyncAt;
         state.LastAttemptAt = requestStartedAt;
         state.LastAttemptSucceeded = true;
-        state.LastAttemptMessage = $"Synced {fetch.ItemClasses.Count} item classes.";
+        state.LastAttemptMessage = advanceWatermark
+            ? $"Synced {allItems.Count} item classes across {iterations} page(s)."
+            : $"Synced {allItems.Count} item classes across {iterations} page(s), but stopped early ({stoppedReason}) — " +
+              "watermark NOT advanced, next sync will retry from the same point. See server logs for details.";
         state.LastAttemptRecordCount = upserted;
 
         await _context.SaveChangesAsync(cancellationToken);
         await tx.CommitAsync(cancellationToken);
 
-        _logger.LogInformation("eTIMS item-class sync succeeded: {Upserted} rows upserted.", upserted);
+        _logger.LogInformation("eTIMS item-class sync finished ({StoppedReason}): {Upserted} rows upserted across {Pages} page(s).",
+            stoppedReason, upserted, iterations);
 
-        return new EtimsSyncSummary(true, upserted, state.LastAttemptMessage, requestStartedAt);
+        return new EtimsSyncSummary(advanceWatermark, upserted, state.LastAttemptMessage, advanceWatermark ? requestStartedAt : null);
     }
 }
