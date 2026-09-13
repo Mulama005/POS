@@ -43,6 +43,8 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<EtimsItemClass> EtimsItemClasses => Set<EtimsItemClass>();
     public DbSet<EtimsSyncState> EtimsSyncStates => Set<EtimsSyncState>();
 
+    public DbSet<SentWhatsAppMessage> SentWhatsAppMessages => Set<SentWhatsAppMessage>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder); // must run first — this is what builds the AspNetUsers/AspNetRoles tables
