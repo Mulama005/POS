@@ -104,6 +104,7 @@ public sealed class EtimsController : ControllerBase
     public async Task<IActionResult> SearchItemClasses(
         [FromQuery] string? q,
         [FromQuery] int? level,
+        [FromQuery] bool leafOnly = false,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
         CancellationToken cancellationToken = default)
@@ -122,6 +123,17 @@ public sealed class EtimsController : ControllerBase
         if (level.HasValue)
         {
             query = query.Where(i => i.ItemClsLvl == level.Value);
+        }
+
+        // The classification picker (Step 26 product-assignment slice) only ever wants
+        // leaf-level nodes as pickable results — higher levels are taxonomy scaffolding
+        // on the way down and, per EtimsItemClass's own doc comment, only leaf levels
+        // reliably carry a TaxTyCd. Assigning a non-leaf code is rejected server-side by
+        // ProductsController.AssignEtimsClassification regardless, but filtering it out of
+        // search results here keeps the picker from ever offering an invalid choice.
+        if (leafOnly)
+        {
+            query = query.Where(i => i.TaxTyCd != null);
         }
 
         var total = await query.CountAsync(cancellationToken);

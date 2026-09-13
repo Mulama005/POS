@@ -31,7 +31,9 @@ public class ProductsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> List([FromQuery] int page = 1, int pageSize = 20, string? search = null, Guid? category = null)
+    public async Task<IActionResult> List(
+        [FromQuery] int page = 1, int pageSize = 20, string? search = null, Guid? category = null,
+        [FromQuery] bool? etimsClassified = null)
     {
         var query = _context.Products
             .Include(p => p.Category)
@@ -45,6 +47,14 @@ public class ProductsController : ControllerBase
                 (p.Barcode != null && p.Barcode.Contains(search)));
         if (category.HasValue)
             query = query.Where(p => p.CategoryId == category.Value);
+
+        // Powers the classification picker's "unclassified" filter — defaults to
+        // unfiltered so this stays the same general-purpose product list everywhere
+        // else already uses it.
+        if (etimsClassified.HasValue)
+            query = etimsClassified.Value
+                ? query.Where(p => p.EtimsItemClassificationCode != null)
+                : query.Where(p => p.EtimsItemClassificationCode == null);
 
         var total = await query.CountAsync();
         var items = await query
@@ -67,7 +77,18 @@ public class ProductsController : ControllerBase
                 ReorderThreshold = p.ReorderThreshold,
                 WarrantyMonths = p.WarrantyMonths,
                 IsActive = p.IsActive,
-                StockCount = p.BulkQuantityOnHand + p.StockUnits.Count(u => u.Status == "InStock")
+                StockCount = p.BulkQuantityOnHand + p.StockUnits.Count(u => u.Status == "InStock"),
+                EtimsItemClassificationCode = p.EtimsItemClassificationCode,
+                // Correlated subquery rather than a real navigation/join — deliberate,
+                // see Product.EtimsItemClassificationCode's comment on why this isn't a
+                // hard FK. Fine at this page size (20–50 rows); revisit only if this
+                // list ever needs to return hundreds of rows at once.
+                EtimsItemClassificationName = _context.EtimsItemClasses
+                    .Where(e => e.ItemClsCd == p.EtimsItemClassificationCode)
+                    .Select(e => e.ItemClsNm)
+                    .FirstOrDefault(),
+                EtimsTaxTypeCode = p.EtimsTaxTypeCode,
+                EtimsClassifiedAt = p.EtimsClassifiedAt
             })
             .ToListAsync();
 
@@ -83,7 +104,16 @@ public class ProductsController : ControllerBase
             .FirstOrDefaultAsync(p => p.Id == id && p.IsActive);
         if (product == null) return NotFound();
 
-        var dto = MapToDto(product);
+        string? etimsClassificationName = null;
+        if (product.EtimsItemClassificationCode is not null)
+        {
+            etimsClassificationName = await _context.EtimsItemClasses
+                .Where(e => e.ItemClsCd == product.EtimsItemClassificationCode)
+                .Select(e => e.ItemClsNm)
+                .FirstOrDefaultAsync();
+        }
+
+        var dto = MapToDto(product, etimsClassificationName);
         return Ok(dto);
     }
 
@@ -211,7 +241,86 @@ public class ProductsController : ControllerBase
         return NoContent();
     }
 
-    private ProductDto MapToDto(Product p)
+    /// <summary>
+    /// The write side of the KRA classification picker (Step 26). Deliberately a single
+    /// code applied to a batch of products in one call — never "one code per category" —
+    /// see the design discussion this came out of: KRA's taxonomy is far finer-grained
+    /// than this app's own Category scheme, so inferring a classification from Category
+    /// would risk real misclassification. The caller (picker UI) is responsible for only
+    /// batching products that genuinely share one classification.
+    /// </summary>
+    [HttpPost("assign-etims-classification")]
+    [Authorize(Roles = "Manager,Admin")]
+    public async Task<IActionResult> AssignEtimsClassification([FromBody] AssignEtimsClassificationRequest request)
+    {
+        if (request.ProductIds is null || request.ProductIds.Count == 0)
+            return BadRequest(new { message = "At least one product must be selected." });
+        if (string.IsNullOrWhiteSpace(request.ItemClsCd))
+            return BadRequest(new { message = "ItemClsCd is required." });
+
+        // Never trust the client's classification choice blindly — re-validate against
+        // what's actually synced, and require leaf-level (TaxTyCd present) exactly like
+        // the picker's own search is filtered, so a request built outside the normal UI
+        // (or a stale client) can't assign a non-leaf taxonomy node.
+        var classification = await _context.EtimsItemClasses
+            .FirstOrDefaultAsync(e => e.ItemClsCd == request.ItemClsCd.Trim());
+        if (classification is null)
+            return BadRequest(new { message = $"'{request.ItemClsCd}' was not found in the synced KRA taxonomy. Run a code sync if this is a recently-added classification." });
+        if (classification.TaxTyCd is null)
+            return BadRequest(new { message = $"'{request.ItemClsCd}' ({classification.ItemClsNm}) is not a leaf-level classification — it has no tax type, so it isn't a valid assignment target. Pick a more specific code." });
+
+        var products = await _context.Products
+            .Where(p => request.ProductIds.Contains(p.Id) && p.IsActive)
+            .ToListAsync();
+
+        var missingIds = request.ProductIds.Except(products.Select(p => p.Id)).ToList();
+        if (missingIds.Count > 0)
+            return BadRequest(new { message = $"{missingIds.Count} product id(s) were not found or are inactive.", missingIds });
+
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null) return Unauthorized();
+        var currentUserId = Guid.Parse(userId);
+        var now = DateTime.UtcNow;
+
+        // Note which products already had a different classification before overwriting —
+        // the picker UI is expected to have already confirmed this with the user, but the
+        // audit trail should reflect it happened regardless of what the UI showed.
+        var reclassified = products.Where(p => p.EtimsItemClassificationCode is not null &&
+            p.EtimsItemClassificationCode != classification.ItemClsCd).Select(p => p.Sku).ToList();
+
+        foreach (var product in products)
+        {
+            product.EtimsItemClassificationCode = classification.ItemClsCd;
+            product.EtimsTaxTypeCode = classification.TaxTyCd;
+            product.EtimsClassifiedAt = now;
+            product.EtimsClassifiedByUserId = currentUserId;
+            product.UpdatedAt = now;
+        }
+
+        await _context.SaveChangesAsync();
+
+        var skuList = string.Join(", ", products.Select(p => p.Sku).Take(20));
+        var truncated = products.Count > 20 ? $" (+{products.Count - 20} more)" : "";
+        await _auditService.LogAsync(
+            userId: currentUserId,
+            actionType: "PRODUCTS_ETIMS_CLASSIFIED",
+            entityName: "Product",
+            entityId: Guid.Empty, // multiple products — see details for which ones
+            details: $"Assigned {classification.ItemClsCd} ({classification.ItemClsNm}) to {products.Count} product(s): {skuList}{truncated}." +
+                (reclassified.Count > 0 ? $" Reclassified (had a different code before): {string.Join(", ", reclassified)}." : "")
+        );
+
+        return Ok(new
+        {
+            updatedProductIds = products.Select(p => p.Id),
+            itemClsCd = classification.ItemClsCd,
+            itemClsNm = classification.ItemClsNm,
+            taxTyCd = classification.TaxTyCd,
+            reclassifiedCount = reclassified.Count
+        });
+    }
+
+    private ProductDto MapToDto(Product p, string? etimsItemClassificationName = null)
     {
         return new ProductDto
         {
@@ -229,7 +338,11 @@ public class ProductsController : ControllerBase
             ReorderThreshold = p.ReorderThreshold,
             WarrantyMonths = p.WarrantyMonths,
             IsActive = p.IsActive,
-            StockCount = p.StockQuantity
+            StockCount = p.StockQuantity,
+            EtimsItemClassificationCode = p.EtimsItemClassificationCode,
+            EtimsItemClassificationName = etimsItemClassificationName,
+            EtimsTaxTypeCode = p.EtimsTaxTypeCode,
+            EtimsClassifiedAt = p.EtimsClassifiedAt
         };
     }
 
