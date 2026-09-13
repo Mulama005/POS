@@ -27,6 +27,7 @@ export function UserManagementPage() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteFullName, setInviteFullName] = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
+  const [invitePhone, setInvitePhone] = useState('')
   const [inviteRole, setInviteRole] = useState<UserRole>('Cashier')
   const [inviteSubmitting, setInviteSubmitting] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
@@ -80,10 +81,11 @@ export function UserManagementPage() {
     setInviteError(null)
     setInviteSubmitting(true)
     try {
-      const res = await inviteUser({ fullName: inviteFullName, email: inviteEmail, role: inviteRole })
+      const res = await inviteUser({ fullName: inviteFullName, email: inviteEmail || undefined, phoneNumber: invitePhone || undefined, role: inviteRole })
       setInviteLink(res.inviteLink ?? null)
       setInviteFullName('')
       setInviteEmail('')
+      setInvitePhone('')
       setInviteRole('Cashier')
       await loadUsers()
     } catch (err) {
@@ -96,9 +98,9 @@ export function UserManagementPage() {
   return (
     <div className="user-mgmt-screen">
       <div className="user-mgmt-header">
-        <h1 className="user-mgmt-title">User management</h1>
+        <div><h1 className="user-mgmt-title">Staff</h1><p className="user-mgmt-hint">Create staff profiles and give each person the right role.</p></div>
         <button type="button" className="user-mgmt-invite-btn" onClick={() => setInviteOpen((v) => !v)}>
-          {inviteOpen ? 'Cancel' : 'Invite user'}
+          {inviteOpen ? 'Cancel' : 'Add staff member'}
         </button>
       </div>
 
@@ -114,24 +116,24 @@ export function UserManagementPage() {
             />
             <input
               type="email"
-              placeholder="Email"
+              placeholder="Email (optional)"
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
-              required
             />
+            <input type="tel" placeholder="Phone number" value={invitePhone} onChange={(e) => setInvitePhone(e.target.value)} required />
             <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as UserRole)}>
               {ROLES.map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
             </select>
             <button type="submit" disabled={inviteSubmitting}>
-              {inviteSubmitting ? 'Sending…' : 'Send invite'}
+              {inviteSubmitting ? 'Saving…' : 'Save staff member'}
             </button>
           </div>
           {inviteError && <p className="user-mgmt-error" role="alert">{inviteError}</p>}
           {inviteLink && (
             <p className="user-mgmt-invite-link-note">
-              No email provider is connected yet — share this link with them directly:
+              Share this sign-in link with the staff member directly:
               <br />
               <code>{inviteLink}</code>
             </p>
@@ -148,6 +150,7 @@ export function UserManagementPage() {
             <tr>
               <th>Name</th>
               <th>Email</th>
+              <th>Phone</th>
               <th>Role</th>
               <th>Status</th>
               <th>2FA</th>
@@ -158,7 +161,8 @@ export function UserManagementPage() {
             {users.map((u) => (
               <tr key={u.id} className={u.isActive ? '' : 'user-mgmt-row--inactive'}>
                 <td>{u.fullName}</td>
-                <td>{u.email}</td>
+                <td>{u.email || '—'}</td>
+                <td>{u.phoneNumber || '—'}</td>
                 <td>
                   <select
                     value={u.role}
