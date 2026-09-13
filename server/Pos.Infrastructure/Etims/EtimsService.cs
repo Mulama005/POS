@@ -124,7 +124,7 @@ public sealed class EtimsService : IEtimsService
                 ok,
                 parsed.ResultCd,
                 alreadyInstalled
-                    ? "Device already initialized — connection confirmed, but this call doesn't re-return taxpayer/branch details (only the first-ever init does)."
+                    ? "Device already initialized."
                     : parsed.ResultMsg,
                 parsed.Data?.Info?.TaxprNm,
                 parsed.Data?.Info?.BhfNm,
