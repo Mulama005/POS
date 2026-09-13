@@ -14,6 +14,15 @@ namespace Pos.Infrastructure.Etims;
 /// </summary>
 public sealed class EtimsCodeSyncService : IEtimsCodeSyncService
 {
+    // Confirmed against real runs (2026-09-13): KRA returns resultCd "001" / resultMsg
+    // "There is no search result" whenever a sync's lastReqDt window genuinely has no
+    // new/changed records — for both /code/selectCodes and /itemClass/selectItemsClass.
+    // This sits outside the 900-series hard-error codes documented elsewhere (900 "no
+    // header info", 901 "not a valid device"), so it's KRA's own clean "nothing new"
+    // signal, not a fault — both sync methods below treat it as a successful, empty
+    // result rather than a failure.
+    private const string NoSearchResultCode = "001";
+
     private readonly PosDbContext _context;
     private readonly IEtimsService _etimsService;
     private readonly ILogger<EtimsCodeSyncService> _logger;
@@ -45,11 +54,29 @@ public sealed class EtimsCodeSyncService : IEtimsCodeSyncService
         var lastReqDt = state.LastSuccessfulSyncAt ?? EtimsSyncKeys.EpochLastReqDt;
         var fetch = await _etimsService.FetchCodesAsync(lastReqDt, cancellationToken);
 
+        if (!fetch.Success && fetch.ResultCode == NoSearchResultCode)
+        {
+            // Same KRA end-of-data signal handled in SyncItemClassesAsync (see that
+            // method's comment) — "nothing new since lastReqDt" is a legitimate,
+            // successful outcome here too, not a failure. Advance the watermark so the
+            // next sync's window moves forward instead of re-asking the same question.
+            state.LastSuccessfulSyncAt = requestStartedAt;
+            state.LastAttemptAt = requestStartedAt;
+            state.LastAttemptSucceeded = true;
+            state.LastAttemptMessage = "Synced 0 code classes (no changes since last sync).";
+            state.LastAttemptRecordCount = 0;
+            await _context.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation("eTIMS code sync: no changes since last sync (resultCd={ResultCd}).", fetch.ResultCode);
+            return new EtimsSyncSummary(true, 0, state.LastAttemptMessage, requestStartedAt);
+        }
+
         if (!fetch.Success)
         {
             state.LastAttemptAt = requestStartedAt;
             state.LastAttemptSucceeded = false;
-            state.LastAttemptMessage = fetch.ErrorMessage ?? $"Failed with result code {fetch.ResultCode}";
+            state.LastAttemptMessage = $"resultCd={fetch.ResultCode ?? "(none)"}, " +
+                (fetch.ErrorMessage ?? "no error message returned");
             state.LastAttemptRecordCount = 0;
             await _context.SaveChangesAsync(cancellationToken);
 
@@ -147,6 +174,13 @@ public sealed class EtimsCodeSyncService : IEtimsCodeSyncService
         // limit, not an expected real count.
         const int pageSize = 1000;
         const int iterationCap = 200; // 200k records — comfortably above any plausible real count
+
+        // Confirmed against a real run (2026-09-13): after 157 full pages / 157,000
+        // genuinely new records — proving lastReqDt-based paging DOES work against this
+        // dataset, contrary to the original "same-timestamp backlog" worry above — page
+        // 158 came back with resultCd "001" / resultMsg "There is no search result".
+        // See the class-level NoSearchResultCode constant for why this is treated as a
+        // normal loop exit (like the <pageSize case), not as fetch failure.
         var seenCodes = new HashSet<string>();
         var allItems = new List<EtimsItemClassDto>();
         var iterations = 0;
@@ -156,6 +190,20 @@ public sealed class EtimsCodeSyncService : IEtimsCodeSyncService
         {
             iterations++;
             var fetch = await _etimsService.FetchItemClassesAsync(lastReqDt, cancellationToken);
+
+            if (!fetch.Success && fetch.ResultCode == NoSearchResultCode)
+            {
+                // Legitimate end-of-data, not a failure — see the constant's comment
+                // above. allItems already holds every page successfully fetched before
+                // this one; nothing from this call gets added since it carried no
+                // records.
+                stoppedReason = "complete";
+                _logger.LogInformation(
+                    "eTIMS item-class sync reached KRA's end-of-data signal (resultCd={ResultCd}) " +
+                    "after {Total} records across {Pages} page(s).",
+                    fetch.ResultCode, allItems.Count, iterations);
+                break;
+            }
 
             if (!fetch.Success)
             {
@@ -168,8 +216,14 @@ public sealed class EtimsCodeSyncService : IEtimsCodeSyncService
                 // from the same point rather than resuming from a half-known state.
                 state.LastAttemptAt = requestStartedAt;
                 state.LastAttemptSucceeded = false;
+                // Always include ResultCode explicitly, even when ErrorMessage is also
+                // present — a non-null ResultMsg (e.g. "There is no search result")
+                // previously hid the numeric resultCd from this message entirely, and
+                // that code is exactly what's needed to tell a real error apart from
+                // KRA's own end-of-data signal.
                 state.LastAttemptMessage = $"Failed on page {iterations} ({allItems.Count} items fetched before failure): " +
-                    (fetch.ErrorMessage ?? $"result code {fetch.ResultCode}");
+                    $"resultCd={fetch.ResultCode ?? "(none)"}, " +
+                    (fetch.ErrorMessage ?? "no error message returned");
                 state.LastAttemptRecordCount = 0;
                 await _context.SaveChangesAsync(cancellationToken);
 

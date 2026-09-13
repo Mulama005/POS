@@ -88,6 +88,13 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
                 .WithMany(x => x.Products)
                 .HasForeignKey(x => x.CategoryId)
                 .OnDelete(DeleteBehavior.Restrict); // a category with products in it shouldn't be deletable
+
+            // eTIMS classification — lengths match EtimsItemClass's own ItemClsCd/TaxTyCd
+            // columns since EtimsItemClassificationCode/EtimsTaxTypeCode are meant to hold
+            // exactly those values (see Product.cs for why this isn't a hard FK).
+            e.Property(x => x.EtimsItemClassificationCode).HasMaxLength(10);
+            e.Property(x => x.EtimsTaxTypeCode).HasMaxLength(5);
+            e.HasIndex(x => x.EtimsItemClassificationCode); // powers the "unclassified" filter
         });
       
 
@@ -370,7 +377,13 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         modelBuilder.Entity<EtimsItemClass>(e =>
         {
             e.Property(x => x.ItemClsCd).IsRequired().HasMaxLength(10);
-            e.Property(x => x.ItemClsNm).IsRequired().HasMaxLength(200);
+            // No HasMaxLength here deliberately — a real sync run (2026-09-13) hit
+            // "value too long for type character varying(200)" partway through KRA's
+            // full taxonomy. 200 was never sourced from the VSCU spec (it doesn't
+            // document a max for this field), so rather than guess a new arbitrary
+            // ceiling that could just fail again on a different record, this maps to
+            // Postgres `text` (unbounded). The index below still works fine on `text`.
+            e.Property(x => x.ItemClsNm).IsRequired();
             e.Property(x => x.TaxTyCd).HasMaxLength(5);
             e.HasIndex(x => x.ItemClsCd).IsUnique();
             // Supports the "browse/search KRA's taxonomy while assigning a Product's

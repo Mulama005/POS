@@ -305,6 +305,16 @@ public sealed class EtimsService : IEtimsService
 
             if (parsed.ResultCd != "000")
             {
+                // Log the full raw body here specifically — this is the one non-"000"
+                // response per run (the terminal page), so it's cheap, and per the
+                // M-Pesa shortcode lesson, a reconstructed message string has already
+                // once hidden the actual field we needed. "There is no search result"
+                // reads like KRA's own end-of-data signal, not a real error, but we
+                // don't yet know its resultCd well enough to special-case it safely —
+                // capture it here so the next run tells us definitively.
+                _logger.LogWarning(
+                    "eTIMS item-classes non-000 response: resultCd={ResultCd} resultMsg={ResultMsg}. Raw: {Raw}",
+                    parsed.ResultCd, parsed.ResultMsg, raw);
                 return new EtimsItemClassesFetchResult(false, parsed.ResultCd, parsed.ResultMsg, Array.Empty<EtimsItemClassDto>());
             }
 

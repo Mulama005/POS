@@ -19,4 +19,12 @@ public class ProductDto
     public int WarrantyMonths { get; set; }
     public bool IsActive { get; set; }
     public int StockCount { get; set; } // computed from StockUnits
+
+    // eTIMS classification (Step 26) — null until assigned via the classification picker.
+    public string? EtimsItemClassificationCode { get; set; }
+    /// <summary>Joined from EtimsItemClasses at read time (not stored on Product) — always
+    /// reflects the classification's current name even if KRA renames it on a later sync.</summary>
+    public string? EtimsItemClassificationName { get; set; }
+    public string? EtimsTaxTypeCode { get; set; }
+    public DateTime? EtimsClassifiedAt { get; set; }
 }
