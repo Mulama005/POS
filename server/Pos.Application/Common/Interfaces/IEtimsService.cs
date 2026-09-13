@@ -32,4 +32,24 @@ public interface IEtimsService
     /// initialized once (or after being redeployed).
     /// </summary>
     Task<EtimsDeviceInitResult> InitDeviceAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Calls /code/selectCodes (VSCU spec section 3.3.2.1) — KRA's general reference
+    /// code lists (Tax Type, Packaging Unit, Unit of Quantity, Currency, etc — the full
+    /// catalogue is section 4 of the spec). `lastReqDt` requests only codes registered or
+    /// modified after that timestamp — pass EtimsSyncKeys.EpochLastReqDt for a full sync.
+    /// This is a pure HTTP wrapper: it does not read or write the database itself. See
+    /// IEtimsCodeSyncService for the persistence layer that calls this and upserts the
+    /// result.
+    /// </summary>
+    Task<EtimsCodesFetchResult> FetchCodesAsync(DateTime lastReqDt, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Calls /itemClass/selectItemsClass (VSCU spec section 3.3.2.2) — KRA's product
+    /// classification taxonomy that every Product will eventually need a code from.
+    /// Same incremental-sync semantics as FetchCodesAsync: pass
+    /// EtimsSyncKeys.EpochLastReqDt for a full sync. Also a pure HTTP wrapper — no
+    /// database access here.
+    /// </summary>
+    Task<EtimsItemClassesFetchResult> FetchItemClassesAsync(DateTime lastReqDt, CancellationToken cancellationToken = default);
 }

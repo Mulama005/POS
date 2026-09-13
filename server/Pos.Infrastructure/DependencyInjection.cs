@@ -57,6 +57,7 @@ public static class DependencyInjection
         // EtimsOptions for why BaseUrl is a local address.
         services.Configure<EtimsOptions>(configuration.GetSection(EtimsOptions.SectionName));
         services.AddHttpClient<IEtimsService, EtimsService>();
+        services.AddScoped<IEtimsCodeSyncService, EtimsCodeSyncService>();
 
         return services;
     }
