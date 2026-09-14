@@ -79,12 +79,12 @@ export function AdminDashboard() {
   const errCount = services.filter((s) => s.status === 'error').length
 
   if (loading) {
-    return <div className="adm-loading">Loading system status…</div>
+    return <div className="admin-loading">Loading system status…</div>
   }
 
   if (error) {
     return (
-      <div className="adm-error-screen">
+      <div className="admin-error-screen">
         <p>{error}</p>
         <button type="button" onClick={() => void fetchData()}>Retry</button>
       </div>
@@ -93,12 +93,12 @@ export function AdminDashboard() {
 
   return (
     <div className="admin-dashboard">
-      <div className="adm-header">
+      <div className="admin-header">
         <h1>Admin dashboard</h1>
-        <span className="adm-timestamp">{new Date().toLocaleTimeString('en-KE', { hour12: false })}</span>
+        <span className="admin-timestamp">{new Date().toLocaleTimeString('en-KE', { hour12: false })}</span>
       </div>
 
-      <div className="adm-summary-line">
+      <div className="admin-summary-line">
         <span className="tone-success">{okCount} OK</span>
         <span className="sep">·</span>
         <span className="tone-warn">{warnCount} WARN</span>
@@ -108,29 +108,29 @@ export function AdminDashboard() {
         <span>{services.length} integrations monitored</span>
       </div>
 
-      <section className="adm-section">
-        <div className="adm-section-header">
+      <section className="admin-section">
+        <div className="admin-section-header">
           <h2>Integrations</h2>
         </div>
         {services.map((svc) => <ServiceEntry key={svc.name} svc={svc} />)}
       </section>
 
-      <section className="adm-section adm-section--log">
-        <div className="adm-section-header">
+      <section className="admin-section admin-section--log">
+        <div className="admin-section-header">
           <h2>Audit log</h2>
-          <span className="adm-section-count">{auditLog.length} recent entries</span>
+          <span className="admin-section-count">{auditLog.length} recent entries</span>
         </div>
         {auditLog.length === 0 ? (
-          <p className="adm-empty">No audit entries recorded yet.</p>
+          <p className="admin-empty">No audit entries recorded yet.</p>
         ) : (
-          <div className="adm-log">
+          <div className="admin-log">
             {auditLog.map((row) => (
-              <div key={row.id} className="adm-log-row">
-                <span className="adm-log-ts">{row.ts}</span>
-                <span className="adm-log-user" title={row.user}>{row.user}</span>
-                <span className="adm-log-action">{row.action}</span>
-                <span className="adm-log-details">{row.details}</span>
-                <span className={`adm-log-level ${STATUS_TONE[row.level === 'error' ? 'error' : row.level === 'warn' ? 'warn' : 'ok']}`}>
+              <div key={row.id} className="admin-log-row">
+                <span className="admin-log-ts">{row.ts}</span>
+                <span className="admin-log-user" title={row.user}>{row.user}</span>
+                <span className="admin-log-action">{row.action}</span>
+                <span className="admin-log-details">{row.details}</span>
+                <span className={`admin-log-level ${STATUS_TONE[row.level === 'error' ? 'error' : row.level === 'warn' ? 'warn' : 'ok']}`}>
                   {row.level.toUpperCase()}
                 </span>
               </div>

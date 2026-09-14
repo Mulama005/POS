@@ -1,119 +1,218 @@
 .mfa-setup-screen {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--pos-bg);
-  padding: 24px;
-  font-family: var(--pos-font-body);
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    background: var(--pos-bg);
+    padding: 120px 40px 64px;
+    font-family: var(--pos-font-body);
+    color: var(--pos-ink);
 }
 
 .mfa-setup-card {
-  width: 100%;
-  max-width: 440px;
-  background: var(--pos-surface);
-  border: 1px solid var(--pos-border);
-  border-radius: 10px;
-  box-shadow: 0 12px 32px -12px rgba(26, 26, 26, 0.16);
-  padding: 32px;
+    width: 100%;
+    max-width: 520px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
 }
 
+/* Signature marker — same short ink rule as the LoginPage. */
+.mfa-setup-card::before {
+    content: '';
+    display: block;
+    width: 48px;
+    height: 3px;
+    background: var(--pos-ink);
+    margin-bottom: 40px;
+}
+
+/* --- Header ----------------------------------------------------------
+   Serif title, kicker subtitle, closed by a hairline rule — the same
+   masthead pattern used everywhere else. */
 .mfa-setup-title {
-  font-family: var(--pos-font-display);
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--pos-ink);
-  margin: 0 0 8px;
+    font-family: var(--pos-font-display);
+    font-size: 46px;
+    font-weight: 400;
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    color: var(--pos-ink);
+    margin: 0 0 16px;
 }
 
 .mfa-setup-subtitle {
-  font-size: 14px;
-  color: var(--pos-ink-muted);
-  margin: 0 0 24px;
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--pos-ink-muted);
+    margin: 0 0 40px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--pos-border);
 }
 
+/* --- Numbered steps --------------------------------------------------
+   Each step is a ledger row: numbered, spaced, hairline-separated.
+   The <ol> carries the numbering; we style the numbers as serif
+   figures to match the editorial tone. */
 .mfa-setup-steps {
-  margin: 0 0 20px;
-  padding-left: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  font-size: 14px;
-  color: var(--pos-ink);
+    margin: 0 0 40px;
+    padding: 0;
+    list-style: none;
+    counter-reset: mfa-step;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    font-size: 15px;
+    color: var(--pos-ink);
 }
 
 .mfa-setup-steps li {
-  padding-left: 4px;
+    counter-increment: mfa-step;
+    position: relative;
+    padding: 24px 0 24px 56px;
+    border-bottom: 1px solid var(--pos-border);
+    line-height: 1.55;
+}
+.mfa-setup-steps li:last-child {
+    border-bottom: none;
 }
 
+.mfa-setup-steps li::before {
+    content: counter(mfa-step, decimal-leading-zero);
+    position: absolute;
+    left: 0;
+    top: 24px;
+    font-family: var(--pos-font-display);
+    font-size: 24px;
+    font-weight: 400;
+    color: var(--pos-ink-muted);
+    letter-spacing: -0.01em;
+    line-height: 1;
+}
+
+/* --- QR block --------------------------------------------------------
+   A hairline-bounded block, not a card. The white background is kept
+   because QR codes need high contrast to scan. */
 .mfa-setup-qr {
-  margin-top: 10px;
-  padding: 12px;
-  background: #fff;
-  border: 1px solid var(--pos-border);
-  border-radius: 8px;
-  width: fit-content;
+    margin-top: 16px;
+    padding: 16px;
+    background: #FFFFFF;
+    border: 1px solid var(--pos-border);
+    border-radius: 0;
+    width: fit-content;
+    display: inline-block;
 }
 
+/* --- Secret block ----------------------------------------------------
+   The manual-entry fallback. Monospace secret on its own line, copy
+   button below it as a quiet underlined text action. */
 .mfa-setup-secret {
-  margin-top: 10px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
 }
 
 .mfa-setup-secret code {
-  font-family: var(--pos-font-mono);
-  font-size: 13px;
-  background: var(--pos-bg);
-  border: 1px solid var(--pos-border);
-  border-radius: 6px;
-  padding: 6px 10px;
-  word-break: break-all;
+    font-family: var(--pos-font-mono);
+    font-size: 14px;
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid var(--pos-rule);
+    border-radius: 0;
+    padding: 6px 0;
+    word-break: break-all;
+    letter-spacing: 0.06em;
+    color: var(--pos-ink);
 }
 
 .mfa-setup-copy-btn {
-  font-family: var(--pos-font-body);
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--pos-accent);
-  background: var(--pos-accent-soft);
-  border: none;
-  border-radius: 6px;
-  padding: 6px 10px;
-  cursor: pointer;
-  white-space: nowrap;
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--pos-ink);
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid var(--pos-ink);
+    border-radius: 0;
+    padding: 4px 0;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 120ms ease, border-color 120ms ease;
+}
+.mfa-setup-copy-btn:hover {
+    color: var(--pos-ink-muted);
+    border-bottom-color: var(--pos-ink-muted);
 }
 
+/* --- Error — hairline-bounded band, no fill -------------------------- */
 .mfa-setup-error {
-  margin: 12px 0 0;
-  font-size: 13px;
-  color: var(--pos-danger);
-  background: rgba(192, 57, 43, 0.08);
-  border: 1px solid rgba(192, 57, 43, 0.2);
-  border-radius: 6px;
-  padding: 8px 10px;
+    margin: 24px 0 0;
+    font-size: 14px;
+    color: var(--pos-danger);
+    background: transparent;
+    border: none;
+    border-top: 1px solid var(--pos-danger);
+    border-bottom: 1px solid var(--pos-danger);
+    border-radius: 0;
+    padding: 12px 0;
+    letter-spacing: 0.01em;
 }
 
+/* --- Hint — quiet italic editorial note ------------------------------ */
 .mfa-setup-hint {
-  margin: 12px 0 0;
-  font-size: 13px;
-  color: var(--pos-ink-muted);
+    margin: 20px 0 0;
+    font-size: 14px;
+    color: var(--pos-ink-muted);
+    font-style: italic;
+    line-height: 1.55;
 }
 
+/* --- Skip link -------------------------------------------------------
+   Bare underlined uppercase text, matching the .pos-btn--quiet pattern
+   used elsewhere. */
 .mfa-setup-skip-btn {
-  display: block;
-  margin: 24px auto 0;
-  font-family: var(--pos-font-body);
-  font-size: 13.5px;
-  color: var(--pos-ink-muted);
-  background: none;
-  border: none;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+    display: block;
+    margin: 40px auto 0;
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--pos-ink-muted);
+    background: none;
+    border: none;
+    border-bottom: 1.5px solid transparent;
+    border-radius: 0;
+    cursor: pointer;
+    padding: 4px 0;
+    text-decoration: none;
+    transition: color 120ms ease, border-color 120ms ease;
+}
+.mfa-setup-skip-btn:hover {
+    color: var(--pos-ink);
+    border-bottom-color: var(--pos-ink);
 }
 
-.mfa-setup-skip-btn:hover {
-  color: var(--pos-ink);
+/* --- Responsive ------------------------------------------------------ */
+@media (max-width: 700px) {
+    .mfa-setup-screen {
+        padding: 64px 24px 48px;
+    }
+    .mfa-setup-title {
+        font-size: 34px;
+    }
+    .mfa-setup-steps li {
+        padding-left: 40px;
+    }
+    .mfa-setup-steps li::before {
+        font-size: 20px;
+    }
 }

@@ -1,0 +1,275 @@
+﻿.audit-page {
+    padding: 64px 72px 96px;
+    font-family: var(--pos-font-body);
+    color: var(--pos-ink);
+    max-width: 1360px;
+}
+
+/* --- Masthead --------------------------------------------------------- */
+.audit-page h1 {
+    font-family: var(--pos-font-display);
+    font-size: 46px;
+    font-weight: 400;
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    margin: 0 0 40px;
+    padding-bottom: 16px;
+    border-bottom: 3px solid var(--pos-rule);
+}
+
+/* --- Filter row -------------------------------------------------------
+   Four underline-only inputs plus a square ink button, all baseline
+   aligned on a single ruled row. */
+.audit-filters {
+    display: flex;
+    align-items: flex-end;
+    gap: 28px;
+    margin-bottom: 48px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--pos-border);
+    flex-wrap: wrap;
+}
+
+.audit-filters input {
+    font-family: var(--pos-font-body);
+    font-size: 14px;
+    padding: 8px 0;
+    border: none;
+    border-bottom: 1.5px solid var(--pos-rule);
+    border-radius: 0;
+    background: transparent;
+    color: var(--pos-ink);
+    outline: none;
+    min-width: 160px;
+    flex: 1 1 160px;
+    transition: border-color 120ms ease;
+}
+
+.audit-filters input::placeholder {
+    color: var(--pos-ink-dim);
+    letter-spacing: 0.02em;
+}
+
+.audit-filters input:focus {
+    border-bottom-color: var(--pos-ink);
+}
+
+/* Date inputs render in monospace so the figures line up cleanly. */
+.audit-filters input[type="date"] {
+    font-family: var(--pos-font-mono);
+    font-size: 13px;
+    letter-spacing: 0.02em;
+    flex: 0 1 160px;
+    min-width: 140px;
+}
+
+.audit-filters button {
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--pos-bg);
+    background: var(--pos-ink);
+    border: 1.5px solid var(--pos-ink);
+    border-radius: 0;
+    padding: 12px 24px;
+    cursor: pointer;
+    flex: 0 0 auto;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+.audit-filters button:hover {
+    background: transparent;
+    color: var(--pos-ink);
+}
+
+/* --- Loading state ---------------------------------------------------- */
+.audit-page > div {
+    font-family: var(--pos-font-body);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--pos-ink-muted);
+    padding: 64px 0;
+    text-align: left;
+}
+
+/* --- Table -----------------------------------------------------------
+   A running ledger. Timestamps and identifiers in monospace; the action
+   column reads in body weight. Hairline rows, uppercase letter-spaced
+   headers closed by a 2px ink rule. */
+.audit-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.audit-table th,
+.audit-table td {
+    text-align: left;
+    padding: 14px 20px 14px 0;
+    border-bottom: 1px solid var(--pos-border);
+    font-size: 13.5px;
+    vertical-align: baseline;
+}
+
+.audit-table th {
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--pos-ink-muted);
+    border-bottom: 2px solid var(--pos-rule);
+    padding-bottom: 12px;
+}
+
+.audit-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Timestamp column — monospace, muted. */
+.audit-table td:nth-child(1) {
+    font-family: var(--pos-font-mono);
+    font-size: 12px;
+    color: var(--pos-ink-muted);
+    white-space: nowrap;
+    letter-spacing: 0;
+}
+
+/* User column — body weight, ink. */
+.audit-table td:nth-child(2) {
+    font-weight: 500;
+    color: var(--pos-ink);
+    white-space: nowrap;
+}
+
+/* Action column — the TSX wraps this in <strong>, so target that.
+   Reads as a monospace code rather than emphasised prose. */
+.audit-table td:nth-child(3) strong {
+    font-family: var(--pos-font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--pos-ink);
+    text-transform: uppercase;
+}
+
+/* Entity column — monospace, muted. */
+.audit-table td:nth-child(4) {
+    font-family: var(--pos-font-mono);
+    font-size: 12px;
+    color: var(--pos-ink-muted);
+    white-space: nowrap;
+}
+
+/* Details column — truncate long strings. */
+.audit-table td:nth-child(5) {
+    color: var(--pos-ink-muted);
+    max-width: 420px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* IP column — monospace, muted. */
+.audit-table td:nth-child(6) {
+    font-family: var(--pos-font-mono);
+    font-size: 12px;
+    color: var(--pos-ink-muted);
+    white-space: nowrap;
+}
+
+/* Row hover — subtle padding-left shift on the first cell. */
+.audit-table tbody tr td:first-child {
+    transition: padding-left 120ms ease;
+}
+.audit-table tbody tr:hover td:first-child {
+    padding-left: 8px;
+}
+
+/* --- Pagination ------------------------------------------------------ */
+.pagination {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    justify-content: center;
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--pos-border);
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--pos-ink-muted);
+}
+
+.pagination button {
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    border: none;
+    border-bottom: 1.5px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    color: var(--pos-ink);
+    padding: 4px 0;
+    cursor: pointer;
+    transition: border-color 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+
+.pagination button:hover:not(:disabled) {
+    border-bottom-color: var(--pos-ink);
+}
+
+.pagination button:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+/* --- Responsive ------------------------------------------------------ */
+@media (max-width: 900px) {
+    .audit-page {
+        padding: 40px 24px 64px;
+    }
+    .audit-page h1 {
+        font-size: 34px;
+    }
+    .audit-filters {
+        gap: 20px;
+    }
+    .audit-filters input,
+    .audit-filters input[type="date"] {
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+    .audit-filters button {
+        flex: 1 1 100%;
+    }
+    /* Collapse table to a two-column ledger on narrow screens; secondary
+       columns wrap onto a second line per entry. */
+    .audit-table th:nth-child(4),
+    .audit-table td:nth-child(4),
+    .audit-table th:nth-child(6),
+    .audit-table td:nth-child(6) {
+        display: none;
+    }
+    .audit-table td:nth-child(5) {
+        max-width: 200px;
+    }
+}
+
+@media (max-width: 600px) {
+    .audit-table th,
+    .audit-table td {
+        padding: 12px 12px 12px 0;
+        font-size: 13px;
+    }
+    .audit-table td:nth-child(5) {
+        display: none;
+    }
+}

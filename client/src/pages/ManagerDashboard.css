@@ -1,186 +1,289 @@
 ﻿.manager-dashboard {
-  padding: 32px 40px 48px;
-  font-family: var(--pos-font-body);
-  color: var(--pos-ink);
-  max-width: 1000px;
+    padding: 64px 72px 96px;
+    font-family: var(--pos-font-body);
+    color: var(--pos-ink);
+    max-width: 1080px;
 }
 
+/* --- Loading / error ------------------------------------------------- */
 .mgr-loading,
 .mgr-error-screen {
-  padding: 80px 40px;
-  text-align: center;
-  color: var(--pos-ink-muted);
+    padding: 96px 72px;
+    text-align: center;
+    color: var(--pos-ink-muted);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
 }
 .mgr-error-screen p {
-  color: var(--pos-danger);
-  margin-bottom: 12px;
+    color: var(--pos-danger);
+    margin-bottom: 20px;
+    letter-spacing: 0.08em;
+    text-transform: none;
+    font-weight: 400;
+    font-size: 15px;
 }
 .mgr-error-screen button {
-  font-family: var(--pos-font-body);
-  font-weight: 600;
-  font-size: 14px;
-  color: #fff;
-  background: var(--pos-accent);
-  border: none;
-  border-radius: 6px;
-  padding: 8px 16px;
-  cursor: pointer;
+    font-family: var(--pos-font-body);
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--pos-bg);
+    background: var(--pos-ink);
+    border: 1.5px solid var(--pos-ink);
+    border-radius: 0;
+    padding: 12px 24px;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+}
+.mgr-error-screen button:hover {
+    background: transparent;
+    color: var(--pos-ink);
 }
 
+/* --- Masthead ---------------------------------------------------------
+   Kicker, serif title, and date on the right, closed by a thick ink
+   rule. This is the page's opening statement. */
 .mgr-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 20px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 32px;
+    padding-bottom: 16px;
+    border-bottom: 3px solid var(--pos-rule);
+    margin-bottom: 24px;
+}
+.mgr-header .mgr-kicker {
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--pos-ink-muted);
+    display: block;
+    margin-bottom: 12px;
 }
 .mgr-header h1 {
-  font-family: var(--pos-font-display);
-  font-size: 22px;
-  margin: 0;
+    font-family: var(--pos-font-display);
+    font-size: 46px;
+    font-weight: 400;
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    margin: 0;
 }
 .mgr-date {
-  font-family: var(--pos-font-mono);
-  font-size: 12px;
-  color: var(--pos-ink-muted);
+    font-family: var(--pos-font-mono);
+    font-size: 12px;
+    color: var(--pos-ink-muted);
+    white-space: nowrap;
 }
 
-/* --- Hero: the one big number, the way a receipt's total line is the
-   thing your eye goes to. No card, no shadow — a rule above and below,
-   like the total row on a ledger page. --- */
+/* --- Hero -------------------------------------------------------------
+   The page's single heaviest number. Framed top and bottom by ink rules
+   so it reads like the total line on a receipt: everything above it
+   feeds it, everything below it elaborates. */
 .mgr-hero {
-  padding: 22px 0 20px;
-  border-top: 2px solid var(--pos-ink);
-  border-bottom: 1px solid var(--pos-border);
-  margin-bottom: 28px;
+    padding: 40px 0 32px;
+    border-top: 3px solid var(--pos-rule);
+    border-bottom: 1px solid var(--pos-border);
+    margin-bottom: 56px;
 }
 .mgr-hero-label {
-  display: block;
-  font-family: var(--pos-font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--pos-ink-muted);
-  margin-bottom: 4px;
+    display: block;
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--pos-ink-muted);
+    margin-bottom: 16px;
 }
 .mgr-hero-value {
-  display: block;
-  font-family: var(--pos-font-mono);
-  font-size: 44px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--pos-ink);
-  line-height: 1.1;
+    display: block;
+    font-family: var(--pos-font-display);
+    font-size: 88px;
+    font-weight: 400;
+    letter-spacing: -0.025em;
+    color: var(--pos-ink);
+    line-height: 1;
 }
 .mgr-hero-stats {
-  margin-top: 10px;
-  font-size: 13.5px;
-  color: var(--pos-ink-muted);
+    margin-top: 20px;
+    font-size: 15px;
+    color: var(--pos-ink-muted);
+    font-family: var(--pos-font-body);
+    letter-spacing: 0.005em;
 }
 .mgr-hero-stats strong {
-  color: var(--pos-ink);
-  font-weight: 600;
+    color: var(--pos-ink);
+    font-weight: 600;
 }
 .mgr-hero-stats .sep {
-  margin: 0 8px;
-  opacity: 0.5;
+    margin: 0 12px;
+    opacity: 0.4;
 }
 
+/* --- Two-column ledger grid ------------------------------------------ */
 .mgr-columns {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 40px;
-  margin-bottom: 28px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 56px;
+    margin-bottom: 64px;
 }
 
+/* --- Section header --------------------------------------------------
+   Serif title + uppercase count, closed by a 3px ink rule. Consistent
+   with every other section in the app. */
 .mgr-section-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 10px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 24px;
+    padding-bottom: 12px;
+    border-bottom: 3px solid var(--pos-rule);
+    margin-bottom: 20px;
 }
 .mgr-section-header h2 {
-  font-family: var(--pos-font-display);
-  font-size: 14.5px;
-  font-weight: 600;
-  margin: 0;
-  letter-spacing: -0.01em;
+    font-family: var(--pos-font-display);
+    font-size: 28px;
+    font-weight: 400;
+    margin: 0;
+    letter-spacing: -0.01em;
 }
 .mgr-section-count {
-  font-family: var(--pos-font-mono);
-  font-size: 11.5px;
-  color: var(--pos-ink-muted);
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--pos-ink-muted);
 }
 
 .mgr-empty {
-  font-size: 13px;
-  color: var(--pos-ink-muted);
-  padding: 8px 0;
+    font-size: 15px;
+    color: var(--pos-ink-muted);
+    padding: 12px 0;
+    font-style: italic;
 }
 
 .tone-success { color: var(--pos-success); }
-.tone-warn { color: var(--pos-warn); }
-.tone-danger { color: var(--pos-danger); }
+.tone-warn    { color: var(--pos-warn); }
+.tone-danger  { color: var(--pos-danger); }
 
+/* --- Register entry ---------------------------------------------------
+   A ledger row: name + status on the top line, cashier + variance on
+   the sub-line, then the CashBar. No wrapper. */
 .mgr-register-entry {
-  padding: 3px 0;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--pos-border);
+}
+.mgr-register-entry:last-child {
+    border-bottom: none;
 }
 .mgr-register-sub {
-  display: flex;
-  justify-content: space-between;
-  font-family: var(--pos-font-mono);
-  font-size: 11.5px;
-  padding: 0 0 8px;
-  color: var(--pos-ink-muted);
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--pos-font-mono);
+    font-size: 12px;
+    padding: 6px 0 12px;
+    color: var(--pos-ink-muted);
 }
 
 .mgr-section--full {
-  margin-bottom: 0;
+    margin-bottom: 0;
 }
 
+/* --- Approvals table -------------------------------------------------
+   A ledger table. Headers are uppercase letter-spaced, separated by a
+   single ink rule from the body; rows are hairlines. Action buttons
+   are quiet underlines, not pills. */
 .mgr-approvals-table {
-  width: 100%;
-  border-collapse: collapse;
+    width: 100%;
+    border-collapse: collapse;
 }
 .mgr-approvals-table th,
 .mgr-approvals-table td {
-  text-align: left;
-  padding: 9px 10px;
-  border-bottom: 1px solid var(--pos-border);
-  font-size: 13.5px;
+    text-align: left;
+    padding: 16px 16px 16px 0;
+    border-bottom: 1px solid var(--pos-border);
+    font-size: 14.5px;
+    vertical-align: baseline;
 }
 .mgr-approvals-table th {
-  font-family: var(--pos-font-mono);
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--pos-ink-muted);
-  font-weight: 600;
-  border-bottom: 1px solid var(--pos-ink);
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--pos-ink-muted);
+    font-weight: 600;
+    border-bottom: 2px solid var(--pos-rule);
+    padding-bottom: 12px;
 }
+.mgr-approvals-table tr:last-child td {
+    border-bottom: none;
+}
+
 .mgr-mono {
-  font-family: var(--pos-font-mono);
-  font-size: 12.5px;
+    font-family: var(--pos-font-mono);
+    font-size: 13px;
+    letter-spacing: 0;
 }
+
+/* --- Approval actions ------------------------------------------------
+   Quiet underlined text buttons. Approve reads as ink; Reject reads
+   as danger ink. Both reveal on hover via the underline. */
 .mgr-approval-actions {
-  display: flex;
-  gap: 8px;
+    display: flex;
+    gap: 20px;
+    justify-content: flex-end;
 }
 .mgr-approval-actions button {
-  font-family: var(--pos-font-body);
-  font-size: 12.5px;
-  font-weight: 600;
-  border: 1px solid var(--pos-border);
-  border-radius: 6px;
-  background: var(--pos-surface);
-  padding: 5px 10px;
-  cursor: pointer;
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--pos-ink);
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid transparent;
+    border-radius: 0;
+    padding: 2px 0;
+    cursor: pointer;
+    transition: border-color 120ms ease, color 120ms ease;
+}
+.mgr-approval-actions button:hover:not(:disabled) {
+    border-bottom-color: var(--pos-ink);
 }
 .mgr-approval-actions button:disabled {
-  opacity: 0.5;
-  cursor: default;
+    opacity: 0.35;
+    cursor: default;
 }
 .mgr-reject-btn {
-  color: var(--pos-danger);
-  border-color: rgba(192, 57, 43, 0.35) !important;
+    color: var(--pos-danger) !important;
+}
+.mgr-reject-btn:hover:not(:disabled) {
+    border-bottom-color: var(--pos-danger) !important;
+}
+
+/* --- Responsive ------------------------------------------------------ */
+@media (max-width: 900px) {
+    .manager-dashboard {
+        padding: 40px 24px 64px;
+    }
+    .mgr-header h1 {
+        font-size: 34px;
+    }
+    .mgr-hero-value {
+        font-size: 56px;
+    }
+    .mgr-columns {
+        grid-template-columns: 1fr;
+        gap: 48px;
+    }
+    .mgr-approval-actions {
+        gap: 12px;
+    }
 }

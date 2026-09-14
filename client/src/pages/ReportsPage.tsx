@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
 import LoadingScreen from "../components/LoadingScreen";
+import "./ReportsPage.css";
 
 // ── Types ────────────────────────────────────────────────────────────────
 interface SalesReport {
@@ -204,10 +205,10 @@ export default function ReportsPage() {
                     <h2>Inventory</h2>
                     <div className="export-buttons">
                         <div className="export-buttons">
-                            <button onClick={() => handleExport("inventory", `inventory_report_${dateRange.from || "all"}.csv`, "csv")}>
+                            <button className="btn-export" onClick={() => handleExport("inventory", `inventory_report_${dateRange.from || "all"}.csv`, "csv")}>
                                 CSV
                             </button>
-                            <button onClick={() => handleExport("inventory", `inventory_report_${dateRange.from || "all"}.pdf`, "pdf")}>
+                            <button className="btn-export" onClick={() => handleExport("inventory", `inventory_report_${dateRange.from || "all"}.pdf`, "pdf")}>
                                 PDF
                             </button>
                         </div>
@@ -287,10 +288,10 @@ export default function ReportsPage() {
                 <div className="section-header">
                     <h2>Staff Performance</h2>
                     <div className="export-buttons">
-                        <button onClick={() => handleExport("staff", `staff_performance_${dateRange.from || "all"}.csv`, "csv")}>
+                        <button className="btn-export" onClick={() => handleExport("staff", `staff_performance_${dateRange.from || "all"}.csv`, "csv")}>
                             CSV
                         </button>
-                        <button onClick={() => handleExport("staff", `staff_performance_${dateRange.from || "all"}.pdf`, "pdf")}>
+                        <button className="btn-export" onClick={() => handleExport("staff", `staff_performance_${dateRange.from || "all"}.pdf`, "pdf")}>
                             PDF
                         </button>
                     </div>
