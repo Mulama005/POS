@@ -44,6 +44,8 @@ export interface ListProductsParams {
   pageSize?: number
   search?: string
   category?: string
+  /** true = only classified products, false = only unclassified, omitted = both. */
+  etimsClassified?: boolean
 }
 
 export async function listProducts(params: ListProductsParams = {}): Promise<ProductListResponse> {

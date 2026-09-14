@@ -38,6 +38,12 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<CreditTransaction> CreditTransactions => Set<CreditTransaction>();
     public DbSet<PricingTier> PricingTiers => Set<PricingTier>();
     public DbSet<ProductTierPrice> ProductTierPrices => Set<ProductTierPrice>();
+    public DbSet<EtimsCodeClass> EtimsCodeClasses => Set<EtimsCodeClass>();
+    public DbSet<EtimsCode> EtimsCodes => Set<EtimsCode>();
+    public DbSet<EtimsItemClass> EtimsItemClasses => Set<EtimsItemClass>();
+    public DbSet<EtimsSyncState> EtimsSyncStates => Set<EtimsSyncState>();
+
+    public DbSet<SentWhatsAppMessage> SentWhatsAppMessages => Set<SentWhatsAppMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -82,6 +88,13 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
                 .WithMany(x => x.Products)
                 .HasForeignKey(x => x.CategoryId)
                 .OnDelete(DeleteBehavior.Restrict); // a category with products in it shouldn't be deletable
+
+            // eTIMS classification — lengths match EtimsItemClass's own ItemClsCd/TaxTyCd
+            // columns since EtimsItemClassificationCode/EtimsTaxTypeCode are meant to hold
+            // exactly those values (see Product.cs for why this isn't a hard FK).
+            e.Property(x => x.EtimsItemClassificationCode).HasMaxLength(10);
+            e.Property(x => x.EtimsTaxTypeCode).HasMaxLength(5);
+            e.HasIndex(x => x.EtimsItemClassificationCode); // powers the "unclassified" filter
         });
       
 
@@ -330,6 +343,59 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
                 .WithMany(x => x.AuditLogEntries)
                 .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ---------- EtimsCodeClass / EtimsCode ----------
+        // Populated by syncing against KRA's /code/selectCodes — CdCls/Cd are KRA's own
+        // natural keys, not arbitrary local values, so both are unique.
+        modelBuilder.Entity<EtimsCodeClass>(e =>
+        {
+            e.Property(x => x.CdCls).IsRequired().HasMaxLength(2);
+            e.Property(x => x.CdClsNm).IsRequired().HasMaxLength(200);
+            e.HasIndex(x => x.CdCls).IsUnique();
+        });
+
+        modelBuilder.Entity<EtimsCode>(e =>
+        {
+            e.Property(x => x.Cd).IsRequired().HasMaxLength(5);
+            e.Property(x => x.CdNm).IsRequired().HasMaxLength(200);
+            e.HasIndex(x => new { x.EtimsCodeClassId, x.Cd }).IsUnique();
+
+            // Cascade here (unlike most of this schema's deliberate Restrict default) is
+            // intentional: a code with no parent class is meaningless data, not an
+            // orphaned business record — if a class is ever removed, its codes should go
+            // with it.
+            e.HasOne(x => x.EtimsCodeClass)
+                .WithMany(x => x.Codes)
+                .HasForeignKey(x => x.EtimsCodeClassId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ---------- EtimsItemClass ----------
+        // Populated by syncing against /itemClass/selectItemsClass. Expect this table to
+        // be large (KRA's full product taxonomy) — ItemClsCd is KRA's natural key.
+        modelBuilder.Entity<EtimsItemClass>(e =>
+        {
+            e.Property(x => x.ItemClsCd).IsRequired().HasMaxLength(10);
+            // No HasMaxLength here deliberately — a real sync run (2026-09-13) hit
+            // "value too long for type character varying(200)" partway through KRA's
+            // full taxonomy. 200 was never sourced from the VSCU spec (it doesn't
+            // document a max for this field), so rather than guess a new arbitrary
+            // ceiling that could just fail again on a different record, this maps to
+            // Postgres `text` (unbounded). The index below still works fine on `text`.
+            e.Property(x => x.ItemClsNm).IsRequired();
+            e.Property(x => x.TaxTyCd).HasMaxLength(5);
+            e.HasIndex(x => x.ItemClsCd).IsUnique();
+            // Supports the "browse/search KRA's taxonomy while assigning a Product's
+            // classification" flow that Step 26's next slice needs.
+            e.HasIndex(x => x.ItemClsNm);
+        });
+
+        // ---------- EtimsSyncState ----------
+        modelBuilder.Entity<EtimsSyncState>(e =>
+        {
+            e.Property(x => x.SyncKey).IsRequired().HasMaxLength(50);
+            e.HasIndex(x => x.SyncKey).IsUnique();
         });
     }
 }
