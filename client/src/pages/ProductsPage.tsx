@@ -11,7 +11,11 @@ import { listCategories } from '../services/categoriesService'
 import type { Category, Product, ProductFormValues, TaxClass } from '../types/product'
 import type { ApiErrorBody } from '../types/auth'
 import { formatKes } from '../utils/currency'
+import { RoleGate } from '../components/RouteGuards'
+import { EtimsClassificationPicker, type EtimsPickerTarget } from '../components/EtimsClassificationPicker'
 import './ProductsPage.css'
+
+type EtimsFilter = 'all' | 'classified' | 'unclassified'
 
 const TAX_CLASSES: TaxClass[] = ['Standard', 'ZeroRated', 'Exempt']
 const PAGE_SIZE = 20
@@ -63,6 +67,10 @@ export function ProductsPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
+  const [etimsFilter, setEtimsFilter] = useState<EtimsFilter>('all')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [pickerTargets, setPickerTargets] = useState<EtimsPickerTarget[] | null>(null)
+
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formValues, setFormValues] = useState<ProductFormValues>(EMPTY_FORM)
@@ -86,7 +94,12 @@ export function ProductsPage() {
     setLoading(true)
     setLoadError(null)
     try {
-      const res = await listProducts({ page, pageSize: PAGE_SIZE, search: search || undefined })
+      const res = await listProducts({
+        page,
+        pageSize: PAGE_SIZE,
+        search: search || undefined,
+        etimsClassified: etimsFilter === 'all' ? undefined : etimsFilter === 'classified',
+      })
       setProducts(res.items)
       setTotal(res.total)
     } catch (err) {
@@ -102,8 +115,12 @@ export function ProductsPage() {
 
   useEffect(() => {
     void loadProducts()
+    // Selection is scoped to "the rows currently on screen" — changing page, search,
+    // or the eTIMS filter can change which rows those are, so a stale selection from
+    // before would silently point at products the user can no longer see.
+    setSelectedIds(new Set())
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, search])
+  }, [page, search, etimsFilter])
 
   const openCreateForm = () => {
     setEditingId(null)
@@ -160,6 +177,55 @@ export function ProductsPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  const allOnPageSelected = products.length > 0 && products.every((p) => selectedIds.has(p.id))
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const toggleSelectAllOnPage = () => {
+    setSelectedIds((prev) => {
+      if (allOnPageSelected) {
+        const next = new Set(prev)
+        products.forEach((p) => next.delete(p.id))
+        return next
+      }
+      const next = new Set(prev)
+      products.forEach((p) => next.add(p.id))
+      return next
+    })
+  }
+
+  const toPickerTarget = (p: Product): EtimsPickerTarget => ({
+    id: p.id,
+    sku: p.sku,
+    name: p.name,
+    currentCode: p.etimsItemClassificationCode,
+  })
+
+  const openPickerForProduct = (p: Product) => setPickerTargets([toPickerTarget(p)])
+
+  const openPickerForSelection = () => {
+    const targets = products.filter((p) => selectedIds.has(p.id)).map(toPickerTarget)
+    if (targets.length > 0) setPickerTargets(targets)
+  }
+
+  const closePicker = () => setPickerTargets(null)
+
+  const handleAssigned = () => {
+    setPickerTargets(null)
+    setSelectedIds(new Set())
+    void loadProducts()
+  }
 
   return (
     <div className="products-screen">
@@ -279,6 +345,21 @@ export function ProductsPage() {
             setSearch(e.target.value)
           }}
         />
+        <div className="products-etims-filter" role="group" aria-label="Filter by eTIMS classification">
+          {(['all', 'classified', 'unclassified'] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              className={`products-etims-filter-btn ${etimsFilter === f ? 'products-etims-filter-btn--active' : ''}`}
+              onClick={() => {
+                setPage(1)
+                setEtimsFilter(f)
+              }}
+            >
+              {f === 'all' ? 'All' : f === 'classified' ? 'Classified' : 'Unclassified'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading && <p className="products-hint">Loading products…</p>}
@@ -286,21 +367,58 @@ export function ProductsPage() {
 
       {!loading && !loadError && (
         <>
+          <RoleGate roles={['Manager', 'Admin']}>
+            {selectedIds.size > 0 && (
+              <div className="products-selection-bar">
+                <span>{selectedIds.size} product{selectedIds.size === 1 ? '' : 's'} selected</span>
+                <div className="products-selection-bar-actions">
+                  <button type="button" onClick={openPickerForSelection}>
+                    Assign eTIMS classification
+                  </button>
+                  <button type="button" className="products-selection-bar-clear" onClick={() => setSelectedIds(new Set())}>
+                    Clear selection
+                  </button>
+                </div>
+              </div>
+            )}
+          </RoleGate>
+
           <table className="products-table">
             <thead>
               <tr>
+                <RoleGate roles={['Manager', 'Admin']}>
+                  <th className="products-col-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={allOnPageSelected}
+                      onChange={toggleSelectAllOnPage}
+                      aria-label="Select all products on this page"
+                    />
+                  </th>
+                </RoleGate>
                 <th>SKU</th>
                 <th>Name</th>
                 <th>Category</th>
                 <th>Price</th>
                 <th>Tax</th>
                 <th>Stock</th>
+                <th>eTIMS</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {products.map((p) => (
                 <tr key={p.id} className={p.isActive ? '' : 'products-row--inactive'}>
+                  <RoleGate roles={['Manager', 'Admin']}>
+                    <td className="products-col-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(p.id)}
+                        onChange={() => toggleSelected(p.id)}
+                        aria-label={`Select ${p.name}`}
+                      />
+                    </td>
+                  </RoleGate>
                   <td>{p.sku}</td>
                   <td>{p.name}</td>
                   <td>{p.categoryName}</td>
@@ -309,10 +427,24 @@ export function ProductsPage() {
                   <td className={`products-col-stock ${p.stockCount <= p.reorderThreshold ? 'products-stock--low' : ''}`}>
                     {p.stockCount}
                   </td>
+                  <td className="products-col-etims">
+                    {p.etimsItemClassificationCode ? (
+                      <span className="pos-badge pos-badge--success" title={p.etimsItemClassificationName ?? undefined}>
+                        {p.etimsItemClassificationCode}
+                      </span>
+                    ) : (
+                      <span className="pos-badge pos-badge--neutral">Unclassified</span>
+                    )}
+                  </td>
                   <td className="products-row-actions">
                     <button type="button" onClick={() => openEditForm(p)} disabled={rowBusy[p.id]}>
                       Edit
                     </button>
+                    <RoleGate roles={['Manager', 'Admin']}>
+                      <button type="button" onClick={() => openPickerForProduct(p)} disabled={rowBusy[p.id]}>
+                        {p.etimsItemClassificationCode ? 'Reclassify' : 'Classify'}
+                      </button>
+                    </RoleGate>
                     <Link to={`/stock/receive?productId=${p.id}`} className="products-receive-link">
                       Receive stock →
                     </Link>
@@ -332,7 +464,7 @@ export function ProductsPage() {
               ))}
               {products.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="products-hint">No products found.</td>
+                  <td colSpan={9} className="products-hint">No products found.</td>
                 </tr>
               )}
             </tbody>
@@ -350,6 +482,14 @@ export function ProductsPage() {
             </div>
           )}
         </>
+      )}
+
+      {pickerTargets && (
+        <EtimsClassificationPicker
+          products={pickerTargets}
+          onClose={closePicker}
+          onAssigned={handleAssigned}
+        />
       )}
     </div>
   )

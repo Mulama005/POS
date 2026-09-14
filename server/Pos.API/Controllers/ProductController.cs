@@ -8,7 +8,6 @@ using Pos.Application.Features.Products;
 using Pos.Domain.Entities;
 using Pos.Domain.Enums;
 using Pos.Infrastructure.Persistence;
-using Pos.Api.Controllers;
 using Pos.Application.Common.Interfaces;
 using System.Security.Claims;
 
@@ -23,7 +22,10 @@ public class ProductsController : ControllerBase
     private readonly IStorageService _storageService;
     private readonly IAuditService _auditService;
 
-    public ProductsController(PosDbContext context, IAuditService auditService, IStorageService storageService)
+    public ProductsController(
+        PosDbContext context,
+        IAuditService auditService,
+        IStorageService storageService)
     {
         _context = context;
         _storageService = storageService;
@@ -32,7 +34,10 @@ public class ProductsController : ControllerBase
 
     [HttpGet]
     public async Task<IActionResult> List(
-        [FromQuery] int page = 1, int pageSize = 20, string? search = null, Guid? category = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null,
+        [FromQuery] Guid? category = null,
         [FromQuery] bool? etimsClassified = null)
     {
         var query = _context.Products
@@ -40,23 +45,28 @@ public class ProductsController : ControllerBase
             .Include(p => p.StockUnits)
             .Where(p => p.IsActive);
 
-        if (!string.IsNullOrEmpty(search))
+        if (!string.IsNullOrWhiteSpace(search))
+        {
             query = query.Where(p =>
                 p.Name.Contains(search) ||
                 p.Sku.Contains(search) ||
                 (p.Barcode != null && p.Barcode.Contains(search)));
-        if (category.HasValue)
-            query = query.Where(p => p.CategoryId == category.Value);
+        }
 
-        // Powers the classification picker's "unclassified" filter — defaults to
-        // unfiltered so this stays the same general-purpose product list everywhere
-        // else already uses it.
+        if (category.HasValue)
+        {
+            query = query.Where(p => p.CategoryId == category.Value);
+        }
+
         if (etimsClassified.HasValue)
+        {
             query = etimsClassified.Value
                 ? query.Where(p => p.EtimsItemClassificationCode != null)
                 : query.Where(p => p.EtimsItemClassificationCode == null);
+        }
 
         var total = await query.CountAsync();
+
         var items = await query
             .OrderBy(p => p.Name)
             .Skip((page - 1) * pageSize)
@@ -69,7 +79,9 @@ public class ProductsController : ControllerBase
                 Name = p.Name,
                 Description = p.Description,
                 CategoryId = p.CategoryId,
-                CategoryName = p.Category != null ? p.Category.Name : string.Empty,
+                CategoryName = p.Category != null
+                    ? p.Category.Name
+                    : string.Empty,
                 CostPrice = p.CostPrice,
                 SalePrice = p.SalePrice,
                 TaxClass = p.TaxClass,
@@ -77,22 +89,33 @@ public class ProductsController : ControllerBase
                 ReorderThreshold = p.ReorderThreshold,
                 WarrantyMonths = p.WarrantyMonths,
                 IsActive = p.IsActive,
-                StockCount = p.BulkQuantityOnHand + p.StockUnits.Count(u => u.Status == "InStock"),
-                EtimsItemClassificationCode = p.EtimsItemClassificationCode,
-                // Correlated subquery rather than a real navigation/join — deliberate,
-                // see Product.EtimsItemClassificationCode's comment on why this isn't a
-                // hard FK. Fine at this page size (20–50 rows); revisit only if this
-                // list ever needs to return hundreds of rows at once.
-                EtimsItemClassificationName = _context.EtimsItemClasses
-                    .Where(e => e.ItemClsCd == p.EtimsItemClassificationCode)
-                    .Select(e => e.ItemClsNm)
-                    .FirstOrDefault(),
+                StockCount =
+                    p.BulkQuantityOnHand +
+                    p.StockUnits.Count(u => u.Status == "InStock"),
+
+                EtimsItemClassificationCode =
+                    p.EtimsItemClassificationCode,
+
+                EtimsItemClassificationName =
+                    _context.EtimsItemClasses
+                        .Where(e =>
+                            e.ItemClsCd ==
+                            p.EtimsItemClassificationCode)
+                        .Select(e => e.ItemClsNm)
+                        .FirstOrDefault(),
+
                 EtimsTaxTypeCode = p.EtimsTaxTypeCode,
                 EtimsClassifiedAt = p.EtimsClassifiedAt
             })
             .ToListAsync();
 
-        return Ok(new { items, total, page, pageSize });
+        return Ok(new
+        {
+            items,
+            total,
+            page,
+            pageSize
+        });
     }
 
     [HttpGet("{id}")]
@@ -101,33 +124,50 @@ public class ProductsController : ControllerBase
         var product = await _context.Products
             .Include(p => p.Category)
             .Include(p => p.StockUnits)
-            .FirstOrDefaultAsync(p => p.Id == id && p.IsActive);
-        if (product == null) return NotFound();
+            .FirstOrDefaultAsync(p =>
+                p.Id == id &&
+                p.IsActive);
+
+        if (product == null)
+            return NotFound();
 
         string? etimsClassificationName = null;
+
         if (product.EtimsItemClassificationCode is not null)
         {
-            etimsClassificationName = await _context.EtimsItemClasses
-                .Where(e => e.ItemClsCd == product.EtimsItemClassificationCode)
-                .Select(e => e.ItemClsNm)
-                .FirstOrDefaultAsync();
+            etimsClassificationName =
+                await _context.EtimsItemClasses
+                    .Where(e =>
+                        e.ItemClsCd ==
+                        product.EtimsItemClassificationCode)
+                    .Select(e => e.ItemClsNm)
+                    .FirstOrDefaultAsync();
         }
 
-        var dto = MapToDto(product, etimsClassificationName);
+        var dto = MapToDto(
+            product,
+            etimsClassificationName);
+
         return Ok(dto);
     }
 
     [HttpPost]
     [Authorize(Roles = "Manager,Admin")]
-    public async Task<IActionResult> Create([FromForm] CreateProductRequest request, IFormFile? image)
+    public async Task<IActionResult> Create(
+        [FromForm] CreateProductRequest request,
+        IFormFile? image)
     {
-        // Validate category exists
-        var category = await _context.Categories.FindAsync(request.CategoryId);
-        if (category == null) return BadRequest("Invalid category");
+        var category =
+            await _context.Categories.FindAsync(request.CategoryId);
 
-        // Check SKU uniqueness
-        if (await _context.Products.AnyAsync(p => p.Sku == request.Sku))
+        if (category == null)
+            return BadRequest("Invalid category");
+
+        if (await _context.Products.AnyAsync(
+                p => p.Sku == request.Sku))
+        {
             return BadRequest("SKU already exists");
+        }
 
         var product = new Product
         {
@@ -146,47 +186,71 @@ public class ProductsController : ControllerBase
             CreatedAt = DateTime.UtcNow
         };
 
-        // Handle image upload (optional)
         if (image != null)
         {
             using var stream = image.OpenReadStream();
-			var fileName = $"{product.Id}_{Guid.NewGuid()}{Path.GetExtension(image.FileName)}";
-			product.ImageUrl = await _storageService.UploadFileAsync(
-				stream, fileName, string.IsNullOrWhiteSpace(image.ContentType) ? "application/octet-stream" : image.ContentType);
+
+            var fileName =
+                $"{product.Id}_{Guid.NewGuid()}" +
+                $"{Path.GetExtension(image.FileName)}";
+
+            product.ImageUrl =
+                await _storageService.UploadFileAsync(
+                    stream,
+                    fileName,
+                    string.IsNullOrWhiteSpace(image.ContentType)
+                        ? "application/octet-stream"
+                        : image.ContentType);
         }
 
         _context.Products.Add(product);
+
         await _context.SaveChangesAsync();
 
-        var createdProduct = await _context.Products
-        .Include(p => p.Category)
-        .Include(p => p.StockUnits)
-        .FirstOrDefaultAsync(p => p.Id == product.Id);
-        
-        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userId == null) return Unauthorized();
+        var createdProduct =
+            await _context.Products
+                .Include(p => p.Category)
+                .Include(p => p.StockUnits)
+                .FirstOrDefaultAsync(p =>
+                    p.Id == product.Id);
+
+        var userId =
+            User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (userId == null)
+            return Unauthorized();
+
         var currentUserId = Guid.Parse(userId);
-        
+
         await _auditService.LogAsync(
-	        userId: currentUserId,
-	        actionType: "PRODUCT_CREATED",
-	        entityName: "Product",
-	        entityId: product.Id,
-	        details: $"Created product {product.Sku} - {product.Name}"
+            userId: currentUserId,
+            actionType: "PRODUCT_CREATED",
+            entityName: "Product",
+            entityId: product.Id,
+            details:
+                $"Created product {product.Sku} - {product.Name}"
         );
 
-    	var dto = MapToDto(createdProduct!);
-    	return CreatedAtAction(nameof(Get), new { id = product.Id }, dto);
+        var dto = MapToDto(createdProduct!);
+
+        return CreatedAtAction(
+            nameof(Get),
+            new { id = product.Id },
+            dto);
     }
 
     [HttpPut("{id}")]
     [Authorize(Roles = "Manager,Admin")]
-    public async Task<IActionResult> Update(Guid id, [FromForm] CreateProductRequest request)
+    public async Task<IActionResult> Update(
+        Guid id,
+        [FromForm] CreateProductRequest request)
     {
-        var product = await _context.Products.FindAsync(id);
-        if (product == null) return NotFound();
+        var product =
+            await _context.Products.FindAsync(id);
 
-        // Update fields (skip image for brevity)
+        if (product == null)
+            return NotFound();
+
         product.Name = request.Name;
         product.Description = request.Description;
         product.CategoryId = request.CategoryId;
@@ -197,21 +261,25 @@ public class ProductsController : ControllerBase
         product.WarrantyMonths = request.WarrantyMonths;
         product.UpdatedAt = DateTime.UtcNow;
 
-        // Handle image replacement if needed
-        
-        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userId == null) return Unauthorized();
+        var userId =
+            User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (userId == null)
+            return Unauthorized();
+
         var currentUserId = Guid.Parse(userId);
-        
+
         await _auditService.LogAsync(
-	        userId: currentUserId,
-	        actionType: "PRODUCT_UPDATED",
-	        entityName: "Product",
-	        entityId: product.Id,
-	        details: $"Updated product {product.Sku} at {product.UpdatedAt}"
+            userId: currentUserId,
+            actionType: "PRODUCT_UPDATED",
+            entityName: "Product",
+            entityId: product.Id,
+            details:
+                $"Updated product {product.Sku} at {product.UpdatedAt}"
         );
 
         await _context.SaveChangesAsync();
+
         return Ok(MapToDto(product));
     }
 
@@ -219,108 +287,262 @@ public class ProductsController : ControllerBase
     [Authorize(Roles = "Manager,Admin")]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var product = await _context.Products.FindAsync(id);
-        if (product == null) return NotFound();
+        var product =
+            await _context.Products.FindAsync(id);
+
+        if (product == null)
+            return NotFound();
 
         product.IsActive = false;
         product.UpdatedAt = DateTime.UtcNow;
+
         await _context.SaveChangesAsync();
-        
-        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userId == null) return Unauthorized();
+
+        var userId =
+            User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (userId == null)
+            return Unauthorized();
+
         var currentUserId = Guid.Parse(userId);
-        
+
         await _auditService.LogAsync(
-	        userId: currentUserId,
-	        actionType: "PRODUCT_DELETED",
-	        entityName: "Product",
-	        entityId: product.Id,
-	        details: $"Deactivated product {product.Sku} - {product.Name}"
+            userId: currentUserId,
+            actionType: "PRODUCT_DELETED",
+            entityName: "Product",
+            entityId: product.Id,
+            details:
+                $"Deactivated product {product.Sku} - {product.Name}"
         );
-        
+
         return NoContent();
     }
 
     /// <summary>
-    /// The write side of the KRA classification picker (Step 26). Deliberately a single
-    /// code applied to a batch of products in one call — never "one code per category" —
-    /// see the design discussion this came out of: KRA's taxonomy is far finer-grained
-    /// than this app's own Category scheme, so inferring a classification from Category
-    /// would risk real misclassification. The caller (picker UI) is responsible for only
-    /// batching products that genuinely share one classification.
+    /// Assigns one KRA eTIMS classification to one or more products.
+    ///
+    /// A classification is considered assignable when it has no child
+    /// classification in the synced KRA taxonomy.
+    ///
+    /// TaxTyCd is deliberately NOT used to determine whether a node is
+    /// a leaf because KRA leaf classifications can legitimately have
+    /// a null TaxTyCd.
     /// </summary>
     [HttpPost("assign-etims-classification")]
     [Authorize(Roles = "Manager,Admin")]
-    public async Task<IActionResult> AssignEtimsClassification([FromBody] AssignEtimsClassificationRequest request)
+    public async Task<IActionResult> AssignEtimsClassification(
+        [FromBody] AssignEtimsClassificationRequest request)
     {
-        if (request.ProductIds is null || request.ProductIds.Count == 0)
-            return BadRequest(new { message = "At least one product must be selected." });
+        if (request.ProductIds is null ||
+            request.ProductIds.Count == 0)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "At least one product must be selected."
+            });
+        }
+
         if (string.IsNullOrWhiteSpace(request.ItemClsCd))
-            return BadRequest(new { message = "ItemClsCd is required." });
+        {
+            return BadRequest(new
+            {
+                message =
+                    "ItemClsCd is required."
+            });
+        }
 
-        // Never trust the client's classification choice blindly — re-validate against
-        // what's actually synced, and require leaf-level (TaxTyCd present) exactly like
-        // the picker's own search is filtered, so a request built outside the normal UI
-        // (or a stale client) can't assign a non-leaf taxonomy node.
-        var classification = await _context.EtimsItemClasses
-            .FirstOrDefaultAsync(e => e.ItemClsCd == request.ItemClsCd.Trim());
+        var itemClsCd = request.ItemClsCd.Trim();
+
+        var classification =
+            await _context.EtimsItemClasses
+                .FirstOrDefaultAsync(e =>
+                    e.ItemClsCd == itemClsCd);
+
         if (classification is null)
-            return BadRequest(new { message = $"'{request.ItemClsCd}' was not found in the synced KRA taxonomy. Run a code sync if this is a recently-added classification." });
-        if (classification.TaxTyCd is null)
-            return BadRequest(new { message = $"'{request.ItemClsCd}' ({classification.ItemClsNm}) is not a leaf-level classification — it has no tax type, so it isn't a valid assignment target. Pick a more specific code." });
+        {
+            return BadRequest(new
+            {
+                message =
+                    $"'{itemClsCd}' was not found in the synced " +
+                    "KRA taxonomy. Run a code sync if this is " +
+                    "a recently-added classification."
+            });
+        }
 
-        var products = await _context.Products
-            .Where(p => request.ProductIds.Contains(p.Id) && p.IsActive)
-            .ToListAsync();
+        /*
+         * Determine whether this classification has children.
+         *
+         * KRA's synced hierarchy observed in the database:
+         *
+         * Level 1 -> Level 2 : first 2 digits
+         * Level 2 -> Level 3 : first 4 digits
+         * Level 3 -> Level 4 : first 6 digits
+         * Level 4 -> Level 5 : first 8 digits
+         * Level 5            : no children
+         *
+         * Do NOT use TaxTyCd as a leaf indicator.
+         */
+        var hasChildren = classification.ItemClsLvl switch
+        {
+            1 => await _context.EtimsItemClasses
+                .AnyAsync(e =>
+                    e.ItemClsLvl == 2 &&
+                    e.ItemClsCd.StartsWith(
+                        classification.ItemClsCd.Substring(0, 2))),
 
-        var missingIds = request.ProductIds.Except(products.Select(p => p.Id)).ToList();
+            2 => await _context.EtimsItemClasses
+                .AnyAsync(e =>
+                    e.ItemClsLvl == 3 &&
+                    e.ItemClsCd.StartsWith(
+                        classification.ItemClsCd.Substring(0, 4))),
+
+            3 => await _context.EtimsItemClasses
+                .AnyAsync(e =>
+                    e.ItemClsLvl == 4 &&
+                    e.ItemClsCd.StartsWith(
+                        classification.ItemClsCd.Substring(0, 6))),
+
+            4 => await _context.EtimsItemClasses
+                .AnyAsync(e =>
+                    e.ItemClsLvl == 5 &&
+                    e.ItemClsCd.StartsWith(
+                        classification.ItemClsCd.Substring(0, 8))),
+
+            5 => false,
+
+            _ => false
+        };
+
+        if (hasChildren)
+        {
+            return BadRequest(new
+            {
+                message =
+                    $"'{itemClsCd}' ({classification.ItemClsNm}) " +
+                    "is a parent classification and cannot be " +
+                    "assigned to a product. Pick the most specific " +
+                    "classification available."
+            });
+        }
+
+        var products =
+            await _context.Products
+                .Where(p =>
+                    request.ProductIds.Contains(p.Id) &&
+                    p.IsActive)
+                .ToListAsync();
+
+        var missingIds =
+            request.ProductIds
+                .Except(products.Select(p => p.Id))
+                .ToList();
+
         if (missingIds.Count > 0)
-            return BadRequest(new { message = $"{missingIds.Count} product id(s) were not found or are inactive.", missingIds });
+        {
+            return BadRequest(new
+            {
+                message =
+                    $"{missingIds.Count} product id(s) were not " +
+                    "found or are inactive.",
+                missingIds
+            });
+        }
 
-        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userId == null) return Unauthorized();
+        var userId =
+            User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (userId == null)
+            return Unauthorized();
+
         var currentUserId = Guid.Parse(userId);
         var now = DateTime.UtcNow;
 
-        // Note which products already had a different classification before overwriting —
-        // the picker UI is expected to have already confirmed this with the user, but the
-        // audit trail should reflect it happened regardless of what the UI showed.
-        var reclassified = products.Where(p => p.EtimsItemClassificationCode is not null &&
-            p.EtimsItemClassificationCode != classification.ItemClsCd).Select(p => p.Sku).ToList();
+        var reclassified =
+            products
+                .Where(p =>
+                    p.EtimsItemClassificationCode is not null &&
+                    p.EtimsItemClassificationCode !=
+                        classification.ItemClsCd)
+                .Select(p => p.Sku)
+                .ToList();
 
         foreach (var product in products)
         {
-            product.EtimsItemClassificationCode = classification.ItemClsCd;
-            product.EtimsTaxTypeCode = classification.TaxTyCd;
+            product.EtimsItemClassificationCode =
+                classification.ItemClsCd;
+
+            /*
+             * TaxTyCd is classification metadata.
+             * It is allowed to be null.
+             */
+            product.EtimsTaxTypeCode =
+                classification.TaxTyCd;
+
             product.EtimsClassifiedAt = now;
-            product.EtimsClassifiedByUserId = currentUserId;
+            product.EtimsClassifiedByUserId =
+                currentUserId;
+
             product.UpdatedAt = now;
         }
 
         await _context.SaveChangesAsync();
 
-        var skuList = string.Join(", ", products.Select(p => p.Sku).Take(20));
-        var truncated = products.Count > 20 ? $" (+{products.Count - 20} more)" : "";
+        var skuList =
+            string.Join(
+                ", ",
+                products
+                    .Select(p => p.Sku)
+                    .Take(20));
+
+        var truncated =
+            products.Count > 20
+                ? $" (+{products.Count - 20} more)"
+                : "";
+
+        var details =
+            $"Assigned {classification.ItemClsCd} " +
+            $"({classification.ItemClsNm}) to " +
+            $"{products.Count} product(s): " +
+            $"{skuList}{truncated}.";
+
+        if (reclassified.Count > 0)
+        {
+            details +=
+                $" Reclassified (had a different code before): " +
+                $"{string.Join(", ", reclassified)}.";
+        }
+
         await _auditService.LogAsync(
             userId: currentUserId,
             actionType: "PRODUCTS_ETIMS_CLASSIFIED",
             entityName: "Product",
-            entityId: Guid.Empty, // multiple products — see details for which ones
-            details: $"Assigned {classification.ItemClsCd} ({classification.ItemClsNm}) to {products.Count} product(s): {skuList}{truncated}." +
-                (reclassified.Count > 0 ? $" Reclassified (had a different code before): {string.Join(", ", reclassified)}." : "")
+            entityId: Guid.Empty,
+            details: details
         );
 
         return Ok(new
         {
-            updatedProductIds = products.Select(p => p.Id),
-            itemClsCd = classification.ItemClsCd,
-            itemClsNm = classification.ItemClsNm,
-            taxTyCd = classification.TaxTyCd,
-            reclassifiedCount = reclassified.Count
+            updatedProductIds =
+                products.Select(p => p.Id),
+
+            itemClsCd =
+                classification.ItemClsCd,
+
+            itemClsNm =
+                classification.ItemClsNm,
+
+            taxTyCd =
+                classification.TaxTyCd,
+
+            reclassifiedCount =
+                reclassified.Count
         });
     }
 
-    private ProductDto MapToDto(Product p, string? etimsItemClassificationName = null)
+    private ProductDto MapToDto(
+        Product p,
+        string? etimsItemClassificationName = null)
     {
         return new ProductDto
         {
@@ -330,7 +552,8 @@ public class ProductsController : ControllerBase
             Name = p.Name,
             Description = p.Description,
             CategoryId = p.CategoryId,
-            CategoryName = p.Category?.Name ?? string.Empty,
+            CategoryName =
+                p.Category?.Name ?? string.Empty,
             CostPrice = p.CostPrice,
             SalePrice = p.SalePrice,
             TaxClass = p.TaxClass,
@@ -339,131 +562,222 @@ public class ProductsController : ControllerBase
             WarrantyMonths = p.WarrantyMonths,
             IsActive = p.IsActive,
             StockCount = p.StockQuantity,
-            EtimsItemClassificationCode = p.EtimsItemClassificationCode,
-            EtimsItemClassificationName = etimsItemClassificationName,
-            EtimsTaxTypeCode = p.EtimsTaxTypeCode,
-            EtimsClassifiedAt = p.EtimsClassifiedAt
+
+            EtimsItemClassificationCode =
+                p.EtimsItemClassificationCode,
+
+            EtimsItemClassificationName =
+                etimsItemClassificationName,
+
+            EtimsTaxTypeCode =
+                p.EtimsTaxTypeCode,
+
+            EtimsClassifiedAt =
+                p.EtimsClassifiedAt
         };
     }
 
-	/// <summary>
-	/// Free-text search across name, SKU, and barcode for the checkout search box.
-	/// Inactive products are excluded.
-	/// </summary>
-	[HttpGet("search")]
-	public async Task<IActionResult> Search([FromQuery] string q, CancellationToken cancellationToken)
-	{
-    	if (string.IsNullOrWhiteSpace(q))
-    	{
-        return Ok(Array.Empty<object>());
-    	}
+    /// <summary>
+    /// Free-text search across name, SKU, and barcode
+    /// for the checkout search box.
+    /// </summary>
+    [HttpGet("search")]
+    public async Task<IActionResult> Search(
+        [FromQuery] string q,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(q))
+        {
+            return Ok(Array.Empty<object>());
+        }
 
-    	var term = q.Trim();
+        var term = q.Trim();
 
-    	var results = await _context.Products
-        	.AsNoTracking()
-        	.Where(p => p.IsActive && (
-          	  	EF.Functions.ILike(p.Name ?? "", $"%{term}%") ||
-            	EF.Functions.ILike(p.Sku ?? "", $"%{term}%") ||
-            	EF.Functions.ILike(p.Barcode ?? "", $"%{term}%")))
-        	.OrderBy(p => p.Name)
-        	.Take(25)
-        	.Select(p => new ProductDtos
-        	{
-            	Id = p.Id,
-            	Sku = p.Sku,
-            	Barcode = p.Barcode ?? string.Empty,
-            	Name = p.Name,
-            	CategoryId = p.CategoryId,
-            	CategoryName = p.Category != null ? p.Category.Name : string.Empty,
-            	SalePrice = p.SalePrice,
-            	TaxClass = p.TaxClass,
-            	StockQuantity = p.BulkQuantityOnHand + p.StockUnits.Count(u => u.Status == "InStock"),
-            	ImageUrl = p.ImageUrl
-        	})
-        	.ToListAsync(cancellationToken);
+        var results =
+            await _context.Products
+                .AsNoTracking()
+                .Where(p =>
+                    p.IsActive &&
+                    (
+                        EF.Functions.ILike(
+                            p.Name ?? "",
+                            $"%{term}%") ||
 
-    	return Ok(results);
-	}
+                        EF.Functions.ILike(
+                            p.Sku ?? "",
+                            $"%{term}%") ||
 
-	/// <summary>
-	/// Exact barcode match for a physical scanner input.
-	/// </summary>
-	[HttpGet("lookup")]
-	public async Task<IActionResult> LookupByBarcode([FromQuery] string barcode, CancellationToken cancellationToken)
-	{
-    	if (string.IsNullOrWhiteSpace(barcode))
-    	{
-        	return BadRequest("barcode is required.");
-    	}
+                        EF.Functions.ILike(
+                            p.Barcode ?? "",
+                            $"%{term}%")
+                    ))
+                .OrderBy(p => p.Name)
+                .Take(25)
+                .Select(p => new ProductDtos
+                {
+                    Id = p.Id,
+                    Sku = p.Sku,
+                    Barcode = p.Barcode ?? string.Empty,
+                    Name = p.Name,
+                    CategoryId = p.CategoryId,
+                    CategoryName =
+                        p.Category != null
+                            ? p.Category.Name
+                            : string.Empty,
+                    SalePrice = p.SalePrice,
+                    TaxClass = p.TaxClass,
+                    StockQuantity =
+                        p.BulkQuantityOnHand +
+                        p.StockUnits.Count(
+                            u => u.Status == "InStock"),
+                    ImageUrl = p.ImageUrl
+                })
+                .ToListAsync(cancellationToken);
 
-    	var product = await _context.Products
-        	.AsNoTracking()
-        	.Where(p => p.IsActive && p.Barcode == barcode.Trim())
-        	.Select(p => new ProductDtos
-        	{
-            	Id = p.Id,
-            	Sku = p.Sku,
-            	Barcode = p.Barcode ?? string.Empty, 
-            	Name = p.Name,
-            	CategoryId = p.CategoryId,
-            	CategoryName = p.Category != null ? p.Category.Name : string.Empty,
-            	SalePrice = p.SalePrice,
-            	TaxClass = p.TaxClass,
-            	StockQuantity = p.BulkQuantityOnHand + p.StockUnits.Count(u => u.Status == "InStock"),
-            	ImageUrl = p.ImageUrl
-        	})
-        	.FirstOrDefaultAsync(cancellationToken);
+        return Ok(results);
+    }
 
-    	if (product is null)
-    	{
-        	return NotFound(new { message = $"No active product with barcode '{barcode}'." });
-    	}
+    /// <summary>
+    /// Exact barcode match for a physical scanner input.
+    /// </summary>
+    [HttpGet("lookup")]
+    public async Task<IActionResult> LookupByBarcode(
+        [FromQuery] string barcode,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(barcode))
+        {
+            return BadRequest(
+                "barcode is required.");
+        }
 
-    	return Ok(product);
-	}
+        var product =
+            await _context.Products
+                .AsNoTracking()
+                .Where(p =>
+                    p.IsActive &&
+                    p.Barcode == barcode.Trim())
+                .Select(p => new ProductDtos
+                {
+                    Id = p.Id,
+                    Sku = p.Sku,
+                    Barcode =
+                        p.Barcode ?? string.Empty,
+                    Name = p.Name,
+                    CategoryId = p.CategoryId,
+                    CategoryName =
+                        p.Category != null
+                            ? p.Category.Name
+                            : string.Empty,
+                    SalePrice = p.SalePrice,
+                    TaxClass = p.TaxClass,
+                    StockQuantity =
+                        p.BulkQuantityOnHand +
+                        p.StockUnits.Count(
+                            u => u.Status == "InStock"),
+                    ImageUrl = p.ImageUrl
+                })
+                .FirstOrDefaultAsync(
+                    cancellationToken);
+
+        if (product is null)
+        {
+            return NotFound(new
+            {
+                message =
+                    $"No active product with barcode " +
+                    $"'{barcode}'."
+            });
+        }
+
+        return Ok(product);
+    }
 
     [HttpPost("import-csv/preview")]
     [Authorize(Roles = "Manager,Admin")]
-    public async Task<IActionResult> PreviewCsv(IFormFile file)
+    public async Task<IActionResult> PreviewCsv(
+        IFormFile file)
     {
-        if (file == null || file.Length == 0) return BadRequest("No file uploaded");
-
-        using var reader = new StreamReader(file.OpenReadStream());
-        using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
-        var records = csv.GetRecords<ProductImportDto>().ToList();
-
-        var existingSkus = await _context.Products.Select(p => p.Sku).ToHashSetAsync();
-
-        var preview = records.Select(r =>
+        if (file == null || file.Length == 0)
         {
-            var isDuplicate = existingSkus.Contains(r.Sku);
-            var action = isDuplicate ? "Skip" : "Create";
-            return new ProductPreview
-            {
-                Row = r,
-                IsDuplicate = isDuplicate,
-                Action = action
-            };
-        }).ToList();
+            return BadRequest(
+                "No file uploaded");
+        }
 
-        return Ok(new { preview, totalRows = preview.Count });
+        using var reader =
+            new StreamReader(file.OpenReadStream());
+
+        using var csv =
+            new CsvReader(
+                reader,
+                CultureInfo.InvariantCulture);
+
+        var records =
+            csv.GetRecords<ProductImportDto>()
+                .ToList();
+
+        var existingSkus =
+            await _context.Products
+                .Select(p => p.Sku)
+                .ToHashSetAsync();
+
+        var preview =
+            records
+                .Select(r =>
+                {
+                    var isDuplicate =
+                        existingSkus.Contains(r.Sku);
+
+                    var action =
+                        isDuplicate
+                            ? "Skip"
+                            : "Create";
+
+                    return new ProductPreview
+                    {
+                        Row = r,
+                        IsDuplicate = isDuplicate,
+                        Action = action
+                    };
+                })
+                .ToList();
+
+        return Ok(new
+        {
+            preview,
+            totalRows = preview.Count
+        });
     }
 
     [HttpPost("import-csv/commit")]
     [Authorize(Roles = "Manager,Admin")]
-    public async Task<IActionResult> CommitCsv([FromBody] List<ProductImportDto> rows)
+    public async Task<IActionResult> CommitCsv(
+        [FromBody] List<ProductImportDto> rows)
     {
-        var categories = await _context.Categories.ToDictionaryAsync(c => c.Name, c => c.Id);
-        var products = new List<Product>();
+        var categories =
+            await _context.Categories
+                .ToDictionaryAsync(
+                    c => c.Name,
+                    c => c.Id);
+
+        var products =
+            new List<Product>();
 
         foreach (var row in rows)
         {
-            if (!categories.TryGetValue(row.CategoryName, out var catId))
-                return BadRequest($"Category '{row.CategoryName}' not found");
+            if (!categories.TryGetValue(
+                    row.CategoryName,
+                    out var catId))
+            {
+                return BadRequest(
+                    $"Category '{row.CategoryName}' not found");
+            }
 
-            if (await _context.Products.AnyAsync(p => p.Sku == row.Sku))
-                continue; // skip duplicates
+            if (await _context.Products.AnyAsync(
+                    p => p.Sku == row.Sku))
+            {
+                continue;
+            }
 
             var product = new Product
             {
@@ -474,62 +788,102 @@ public class ProductsController : ControllerBase
                 CategoryId = catId,
                 CostPrice = row.CostPrice,
                 SalePrice = row.SalePrice,
-                TaxClass = ParseTaxClass(row.TaxClass),
-                ReorderThreshold = row.ReorderThreshold,
-                WarrantyMonths = row.WarrantyMonths,
+                TaxClass =
+                    ParseTaxClass(row.TaxClass),
+                ReorderThreshold =
+                    row.ReorderThreshold,
+                WarrantyMonths =
+                    row.WarrantyMonths,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
             };
+
             products.Add(product);
         }
 
-        await _context.Products.AddRangeAsync(products);
+        await _context.Products
+            .AddRangeAsync(products);
+
         await _context.SaveChangesAsync();
-        return Ok(new { created = products.Count });
+
+        return Ok(new
+        {
+            created = products.Count
+        });
     }
 
     /// <summary>
-    /// CSV cells are always plain text (e.g. "Standard", "zero-rated", "2"), so this parses
-    /// leniently: matches the enum by name (case-insensitive) or by its underlying number,
-    /// and falls back to Standard for blank/unrecognised values rather than failing the
-    /// whole import over one bad cell.
+    /// CSV cells are plain text. Matches the enum by name
+    /// (case-insensitive) or underlying number and falls
+    /// back to Standard for blank/unrecognised values.
     /// </summary>
-    private static TaxClass ParseTaxClass(string? value)
+    private static TaxClass ParseTaxClass(
+        string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
             return TaxClass.Standard;
         }
 
-        var normalized = value.Trim().Replace("-", string.Empty).Replace(" ", string.Empty);
-        return Enum.TryParse<TaxClass>(normalized, ignoreCase: true, out var parsed)
-            ? parsed
-            : TaxClass.Standard;
+        var normalized =
+            value
+                .Trim()
+                .Replace("-", string.Empty)
+                .Replace(" ", string.Empty);
+
+        return Enum.TryParse<TaxClass>(
+            normalized,
+            ignoreCase: true,
+            out var parsed)
+                ? parsed
+                : TaxClass.Standard;
     }
 
     [HttpGet("{productId}/price")]
     [Authorize]
-    public async Task<IActionResult> GetPrice(Guid productId, [FromQuery] Guid? customerId = null)
+    public async Task<IActionResult> GetPrice(
+        Guid productId,
+        [FromQuery] Guid? customerId = null)
     {
-        var product = await _context.Products.FindAsync(productId);
-        if (product == null) return NotFound();
+        var product =
+            await _context.Products
+                .FindAsync(productId);
 
-        decimal finalPrice = product.SalePrice;
+        if (product == null)
+            return NotFound();
+
+        decimal finalPrice =
+            product.SalePrice;
 
         if (customerId.HasValue)
         {
-            var customer = await _context.Customers.FindAsync(customerId.Value);
-            if (!string.IsNullOrEmpty(customer?.PricingTier))
+            var customer =
+                await _context.Customers
+                    .FindAsync(customerId.Value);
+
+            if (!string.IsNullOrEmpty(
+                    customer?.PricingTier))
             {
-                var tierPrice = await _context.ProductTierPrices
-                    .Include(tp => tp.Tier)
-                    .FirstOrDefaultAsync(tp => tp.ProductId == productId && tp.Tier.Name == customer.PricingTier);
+                var tierPrice =
+                    await _context.ProductTierPrices
+                        .Include(tp => tp.Tier)
+                        .FirstOrDefaultAsync(tp =>
+                            tp.ProductId == productId &&
+                            tp.Tier.Name ==
+                                customer.PricingTier);
+
                 if (tierPrice != null)
-                    finalPrice = tierPrice.Price;
+                {
+                    finalPrice =
+                        tierPrice.Price;
+                }
             }
         }
 
-        return Ok(new { productId, price = finalPrice });
+        return Ok(new
+        {
+            productId,
+            price = finalPrice
+        });
     }
-	
 }
