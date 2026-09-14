@@ -61,7 +61,7 @@ export function EtimsClassificationPicker({
   const [browseLoading, setBrowseLoading] = useState(false)
   const [browseError, setBrowseError] = useState<string | null>(null)
   const [browsePath, setBrowsePath] = useState<BrowseLevel[]>([])
-  const [browseParent, setBrowseParent] = useState<EtimsItemClassOption | null>(null)
+  const [, setBrowseParent] = useState<EtimsItemClassOption | null>(null)
 
   const [selected, setSelected] = useState<EtimsItemClassOption | null>(null)
   const [submitting, setSubmitting] = useState(false)
