@@ -23,6 +23,22 @@ function Icon({ name, size = 16 }: { name: string; size?: number }) {
         <polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" />
       </svg>
     ),
+      reports: (
+          <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" />
+              <line x1="6" y1="20" x2="6" y2="14" /><line x1="2" y1="20" x2="22" y2="20" />
+          </svg>
+      ),
+      list: (
+          <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6" />
+              <line x1="8" y1="12" x2="21" y2="12" />
+              <line x1="8" y1="18" x2="21" y2="18" />
+              <line x1="3" y1="6" x2="3.01" y2="6" />
+              <line x1="3" y1="12" x2="3.01" y2="12" />
+              <line x1="3" y1="18" x2="3.01" y2="18" />
+          </svg>
+      ),
     receive: (
       <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 8v13H3V8" /><path d="M1 3h22v5H1z" /><line x1="10" y1="12" x2="14" y2="12" />
@@ -56,6 +72,12 @@ function Icon({ name, size = 16 }: { name: string; size?: number }) {
         <line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
       </svg>
     ),
+      bell: (
+          <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          </svg>
+      ),
     logout: (
       <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -124,10 +146,22 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
         { id: 'customers', label: 'Customers', icon: 'customers', path: '/customers' },
       ],
     },
+      {
+          label: "Insights",
+          items: [
+              { id: "reports", label: "Reports", icon: "reports", path: "/reports" },
+          ],
+      },
     {
       label: 'Lookups',
       items: [{ id: 'warranty', label: 'Warranty lookup', icon: 'warranty', path: '/warranty-lookup' }],
     },
+      {
+          label: "Monitoring",
+          items: [
+              { id: "audit", label: "Audit Log", icon: "list", path: "/audit" },
+          ],
+      }
   ],
   Admin: [
     {
@@ -144,6 +178,12 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
         { id: 'customers', label: 'Customers', icon: 'customers', path: '/customers' },
       ],
     },
+      {
+          label: "Insights",
+          items: [
+              { id: "reports", label: "Reports", icon: "reports", path: "/reports" },
+          ],
+      },
     {
       label: 'Lookups',
       items: [{ id: 'warranty', label: 'Warranty lookup', icon: 'warranty', path: '/warranty-lookup' }],
@@ -152,6 +192,12 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
       label: 'Administration',
       items: [{ id: 'users', label: 'Users', icon: 'users', path: '/users' }],
     },
+      {
+          label: "Monitoring",
+          items: [
+              { id: "audit", label: "Audit Log", icon: "list", path: "/audit" },
+          ],
+      }
   ],
   // Technician is blocked from register/till access entirely (Step 9 RBAC) — their world is
   // repairs, plus warranty lookup to answer a customer's "is this still covered" on the spot.

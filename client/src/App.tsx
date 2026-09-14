@@ -16,6 +16,8 @@ import { WarrantyLookupPage } from './pages/WarrantyLookupPage'
 import { AdminDashboard } from './pages/AdminDashboard'
 import { ManagerDashboard } from './pages/ManagerDashboard'
 import { DashboardLayout } from './layouts/DashboardLayouts'
+import AuditLogPage from "./pages/AuditLogPage.tsx";
+import ReportsPage from "./pages/ReportsPage.tsx";
 import { RequireAuth, RequireRole } from './components/RouteGuards'
 import { useAuth } from './hooks/useAuth'
 import type { UserRole } from './types/auth'
@@ -75,6 +77,8 @@ function App() {
           <Route path="/mfa/setup" element={<MfaSetupPage />} />
           <Route path="/inventory" element={<ProductsPage />} />
           <Route path="/stock/receive" element={<ReceiveStock />} />
+            <Route path="/audit" element={<AuditLogPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
         </Route>
       </Route>
 
