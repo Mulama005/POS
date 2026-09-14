@@ -48,6 +48,14 @@ export interface Product {
   isActive: boolean
   /** Combined bulk + serialized on-hand quantity. */
   stockCount: number
+
+  // eTIMS classification (Step 26) — null until assigned via the classification picker.
+  etimsItemClassificationCode: string | null
+  /** Joined from EtimsItemClasses server-side at read time — always reflects the
+   * classification's current name even if a later sync renames it. */
+  etimsItemClassificationName: string | null
+  etimsTaxTypeCode: string | null
+  etimsClassifiedAt: string | null
 }
 
 export interface ProductListResponse {

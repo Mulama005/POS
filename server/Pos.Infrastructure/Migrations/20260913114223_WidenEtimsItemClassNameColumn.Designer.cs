@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Pos.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using Pos.Infrastructure.Persistence;
 namespace Pos.Infrastructure.Migrations
 {
     [DbContext(typeof(PosDbContext))]
-    partial class PosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260913114223_WidenEtimsItemClassNameColumn")]
+    partial class WidenEtimsItemClassNameColumn
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -479,7 +482,8 @@ namespace Pos.Infrastructure.Migrations
 
                     b.Property<string>("ItemClsNm")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<bool?>("MjrTgYn")
                         .HasColumnType("boolean");
@@ -687,20 +691,6 @@ namespace Pos.Infrastructure.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
-                    b.Property<DateTime?>("EtimsClassifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("EtimsClassifiedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("EtimsItemClassificationCode")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("EtimsTaxTypeCode")
-                        .HasMaxLength(5)
-                        .HasColumnType("character varying(5)");
-
                     b.Property<string>("ImageUrl")
                         .HasColumnType("text");
 
@@ -739,8 +729,6 @@ namespace Pos.Infrastructure.Migrations
                         .HasFilter("\"Barcode\" IS NOT NULL AND \"Barcode\" <> ''");
 
                     b.HasIndex("CategoryId");
-
-                    b.HasIndex("EtimsItemClassificationCode");
 
                     b.HasIndex("Sku")
                         .IsUnique();

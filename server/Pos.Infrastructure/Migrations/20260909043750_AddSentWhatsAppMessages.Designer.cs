@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Pos.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using Pos.Infrastructure.Persistence;
 namespace Pos.Infrastructure.Migrations
 {
     [DbContext(typeof(PosDbContext))]
-    partial class PosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260909043750_AddSentWhatsAppMessages")]
+    partial class AddSentWhatsAppMessages
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -364,186 +367,6 @@ namespace Pos.Infrastructure.Migrations
                     b.ToTable("Customers");
                 });
 
-            modelBuilder.Entity("Pos.Domain.Entities.EtimsCode", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Cd")
-                        .IsRequired()
-                        .HasMaxLength(5)
-                        .HasColumnType("character varying(5)");
-
-                    b.Property<string>("CdDesc")
-                        .HasColumnType("text");
-
-                    b.Property<string>("CdNm")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("EtimsCodeClassId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("SrtOrd")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("UseYn")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("UserDfnCd1")
-                        .HasColumnType("text");
-
-                    b.Property<string>("UserDfnCd2")
-                        .HasColumnType("text");
-
-                    b.Property<string>("UserDfnCd3")
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EtimsCodeClassId", "Cd")
-                        .IsUnique();
-
-                    b.ToTable("EtimsCodes");
-                });
-
-            modelBuilder.Entity("Pos.Domain.Entities.EtimsCodeClass", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CdCls")
-                        .IsRequired()
-                        .HasMaxLength(2)
-                        .HasColumnType("character varying(2)");
-
-                    b.Property<string>("CdClsDesc")
-                        .HasColumnType("text");
-
-                    b.Property<string>("CdClsNm")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("UseYn")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("UserDfnNm1")
-                        .HasColumnType("text");
-
-                    b.Property<string>("UserDfnNm2")
-                        .HasColumnType("text");
-
-                    b.Property<string>("UserDfnNm3")
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CdCls")
-                        .IsUnique();
-
-                    b.ToTable("EtimsCodeClasses");
-                });
-
-            modelBuilder.Entity("Pos.Domain.Entities.EtimsItemClass", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ItemClsCd")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<int>("ItemClsLvl")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ItemClsNm")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<bool?>("MjrTgYn")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("TaxTyCd")
-                        .HasMaxLength(5)
-                        .HasColumnType("character varying(5)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("UseYn")
-                        .HasColumnType("boolean");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ItemClsCd")
-                        .IsUnique();
-
-                    b.HasIndex("ItemClsNm");
-
-                    b.ToTable("EtimsItemClasses");
-                });
-
-            modelBuilder.Entity("Pos.Domain.Entities.EtimsSyncState", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("LastAttemptAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("LastAttemptMessage")
-                        .HasColumnType("text");
-
-                    b.Property<int>("LastAttemptRecordCount")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("LastAttemptSucceeded")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTime?>("LastSuccessfulSyncAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("SyncKey")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("SyncKey")
-                        .IsUnique();
-
-                    b.ToTable("EtimsSyncStates");
-                });
-
             modelBuilder.Entity("Pos.Domain.Entities.InventoryAdjustment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -687,20 +510,6 @@ namespace Pos.Infrastructure.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
-                    b.Property<DateTime?>("EtimsClassifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("EtimsClassifiedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("EtimsItemClassificationCode")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("EtimsTaxTypeCode")
-                        .HasMaxLength(5)
-                        .HasColumnType("character varying(5)");
-
                     b.Property<string>("ImageUrl")
                         .HasColumnType("text");
 
@@ -739,8 +548,6 @@ namespace Pos.Infrastructure.Migrations
                         .HasFilter("\"Barcode\" IS NOT NULL AND \"Barcode\" <> ''");
 
                     b.HasIndex("CategoryId");
-
-                    b.HasIndex("EtimsItemClassificationCode");
 
                     b.HasIndex("Sku")
                         .IsUnique();
@@ -1467,17 +1274,6 @@ namespace Pos.Infrastructure.Migrations
                     b.Navigation("Sale");
                 });
 
-            modelBuilder.Entity("Pos.Domain.Entities.EtimsCode", b =>
-                {
-                    b.HasOne("Pos.Domain.Entities.EtimsCodeClass", "EtimsCodeClass")
-                        .WithMany("Codes")
-                        .HasForeignKey("EtimsCodeClassId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("EtimsCodeClass");
-                });
-
             modelBuilder.Entity("Pos.Domain.Entities.InventoryAdjustment", b =>
                 {
                     b.HasOne("Pos.Domain.Entities.User", "AdjustedByUser")
@@ -1736,11 +1532,6 @@ namespace Pos.Infrastructure.Migrations
                     b.Navigation("Repairs");
 
                     b.Navigation("Sales");
-                });
-
-            modelBuilder.Entity("Pos.Domain.Entities.EtimsCodeClass", b =>
-                {
-                    b.Navigation("Codes");
                 });
 
             modelBuilder.Entity("Pos.Domain.Entities.PricingTier", b =>

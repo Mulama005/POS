@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Pos.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using Pos.Infrastructure.Persistence;
 namespace Pos.Infrastructure.Migrations
 {
     [DbContext(typeof(PosDbContext))]
-    partial class PosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260913125109_AddKraClassificationToProduct")]
+    partial class AddKraClassificationToProduct
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -687,25 +690,25 @@ namespace Pos.Infrastructure.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
-                    b.Property<DateTime?>("EtimsClassifiedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("EtimsClassifiedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("EtimsItemClassificationCode")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("EtimsTaxTypeCode")
-                        .HasMaxLength(5)
-                        .HasColumnType("character varying(5)");
-
                     b.Property<string>("ImageUrl")
                         .HasColumnType("text");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("KraClassifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("KraClassifiedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("KraItemClassificationCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("KraTaxTypeCode")
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -740,7 +743,7 @@ namespace Pos.Infrastructure.Migrations
 
                     b.HasIndex("CategoryId");
 
-                    b.HasIndex("EtimsItemClassificationCode");
+                    b.HasIndex("KraItemClassificationCode");
 
                     b.HasIndex("Sku")
                         .IsUnique();

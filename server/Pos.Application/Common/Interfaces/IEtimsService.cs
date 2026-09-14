@@ -1,0 +1,55 @@
+namespace Pos.Application.Common.Interfaces;
+
+public sealed record EtimsDeviceInitResult(
+    bool Success,
+    string? ResultCode,
+    string? ResultMessage,
+    string? TaxpayerName,
+    string? BranchName,
+    string? DeviceId,
+    string? ErrorMessage);
+
+/// <summary>
+/// KRA eTIMS VSCU integration, Step 26 — first slice only (device-init / connectivity
+/// check). This talks to a locally-running VSCU JAR (KRA's own distribution model, see
+/// EtimsOptions), not to KRA's API servers directly.
+///
+/// Per the VSCU Specification Document v2.0 (section 3.3.1, cross-checked against the
+/// item-save and sales-save request shapes in sections 3.3.4/3.3.6), every other VSCU
+/// endpoint only needs tin + bhfId in its request body — the intrlKey/signKey/cmcKey
+/// returned by device-init are never sent back to the JAR by the caller. The JAR
+/// retrieves and manages those keys internally after a successful init. This interface
+/// deliberately does not expose them for that reason; callers only need to know whether
+/// init succeeded.
+/// </summary>
+public interface IEtimsService
+{
+    /// <summary>
+    /// Calls the VSCU JAR's device-initialization endpoint to confirm: (1) the JAR is
+    /// running and reachable at EtimsOptions.BaseUrl, and (2) KRA recognizes our
+    /// tin/bhfId/device-serial combination. This is a connectivity/identity check, not
+    /// something that needs to run before every later call — the JAR only needs to be
+    /// initialized once (or after being redeployed).
+    /// </summary>
+    Task<EtimsDeviceInitResult> InitDeviceAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Calls /code/selectCodes (VSCU spec section 3.3.2.1) — KRA's general reference
+    /// code lists (Tax Type, Packaging Unit, Unit of Quantity, Currency, etc — the full
+    /// catalogue is section 4 of the spec). `lastReqDt` requests only codes registered or
+    /// modified after that timestamp — pass EtimsSyncKeys.EpochLastReqDt for a full sync.
+    /// This is a pure HTTP wrapper: it does not read or write the database itself. See
+    /// IEtimsCodeSyncService for the persistence layer that calls this and upserts the
+    /// result.
+    /// </summary>
+    Task<EtimsCodesFetchResult> FetchCodesAsync(DateTime lastReqDt, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Calls /itemClass/selectItemsClass (VSCU spec section 3.3.2.2) — KRA's product
+    /// classification taxonomy that every Product will eventually need a code from.
+    /// Same incremental-sync semantics as FetchCodesAsync: pass
+    /// EtimsSyncKeys.EpochLastReqDt for a full sync. Also a pure HTTP wrapper — no
+    /// database access here.
+    /// </summary>
+    Task<EtimsItemClassesFetchResult> FetchItemClassesAsync(DateTime lastReqDt, CancellationToken cancellationToken = default);
+}
