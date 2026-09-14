@@ -1,0 +1,320 @@
+﻿.reports-page {
+    padding: 64px 72px 96px;
+    font-family: var(--pos-font-body);
+    color: var(--pos-ink);
+    max-width: 1200px;
+}
+
+/* --- Masthead --------------------------------------------------------- */
+.page-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 32px;
+    padding-bottom: 16px;
+    border-bottom: 3px solid var(--pos-rule);
+    margin-bottom: 56px;
+}
+
+.page-header h1 {
+    font-family: var(--pos-font-display);
+    font-size: 46px;
+    font-weight: 400;
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    margin: 0;
+}
+
+/* --- Date range filter ------------------------------------------------
+   Two underline-only date inputs and a square ink apply button. */
+.date-filter {
+    display: flex;
+    align-items: flex-end;
+    gap: 20px;
+}
+
+.date-filter input[type="date"] {
+    font-family: var(--pos-font-mono);
+    font-size: 14px;
+    padding: 8px 0;
+    border: none;
+    border-bottom: 1.5px solid var(--pos-rule);
+    border-radius: 0;
+    background: transparent;
+    color: var(--pos-ink);
+    outline: none;
+    letter-spacing: 0.02em;
+    transition: border-color 120ms ease;
+}
+.date-filter input[type="date"]:focus {
+    border-bottom-color: var(--pos-ink);
+}
+
+.date-filter button {
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--pos-bg);
+    background: var(--pos-ink);
+    border: 1.5px solid var(--pos-ink);
+    border-radius: 0;
+    padding: 12px 22px;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+}
+.date-filter button:hover {
+    background: transparent;
+    color: var(--pos-ink);
+}
+
+/* --- Sections ---------------------------------------------------------
+   Each report section opens with a thick ink rule. No cards. */
+.report-section {
+    padding-top: 40px;
+    margin-bottom: 80px;
+    border-top: 3px solid var(--pos-rule);
+}
+.report-section:last-child {
+    margin-bottom: 0;
+}
+
+/* Section heading row: serif title on the left, exports on the right,
+   separated from the content below by a hairline. */
+.section-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 32px;
+    padding-bottom: 24px;
+    margin-bottom: 40px;
+    border-bottom: 1px solid var(--pos-border);
+}
+
+.section-header h2 {
+    font-family: var(--pos-font-display);
+    font-size: 34px;
+    font-weight: 400;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+    margin: 0;
+}
+
+/* --- Export buttons ---------------------------------------------------
+   Quiet underlined text actions, consistent with every secondary action
+   across the app. */
+.export-buttons {
+    display: flex;
+    gap: 24px;
+    align-items: baseline;
+}
+
+.btn-export,
+.export-buttons button {
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--pos-ink);
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid transparent;
+    border-radius: 0;
+    padding: 4px 0;
+    cursor: pointer;
+    transition: border-color 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+.btn-export:hover,
+.export-buttons button:hover:not(:disabled) {
+    border-bottom-color: var(--pos-ink);
+}
+.btn-export:disabled,
+.export-buttons button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+/* --- KPI grid ---------------------------------------------------------
+   A row of large serif figures with uppercase kicker labels, separated
+   from each other by hairline verticals rather than card borders. */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0;
+    margin-bottom: 48px;
+    border-top: 1px solid var(--pos-border);
+    border-bottom: 1px solid var(--pos-border);
+}
+
+.kpi-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 32px 32px 32px 0;
+    border-right: 1px solid var(--pos-border);
+}
+.kpi-card:last-child {
+    border-right: none;
+    padding-right: 0;
+}
+.kpi-card:first-child {
+    padding-left: 0;
+}
+
+.kpi-card .label {
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--pos-ink-muted);
+}
+
+.kpi-card .value {
+    font-family: var(--pos-font-display);
+    font-size: 42px;
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--pos-ink);
+}
+
+/* --- Section sub-headings (plain <h3> in the TSX) -------------------- */
+.report-section h3 {
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--pos-ink-muted);
+    margin: 0 0 20px;
+}
+
+/* --- Tables -----------------------------------------------------------
+   Plain <table> elements (no class in the TSX) styled via descendant
+   selector. Hairline rows, uppercase letter-spaced headers closed by a
+   2px ink rule. */
+.report-section table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.report-section table th,
+.report-section table td {
+    text-align: left;
+    padding: 16px 20px 16px 0;
+    border-bottom: 1px solid var(--pos-border);
+    font-size: 14.5px;
+    vertical-align: baseline;
+}
+
+.report-section table th {
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--pos-ink-muted);
+    border-bottom: 2px solid var(--pos-rule);
+    padding-bottom: 12px;
+}
+
+.report-section table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Numeric columns read in monospace. Matches the pattern used on the
+   audit log and product tables. */
+.report-section table td:not(:first-child) {
+    font-family: var(--pos-font-mono);
+    font-size: 13px;
+    letter-spacing: 0;
+}
+
+/* Row hover — subtle padding-left shift on the first cell. */
+.report-section table tbody tr td:first-child {
+    transition: padding-left 120ms ease;
+}
+.report-section table tbody tr:hover td:first-child {
+    padding-left: 8px;
+}
+
+/* --- Empty states ----------------------------------------------------
+   Inline italic note, matching other "no results" treatments. */
+.report-section > p {
+    font-size: 15px;
+    color: var(--pos-ink-muted);
+    font-style: italic;
+    padding: 16px 0;
+    margin: 0;
+}
+
+/* --- Responsive ------------------------------------------------------ */
+@media (max-width: 1000px) {
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .kpi-card {
+        border-right: 1px solid var(--pos-border);
+        border-bottom: 1px solid var(--pos-border);
+    }
+    .kpi-card:nth-child(2n) {
+        border-right: none;
+        padding-right: 0;
+    }
+    .kpi-card:nth-last-child(-n + 2) {
+        border-bottom: none;
+    }
+}
+
+@media (max-width: 760px) {
+    .reports-page {
+        padding: 40px 24px 64px;
+    }
+    .page-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 24px;
+    }
+    .page-header h1 {
+        font-size: 34px;
+    }
+    .date-filter {
+        flex-wrap: wrap;
+    }
+    .date-filter input[type="date"] {
+        flex: 1 1 140px;
+    }
+    .date-filter button {
+        flex: 1 1 100%;
+    }
+    .section-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 16px;
+    }
+    .section-header h2 {
+        font-size: 26px;
+    }
+    .kpi-grid {
+        grid-template-columns: 1fr;
+    }
+    .kpi-card {
+        border-right: none;
+        border-bottom: 1px solid var(--pos-border);
+        padding: 24px 0;
+    }
+    .kpi-card:last-child {
+        border-bottom: none;
+    }
+    .kpi-card .value {
+        font-size: 34px;
+    }
+    .report-section table th,
+    .report-section table td {
+        padding: 12px 10px 12px 0;
+        font-size: 13px;
+    }
+}

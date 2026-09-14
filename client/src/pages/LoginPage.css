@@ -1,182 +1,227 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
-
 .login-screen {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--pos-bg);
-  padding: 24px;
-  font-family: var(--pos-font-body);
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    background: var(--pos-bg);
+    padding: 120px 40px 64px;
+    font-family: var(--pos-font-body);
+    color: var(--pos-ink);
 }
 
+/* The form column. Constrained for readability, but transparent — it's
+   content on the canvas, not a container on top of it. */
 .login-card {
-  width: 100%;
-  max-width: 400px;
-  background: var(--pos-surface);
-  border: 1px solid var(--pos-border);
-  border-top: none;
-  border-radius: 0 0 10px 10px;
-  box-shadow: 0 12px 32px -12px rgba(26, 26, 26, 0.16);
-  padding: 40px 32px 32px;
-  position: relative;
-  animation: login-card-in 320ms ease-out;
+    width: 100%;
+    max-width: 440px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+    position: static;
+    animation: login-card-in 400ms ease-out;
 }
 
-/* Signature element: a torn/perforated edge, like a receipt just pulled
-   from the printer. Built from a repeating triangular gradient rather than
-   an image so it stays crisp at any zoom level. */
+/* The signature move: a thin rule above the wordmark, then the wordmark
+   itself as the page's only display type. No decorative edges. */
 .login-card::before {
-  content: '';
-  position: absolute;
-  top: -11px;
-  left: 0;
-  right: 0;
-  height: 12px;
-  background:
-    linear-gradient(135deg, var(--pos-surface) 50%, transparent 50%),
-    linear-gradient(-135deg, var(--pos-surface) 50%, transparent 50%);
-  background-size: 16px 16px;
-  background-position: bottom left;
-  background-repeat: repeat-x;
-  filter: drop-shadow(0 -2px 3px rgba(26, 26, 26, 0.06));
+    content: '';
+    display: block;
+    width: 48px;
+    height: 3px;
+    background: var(--pos-ink);
+    margin-bottom: 40px;
 }
 
 @keyframes login-card-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .login-card {
-    animation: none;
-  }
+    .login-card {
+        animation: none;
+    }
 }
 
+/* --- Header ---------------------------------------------------------- */
 .login-card__header {
-  margin-bottom: 28px;
+    margin-bottom: 56px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--pos-border);
 }
 
 .login-wordmark {
-  font-family: var(--pos-font-display);
-  font-weight: 700;
-  font-size: 22px;
-  letter-spacing: -0.01em;
-  color: var(--pos-ink);
+    font-family: var(--pos-font-display);
+    font-weight: 400;
+    font-size: 64px;
+    line-height: 0.95;
+    letter-spacing: -0.025em;
+    color: var(--pos-ink);
+    display: block;
 }
 
 .login-wordmark__accent {
-  color: var(--pos-accent);
+    color: var(--pos-ink);
 }
 
 .login-tagline {
-  margin: 4px 0 0;
-  font-size: 14px;
-  color: var(--pos-ink-muted);
+    margin: 20px 0 0;
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--pos-ink-muted);
 }
 
+/* --- Form ------------------------------------------------------------ */
 .login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
 }
 
 .login-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 .login-field label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--pos-ink);
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--pos-ink-muted);
 }
 
+/* Underline-only inputs, matching the shared .pos-input primitive. */
 .login-field input {
-  font-family: var(--pos-font-body);
-  font-size: 15px;
-  padding: 10px 12px;
-  border: 1px solid var(--pos-border);
-  border-radius: 6px;
-  background: var(--pos-bg);
-  color: var(--pos-ink);
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+    font-family: var(--pos-font-body);
+    font-size: 17px;
+    padding: 8px 0;
+    border: none;
+    border-bottom: 1.5px solid var(--pos-rule);
+    border-radius: 0;
+    background: transparent;
+    color: var(--pos-ink);
+    outline: none;
+    transition: border-color 120ms ease;
+}
+
+.login-field input::placeholder {
+    color: var(--pos-ink-dim);
 }
 
 .login-field input:focus-visible {
-  outline: none;
-  border-color: var(--pos-accent);
-  box-shadow: 0 0 0 3px var(--pos-accent-soft);
+    outline: none;
+    border-bottom-color: var(--pos-ink);
 }
 
 .login-field__error {
-  font-size: 12.5px;
-  color: var(--pos-danger);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--pos-danger);
+    margin-top: 2px;
 }
 
+/* Error banner — hairline top and bottom only, no fill, no radius. */
 .login-error {
-  margin: 0;
-  font-size: 13px;
-  color: var(--pos-danger);
-  background: rgba(192, 57, 43, 0.08);
-  border: 1px solid rgba(192, 57, 43, 0.2);
-  border-radius: 6px;
-  padding: 8px 10px;
+    margin: 0;
+    font-size: 14px;
+    color: var(--pos-danger);
+    background: transparent;
+    border: none;
+    border-top: 1px solid var(--pos-danger);
+    border-bottom: 1px solid var(--pos-danger);
+    border-radius: 0;
+    padding: 12px 0;
+    letter-spacing: 0.01em;
 }
 
 .login-mfa-copy {
-  margin: -6px 0 0;
-  font-size: 13.5px;
-  color: var(--pos-ink-muted);
+    margin: -8px 0 0;
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--pos-ink-muted);
 }
 
+/* --- Submit — square ink button, matching .pos-btn -------------------- */
 .login-submit {
-  font-family: var(--pos-font-body);
-  font-size: 15px;
-  font-weight: 600;
-  color: #fff;
-  background: var(--pos-accent);
-  border: none;
-  border-radius: 6px;
-  padding: 11px 16px;
-  cursor: pointer;
-  transition: background 120ms ease;
+    font-family: var(--pos-font-body);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--pos-bg);
+    background: var(--pos-ink);
+    border: 1.5px solid var(--pos-ink);
+    border-radius: 0;
+    padding: 16px 24px;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background 120ms ease, color 120ms ease;
 }
 
 .login-submit:hover:not(:disabled) {
-  background: var(--pos-accent-hover);
+    background: transparent;
+    color: var(--pos-ink);
 }
 
 .login-submit:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 .login-submit:focus-visible {
-  outline: 2px solid var(--pos-accent);
-  outline-offset: 2px;
+    outline: 2px solid var(--pos-ink);
+    outline-offset: 3px;
 }
 
+/* --- Secondary action — bare underlined text ------------------------- */
 .login-link-button {
-  font-family: var(--pos-font-body);
-  font-size: 13.5px;
-  color: var(--pos-ink-muted);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 2px;
-  align-self: center;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--pos-ink-muted);
+    background: none;
+    border: none;
+    border-bottom: 1.5px solid transparent;
+    border-radius: 0;
+    cursor: pointer;
+    padding: 4px 0;
+    align-self: center;
+    text-decoration: none;
+    transition: color 120ms ease, border-color 120ms ease;
 }
 
 .login-link-button:hover {
-  color: var(--pos-ink);
+    color: var(--pos-ink);
+    border-bottom-color: var(--pos-ink);
+}
+
+/* --- Responsive ------------------------------------------------------ */
+@media (max-width: 700px) {
+    .login-screen {
+        padding: 64px 24px 48px;
+    }
+    .login-wordmark {
+        font-size: 44px;
+    }
+    .login-card__header {
+        margin-bottom: 40px;
+    }
 }
