@@ -1,5 +1,5 @@
-using Pos.Domain.Enums;
 using Pos.Domain.Common;
+using Pos.Domain.Enums;
 
 namespace Pos.Domain.Entities;
 
@@ -14,53 +14,82 @@ public class Product : BaseEntity
     public decimal CostPrice { get; set; }
     public decimal SalePrice { get; set; }
     public TaxClass TaxClass { get; set; } = TaxClass.Standard;
-    public string? ImageUrl { get; set; } // Supabase Storage URL
+    public string? ImageUrl { get; set; }
     public int ReorderThreshold { get; set; } = 5;
     public int WarrantyMonths { get; set; } = 12;
     public bool IsActive { get; set; } = true;
+
     public ICollection<StockUnit> StockUnits { get; set; } = new List<StockUnit>();
     public ICollection<ProductTierPrice> TierPrices { get; set; } = new List<ProductTierPrice>();
     public ICollection<SaleItem> SaleItems { get; set; } = new List<SaleItem>();
     public ICollection<InventoryAdjustment> InventoryAdjustments { get; set; } = new List<InventoryAdjustment>();
 
-    // ---------- eTIMS / KRA classification (Step 26) ----------
-    // Deliberately scoped to *classification* only, not the full KRA item-master record
-    // (itemCd, itemTyCd, pkgUnitCd, qtyUnitCd, etc.) — that's the separate, still-not-
-    // started "wire /items/saveItems" slice of Step 26. This is just what the
-    // search-and-assign picker writes: which KRA taxonomy leaf this product maps to.
+    // ---------- eTIMS / KRA classification ----------
 
-    /// <summary>KRA's classification code (matches EtimsItemClass.ItemClsCd) — assigned
-    /// via the classification picker, not entered freely. Deliberately NOT a DB foreign
-    /// key to EtimsItemClasses: that table gets replaced wholesale on every re-sync
-    /// (upserted, but KRA could in principle retire a code), and a hard FK would let a
-    /// future sync's data shift silently orphan or block updates on live products. The
-    /// assignment endpoint validates against EtimsItemClasses at write time instead.</summary>
+    /// <summary>
+    /// KRA item classification code assigned through the eTIMS classification picker.
+    /// This is intentionally not a database FK because the KRA classification catalogue
+    /// can be re-synchronised independently of live products.
+    /// </summary>
     public string? EtimsItemClassificationCode { get; set; }
 
-    /// <summary>Snapshot of the classification's TaxTyCd at the moment it was assigned —
-    /// not a live join. Since Product.TaxClass already drives today's VAT-inclusive
-    /// pricing math in checkout, this is kept separate rather than merged into that enum;
-    /// reconciling the two is a deliberate later decision, not an accident of this
-    /// schema.</summary>
+    /// <summary>
+    /// Snapshot of the classification TaxTyCd at the time classification was assigned.
+    /// May be null because KRA classification records can legitimately have no TaxTyCd.
+    /// </summary>
     public string? EtimsTaxTypeCode { get; set; }
 
     public DateTime? EtimsClassifiedAt { get; set; }
 
-    /// <summary>Who assigned the classification — kept directly on Product (in addition
-    /// to the audit log entry the assignment endpoint also writes) so a product's own
-    /// detail view can show "classified by X on Y" without joining audit history.</summary>
     public Guid? EtimsClassifiedByUserId { get; set; }
 
+    // ---------- eTIMS / KRA item registration ----------
+
     /// <summary>
-    /// On-hand quantity for products whose Category.RequiresSerialTracking is false (bulk
-    /// items — cables, chargers — where individual units aren't worth tracking one row
-    /// each). Written by StockController's bulk-receive endpoint and decremented directly
-    /// on sale. Stays 0 for serialized products; their quantity lives entirely in
-    /// StockUnits instead. Whether a product is bulk or serialized is decided by its
-    /// Category — the two tracking modes are never mixed for the same product.
+    /// The unique KRA eTIMS item code returned/registered for this product.
+    /// Example format: KE2NTU0000001.
+    /// </summary>
+    public string? EtimsItemCode { get; set; }
+
+    /// <summary>
+    /// KRA product type code used when registering the item.
+    /// 2 = Finished Product for normal stocked POS products.
+    /// </summary>
+    public string? EtimsItemTypeCode { get; set; }
+
+    /// <summary>
+    /// Country of origin code used for eTIMS item registration.
+    /// Defaults to KE for products registered as Kenyan-origin products.
+    /// </summary>
+    public string? EtimsOriginCountryCode { get; set; }
+
+    /// <summary>
+    /// KRA packaging unit code used when registering the item.
+    /// </summary>
+    public string? EtimsPackagingUnitCode { get; set; }
+
+    /// <summary>
+    /// KRA quantity unit code used when registering the item.
+    /// </summary>
+    public string? EtimsQuantityUnitCode { get; set; }
+
+    /// <summary>
+    /// Time at which KRA accepted the item registration.
+    /// </summary>
+    public DateTime? EtimsRegisteredAt { get; set; }
+
+    /// <summary>
+    /// POS user who registered the item with eTIMS.
+    /// </summary>
+    public Guid? EtimsRegisteredByUserId { get; set; }
+
+    /// <summary>
+    /// On-hand quantity for bulk products.
+    /// Serialized products derive stock from StockUnits.
     /// </summary>
     public int BulkQuantityOnHand { get; set; } = 0;
 
-    
-    public int StockQuantity => BulkQuantityOnHand + (StockUnits?.Count(u => u.Status == "InStock") ?? 0);
+    public int StockQuantity =>
+        BulkQuantityOnHand +
+        (StockUnits?.Count(u => u.Status == "InStock") ?? 0);
 }

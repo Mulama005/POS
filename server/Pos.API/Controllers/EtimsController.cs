@@ -6,6 +6,8 @@ using Pos.Api.Authorization;
 using Pos.Application.Common.Interfaces;
 using Pos.Domain.Entities;
 using Pos.Infrastructure.Persistence;
+using Pos.Infrastructure.Etims;
+using Microsoft.Extensions.Options;
 
 namespace Pos.Api.Controllers;
 
@@ -20,17 +22,23 @@ namespace Pos.Api.Controllers;
 public sealed class EtimsController : ControllerBase
 {
     private readonly IEtimsCodeSyncService _syncService;
+    private readonly IEtimsService _etimsService;
+    private readonly EtimsOptions _etimsOptions;
     private readonly IAuditService _auditService;
     private readonly PosDbContext _db;
 
     public EtimsController(
         IEtimsCodeSyncService syncService,
+        IEtimsService etimsService,
         IAuditService auditService,
-        PosDbContext db)
+        PosDbContext db,
+        IOptions<EtimsOptions> etimsOptions)
     {
         _syncService = syncService;
+        _etimsService = etimsService;
         _auditService = auditService;
         _db = db;
+        _etimsOptions = etimsOptions.Value;
     }
 
     /// <summary>
@@ -90,6 +98,362 @@ public sealed class EtimsController : ControllerBase
         return summary.Success
             ? Ok(summary)
             : StatusCode(502, summary);
+    }
+
+    /// <summary>
+    /// Registers one classified product as an eTIMS item through the local VSCU JAR.
+    ///
+    /// EtimsItemCode is allocated locally before the external call so a failed or
+    /// interrupted registration can be retried with the same KRA item code.
+    ///
+    /// EtimsRegisteredAt is the authoritative local flag indicating that the
+    /// registration call was accepted successfully.
+    /// </summary>
+    [HttpPost("items/{productId:guid}/register")]
+    public async Task<IActionResult> RegisterItem(
+        Guid productId,
+        CancellationToken cancellationToken)
+    {
+        var product = await _db.Products
+            .FirstOrDefaultAsync(
+                p => p.Id == productId && p.IsActive,
+                cancellationToken);
+
+        if (product is null)
+        {
+            return NotFound(new
+            {
+                message = "Product was not found or is inactive."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(product.EtimsItemClassificationCode))
+        {
+            return BadRequest(new
+            {
+                message =
+                    "Assign a leaf-level eTIMS classification to the product before registering it."
+            });
+        }
+
+        // IMPORTANT:
+        // EtimsItemCode is allocated locally before calling VSCU.
+        // Therefore EtimsItemCode != null does NOT necessarily mean KRA
+        // accepted the registration.
+        //
+        // Only EtimsRegisteredAt means the registration completed successfully.
+        if (product.EtimsRegisteredAt is not null)
+        {
+            return Conflict(new
+            {
+                message = "Product is already registered with eTIMS.",
+                itemCd = product.EtimsItemCode
+            });
+        }
+
+        var classification = await _db.EtimsItemClasses
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x =>
+                    x.ItemClsCd == product.EtimsItemClassificationCode &&
+                    x.UseYn,
+                cancellationToken);
+
+        if (classification is null)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "The product's eTIMS classification no longer exists or is inactive."
+            });
+        }
+
+        // Product.TaxClass is the POS source of truth for the tax type.
+        //
+        // KRA's classification feed can legitimately contain a null TaxTyCd
+        // even for a leaf classification, so registration derives the
+        // mandatory KRA tax type from the product's TaxClass.
+        var taxTypeCode = product.TaxClass switch
+        {
+            Pos.Domain.Enums.TaxClass.Standard => "B",
+            Pos.Domain.Enums.TaxClass.ZeroRated => "C",
+            Pos.Domain.Enums.TaxClass.Exempt => "A",
+            _ => null
+        };
+
+        if (taxTypeCode is null)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "The product has an unsupported tax class for eTIMS item registration."
+            });
+        }
+
+        var userId = GetUserId();
+
+        if (userId is null)
+        {
+            return Unauthorized();
+        }
+
+        var userName =
+            User.FindFirst(ClaimTypes.Email)?.Value
+            ?? User.FindFirst(ClaimTypes.Name)?.Value
+            ?? User.Identity?.Name
+            ?? "AyiyaPOS";
+
+        userName = userName.Trim();
+
+        if (userName.Length == 0)
+        {
+            userName = "AyiyaPOS";
+        }
+
+        // KRA regrId/modrId are limited to 20 characters.
+        // Do not send the 36-character POS user GUID.
+        var operatorId =
+            User.FindFirst(ClaimTypes.Email)?.Value
+            ?? User.FindFirst(ClaimTypes.Name)?.Value
+            ?? User.Identity?.Name
+            ?? "AyiyaPOS";
+
+        operatorId = operatorId.Trim();
+
+        if (operatorId.Length > 20)
+        {
+            operatorId = operatorId[..20];
+        }
+
+        if (operatorId.Length == 0)
+        {
+            operatorId = "AyiyaPOS";
+        }
+
+        // ------------------------------------------------------------
+        // ITEM CODE
+        // ------------------------------------------------------------
+        //
+        // If an earlier attempt already allocated an item code but did not
+        // complete registration, reuse it.
+        //
+        // Example:
+        //
+        //   EtimsItemCode       = KE2NTU0000001
+        //   EtimsRegisteredAt   = NULL
+        //
+        // The request below will reuse KE2NTU0000001 rather than generating
+        // KE2NTU0000002.
+        //
+        if (string.IsNullOrWhiteSpace(product.EtimsItemCode))
+        {
+            var sequence = await _db.Database
+                .SqlQueryRaw<long>(
+                    "SELECT nextval('\"EtimsItemCodeSequence\"') AS \"Value\"")
+                .SingleAsync(cancellationToken);
+
+            var origin =
+                _etimsOptions.OriginCountryCode
+                    .Trim()
+                    .ToUpperInvariant();
+
+            var itemType =
+                _etimsOptions.ItemTypeCode
+                    .Trim()
+                    .ToUpperInvariant();
+
+            var pkg =
+                _etimsOptions.DefaultPackagingUnitCode
+                    .Trim()
+                    .ToUpperInvariant();
+
+            var qty =
+                _etimsOptions.DefaultQuantityUnitCode
+                    .Trim()
+                    .ToUpperInvariant();
+
+            if (origin.Length != 2 ||
+                itemType.Length != 1 ||
+                pkg.Length != 2 ||
+                qty.Length != 1)
+            {
+                return BadRequest(new
+                {
+                    message =
+                        "eTIMS item-code configuration is invalid. Expected country=2 characters, item type=1, packaging unit=2, quantity unit=1."
+                });
+            }
+
+            product.EtimsItemCode =
+                $"{origin}{itemType}{pkg}{qty}{sequence.ToString(
+                    "D7",
+                    System.Globalization.CultureInfo.InvariantCulture)}";
+
+            product.EtimsItemTypeCode = itemType;
+            product.EtimsOriginCountryCode = origin;
+            product.EtimsPackagingUnitCode = pkg;
+            product.EtimsQuantityUnitCode = qty;
+            product.UpdatedAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        // If this is a retry, the fields below should already exist from the
+        // original allocation. The fallbacks also make the request robust if
+        // an older locally-created item code is missing these fields.
+        var itemTypeCode =
+            string.IsNullOrWhiteSpace(product.EtimsItemTypeCode)
+                ? _etimsOptions.ItemTypeCode.Trim().ToUpperInvariant()
+                : product.EtimsItemTypeCode.Trim().ToUpperInvariant();
+
+        var originCountryCode =
+            string.IsNullOrWhiteSpace(product.EtimsOriginCountryCode)
+                ? _etimsOptions.OriginCountryCode.Trim().ToUpperInvariant()
+                : product.EtimsOriginCountryCode.Trim().ToUpperInvariant();
+
+        var packagingUnitCode =
+            string.IsNullOrWhiteSpace(product.EtimsPackagingUnitCode)
+                ? _etimsOptions.DefaultPackagingUnitCode.Trim().ToUpperInvariant()
+                : product.EtimsPackagingUnitCode.Trim().ToUpperInvariant();
+
+        var quantityUnitCode =
+            string.IsNullOrWhiteSpace(product.EtimsQuantityUnitCode)
+                ? _etimsOptions.DefaultQuantityUnitCode.Trim().ToUpperInvariant()
+                : product.EtimsQuantityUnitCode.Trim().ToUpperInvariant();
+
+        if (itemTypeCode.Length != 1 ||
+            originCountryCode.Length != 2 ||
+            packagingUnitCode.Length != 2 ||
+            quantityUnitCode.Length != 1)
+        {
+            return BadRequest(new
+            {
+                message =
+                    "eTIMS item-code configuration is invalid. Expected country=2 characters, item type=1, packaging unit=2, quantity unit=1."
+            });
+        }
+
+        var request = new EtimsItemSaveRequest(
+            classification.ItemClsCd,
+            product.EtimsItemCode!,
+            itemTypeCode,
+            product.Name,
+            originCountryCode,
+            packagingUnitCode,
+            quantityUnitCode,
+            taxTypeCode,
+            product.SalePrice,
+            "N",
+            "Y",
+            operatorId,
+            userName,
+            operatorId,
+            userName,
+            product.Name,
+            null,
+            string.IsNullOrWhiteSpace(product.Barcode)
+                ? null
+                : product.Barcode);
+
+        // ------------------------------------------------------------
+        // KRA / VSCU ITEM REGISTRATION
+        // ------------------------------------------------------------
+
+        var result = await _etimsService.SaveItemAsync(
+            request,
+            cancellationToken);
+
+        if (!result.Success)
+        {
+            await _auditService.LogAsync(
+                userId.Value,
+                "ETIMS_ITEM_REGISTRATION_FAILED",
+                "Product",
+                product.Id,
+                result.ErrorMessage
+                    ?? result.ResultMessage
+                    ?? "Unknown eTIMS item registration error.");
+
+            return StatusCode(
+                StatusCodes.Status502BadGateway,
+                new
+                {
+                    message =
+                        result.ErrorMessage
+                        ?? result.ResultMessage
+                        ?? "eTIMS item registration failed.",
+
+                    resultCode = result.ResultCode,
+
+                    itemCd = result.ItemCd
+                        ?? product.EtimsItemCode,
+
+                    itemClsCd =
+                        product.EtimsItemClassificationCode
+                });
+        }
+
+        // ------------------------------------------------------------
+        // MARK AS SUCCESSFULLY REGISTERED
+        // ------------------------------------------------------------
+
+        product.EtimsRegisteredAt =
+            result.ResultDate ?? DateTime.UtcNow;
+
+        product.EtimsRegisteredByUserId =
+            userId.Value;
+
+        product.EtimsTaxTypeCode =
+            taxTypeCode;
+
+        product.EtimsItemTypeCode =
+            itemTypeCode;
+
+        product.EtimsOriginCountryCode =
+            originCountryCode;
+
+        product.EtimsPackagingUnitCode =
+            packagingUnitCode;
+
+        product.EtimsQuantityUnitCode =
+            quantityUnitCode;
+
+        product.UpdatedAt =
+            DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        await _auditService.LogAsync(
+            userId.Value,
+            "ETIMS_ITEM_REGISTERED",
+            "Product",
+            product.Id,
+            $"Registered item {product.EtimsItemCode} ({product.Name}) with KRA eTIMS.");
+
+        return Ok(new
+        {
+            productId = product.Id,
+
+            itemCd =
+                product.EtimsItemCode,
+
+            itemClsCd =
+                classification.ItemClsCd,
+
+            itemClsNm =
+                classification.ItemClsNm,
+
+            taxTypeCode,
+
+            resultCode =
+                result.ResultCode,
+
+            resultDate =
+                result.ResultDate,
+
+            registeredAt =
+                product.EtimsRegisteredAt
+        });
     }
 
     /// <summary>
@@ -352,8 +716,8 @@ public sealed class EtimsController : ControllerBase
         // DETERMINE CHILD PREFIX
         // ------------------------------------------------------------
 
-        var prefixLength = GetHierarchyPrefixLength(
-            parent.ItemClsLvl);
+        var prefixLength =
+            GetHierarchyPrefixLength(parent.ItemClsLvl);
 
         if (prefixLength <= 0 ||
             parent.ItemClsCd.Length < prefixLength)
@@ -467,8 +831,6 @@ public sealed class EtimsController : ControllerBase
                 child.UseYn,
                 hasChildren,
 
-                // The existing product-assignment flow requires a tax
-                // type on the final classification.
                 selectable =
                     !hasChildren
             };

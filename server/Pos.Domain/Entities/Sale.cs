@@ -38,6 +38,16 @@ public class Sale : BaseEntity
     public string? EtimsControlNumber { get; set; }
     public string? EtimsQrCodeData { get; set; }
 
+    // eTIMS/VSCU receipt data returned by /trnsSales/saveSales.
+    public long? EtimsReceiptNumber { get; set; }
+    public long? EtimsTotalReceiptNumber { get; set; }
+    public string? EtimsInternalData { get; set; }
+    public string? EtimsReceiptSignature { get; set; }
+    public DateTime? EtimsReceiptPublishedDate { get; set; }
+    public string? EtimsSdcId { get; set; }
+    public string? EtimsMrcNo { get; set; }
+    public string? EtimsResultCode { get; set; }
+
     /// <summary>
     /// True once this sale (created while offline) has been successfully replayed
     /// against the backend, including eTIMS invoicing (Step 35). Sales created online are

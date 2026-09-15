@@ -52,4 +52,14 @@ public interface IEtimsService
     /// database access here.
     /// </summary>
     Task<EtimsItemClassesFetchResult> FetchItemClassesAsync(DateTime lastReqDt, CancellationToken cancellationToken = default);
+
+    /// <summary>Registers a product/item with KRA via /item/saveItem.</summary>
+    Task<EtimsItemSaveResult> SaveItemAsync(
+        EtimsItemSaveRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Calls /trnsSales/saveSales to submit one completed sale to KRA through VSCU.</summary>
+    Task<EtimsSaleSaveResult> SaveSaleAsync(
+        EtimsSaleSaveRequest request,
+        CancellationToken cancellationToken = default);
 }

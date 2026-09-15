@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Pos.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using Pos.Infrastructure.Persistence;
 namespace Pos.Infrastructure.Migrations
 {
     [DbContext(typeof(PosDbContext))]
-    partial class PosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260914202146_AddEtimsItemRegistrationFields")]
+    partial class AddEtimsItemRegistrationFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,6 +24,8 @@ namespace Pos.Infrastructure.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.HasSequence("EtimsItemCodeSequence");
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", b =>
                 {
@@ -698,19 +703,24 @@ namespace Pos.Infrastructure.Migrations
                         .HasColumnType("character varying(10)");
 
                     b.Property<string>("EtimsItemCode")
-                        .HasColumnType("text");
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("EtimsItemTypeCode")
-                        .HasColumnType("text");
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)");
 
                     b.Property<string>("EtimsOriginCountryCode")
-                        .HasColumnType("text");
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)");
 
                     b.Property<string>("EtimsPackagingUnitCode")
-                        .HasColumnType("text");
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)");
 
                     b.Property<string>("EtimsQuantityUnitCode")
-                        .HasColumnType("text");
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)");
 
                     b.Property<DateTime?>("EtimsRegisteredAt")
                         .HasColumnType("timestamp with time zone");
@@ -762,6 +772,12 @@ namespace Pos.Infrastructure.Migrations
                     b.HasIndex("CategoryId");
 
                     b.HasIndex("EtimsItemClassificationCode");
+
+                    b.HasIndex("EtimsItemCode")
+                        .IsUnique()
+                        .HasFilter("\"EtimsItemCode\" IS NOT NULL");
+
+                    b.HasIndex("EtimsRegisteredAt");
 
                     b.HasIndex("Sku")
                         .IsUnique();
@@ -1004,40 +1020,11 @@ namespace Pos.Infrastructure.Migrations
                     b.Property<string>("EtimsControlNumber")
                         .HasColumnType("text");
 
-                    b.Property<string>("EtimsInternalData")
-                        .HasMaxLength(26)
-                        .HasColumnType("character varying(26)");
-
                     b.Property<string>("EtimsInvoiceNumber")
                         .HasColumnType("text");
 
-                    b.Property<string>("EtimsMrcNo")
-                        .HasMaxLength(11)
-                        .HasColumnType("character varying(11)");
-
                     b.Property<string>("EtimsQrCodeData")
                         .HasColumnType("text");
-
-                    b.Property<long?>("EtimsReceiptNumber")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime?>("EtimsReceiptPublishedDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("EtimsReceiptSignature")
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.Property<string>("EtimsResultCode")
-                        .HasMaxLength(3)
-                        .HasColumnType("character varying(3)");
-
-                    b.Property<string>("EtimsSdcId")
-                        .HasMaxLength(18)
-                        .HasColumnType("character varying(18)");
-
-                    b.Property<long?>("EtimsTotalReceiptNumber")
-                        .HasColumnType("bigint");
 
                     b.Property<bool>("IsSynced")
                         .HasColumnType("boolean");
