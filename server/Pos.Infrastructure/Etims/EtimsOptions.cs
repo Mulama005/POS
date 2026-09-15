@@ -40,4 +40,10 @@ public sealed class EtimsOptions
     /// locally-invented string.
     /// </summary>
     public string DeviceSerialNumber { get; init; } = string.Empty;
+
+    /// <summary>KRA item type for products created by AyiyaPOS. 2 = Finished Product.</summary>
+    public string ItemTypeCode { get; init; } = "2";
+    public string OriginCountryCode { get; init; } = "KE";
+    public string DefaultPackagingUnitCode { get; init; } = "NT";
+    public string DefaultQuantityUnitCode { get; init; } = "U";
 }

@@ -343,6 +343,298 @@ public sealed class EtimsService : IEtimsService
         }
     }
 
+    public async Task<EtimsItemSaveResult> SaveItemAsync(
+        EtimsItemSaveRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var missing = ValidateConfig();
+        if (missing is not null)
+            return new EtimsItemSaveResult(false, null, null, null, request.ItemCd, missing);
+
+        var (tin, bhfId, _, baseUrl) = TrimmedConfig();
+        const string path = "/items/saveItems";
+        var url = $"{baseUrl}{path}";
+        var wireRequest = new ItemSaveRequest
+        {
+            Tin = tin, BhfId = bhfId, ItemClsCd = request.ItemClsCd, ItemCd = request.ItemCd,
+            ItemTyCd = request.ItemTyCd, ItemNm = request.ItemNm, OrgnNatCd = request.OrgnNatCd,
+            PkgUnitCd = request.PkgUnitCd, QtyUnitCd = request.QtyUnitCd, TaxTyCd = request.TaxTyCd,
+            DftPrc = request.DftPrc, IsrcAplcbYn = request.IsrcAplcbYn, UseYn = request.UseYn,
+            RegrId = request.RegrId, RegrNm = request.RegrNm, ModrId = request.ModrId,
+            ModrNm = request.ModrNm, ItemStdNm = request.ItemStdNm, BtchNo = request.BtchNo, Bcd = request.Bcd
+        };
+        try
+        {
+            _logger.LogInformation("eTIMS item-save request: POST {Url} itemCd={ItemCd} itemClsCd={ItemClsCd} itemNm={ItemNm}",
+                url, wireRequest.ItemCd, wireRequest.ItemClsCd, wireRequest.ItemNm);
+            using var response = await _httpClient.PostAsJsonAsync(url, wireRequest, cancellationToken);
+            var raw = await response.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogInformation("eTIMS item-save raw response ({StatusCode}, {Length} chars): {Raw}",
+                (int)response.StatusCode, raw.Length, raw);
+            if (!response.IsSuccessStatusCode)
+                return new EtimsItemSaveResult(false, null, null, null, request.ItemCd,
+                    $"VSCU JAR at {url} returned HTTP {(int)response.StatusCode}. Raw body: {raw}");
+            ItemSaveResponse? parsed;
+            try { parsed = JsonSerializer.Deserialize<ItemSaveResponse>(raw, JsonOpts); }
+            catch (JsonException jex)
+            {
+                _logger.LogError(jex, "eTIMS item-save response was not valid JSON. Raw body: {Raw}", raw);
+                return new EtimsItemSaveResult(false, null, null, null, request.ItemCd, "VSCU JAR returned an invalid JSON response.");
+            }
+            if (parsed is null)
+                return new EtimsItemSaveResult(false, null, null, null, request.ItemCd, "VSCU JAR returned an empty response body.");
+            DateTime? resultDate = null;
+            if (!string.IsNullOrWhiteSpace(parsed.ResultDt) && DateTime.TryParseExact(parsed.ResultDt, "yyyyMMddHHmmss",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out var parsedDate))
+                resultDate = parsedDate;
+            var itemCd = string.IsNullOrWhiteSpace(parsed.Data?.ItemCd) ? request.ItemCd : parsed.Data.ItemCd;
+            if (parsed.ResultCd != "000")
+            {
+                _logger.LogWarning("eTIMS item-save failed: resultCd={ResultCd} resultMsg={ResultMsg} itemCd={ItemCd}",
+                    parsed.ResultCd, parsed.ResultMsg, itemCd);
+                return new EtimsItemSaveResult(false, parsed.ResultCd, parsed.ResultMsg, resultDate, itemCd, parsed.ResultMsg);
+            }
+            return new EtimsItemSaveResult(true, parsed.ResultCd, parsed.ResultMsg, resultDate, itemCd, null);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Could not reach the VSCU JAR at {Url} for item save.", url);
+            return new EtimsItemSaveResult(false, null, null, null, request.ItemCd, $"Could not reach the VSCU JAR at {baseUrl}. ({ex.Message})");
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogError(ex, "eTIMS item-save request to {Url} timed out.", url);
+            return new EtimsItemSaveResult(false, null, null, null, request.ItemCd, $"Request to the VSCU JAR at {baseUrl} timed out.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error calling eTIMS item-save at {Url}.", url);
+            return new EtimsItemSaveResult(false, null, null, null, request.ItemCd, $"Unexpected error: {ex.Message}");
+        }
+    }
+
+    public async Task<EtimsSaleSaveResult> SaveSaleAsync(
+        EtimsSaleSaveRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var missing = ValidateConfig();
+        if (missing is not null)
+        {
+            return new EtimsSaleSaveResult(
+                false, null, null, null, request.InvoiceNumber, null, null,
+                null, null, null, null, null, missing);
+        }
+
+        var (tin, bhfId, _, baseUrl) = TrimmedConfig();
+        const string path = "/trnsSales/saveSales";
+        var url = $"{baseUrl}{path}";
+
+        var wireRequest = new SalesSaveRequest
+        {
+            Tin = tin,
+            BhfId = bhfId,
+            TrdInvcNo = request.TraderInvoiceNumber,
+            InvcNo = request.InvoiceNumber,
+            OrgInvcNo = request.OriginalInvoiceNumber,
+            CustTin = request.CustomerTin,
+            CustNm = request.CustomerName,
+            SalesTyCd = request.SalesTypeCode,
+            RcptTyCd = request.ReceiptTypeCode,
+            PmtTyCd = request.PaymentTypeCode,
+            SalesSttsCd = request.SalesStatusCode,
+            CfmDt = request.ConfirmedAt.ToString("yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture),
+            SalesDt = request.SaleDate.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture),
+            StockRlsDt = request.StockReleasedAt?.ToString("yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture),
+            TotItemCnt = request.Items.Count,
+            TaxblAmtA = request.TaxableAmountA,
+            TaxblAmtB = request.TaxableAmountB,
+            TaxblAmtC = request.TaxableAmountC,
+            TaxblAmtD = request.TaxableAmountD,
+            TaxblAmtE = request.TaxableAmountE,
+            TaxRtA = request.TaxRateA,
+            TaxRtB = request.TaxRateB,
+            TaxRtC = request.TaxRateC,
+            TaxRtD = request.TaxRateD,
+            TaxRtE = request.TaxRateE,
+            TaxAmtA = request.TaxAmountA,
+            TaxAmtB = request.TaxAmountB,
+            TaxAmtC = request.TaxAmountC,
+            TaxAmtD = request.TaxAmountD,
+            TaxAmtE = request.TaxAmountE,
+            TotTaxblAmt = request.TotalTaxableAmount,
+            TotTaxAmt = request.TotalTaxAmount,
+            TotAmt = request.TotalAmount,
+            PrchrAcptcYn = request.BuyerAcceptanceYn,
+            RegrId = request.RegistrantId,
+            RegrNm = request.RegistrantName,
+            ModrId = request.ModifierId,
+            ModrNm = request.ModifierName,
+            Receipt = new SalesReceiptRequest
+            {
+                CustTin = request.CustomerTin,
+                CustMblNo = request.CustomerMobileNumber,
+                RptNo = request.ReceiptReportNumber,
+                TrdeNm = request.TradeName,
+                Adrs = request.Address,
+                TopMsg = request.TopMessage,
+                BtmMsg = request.BottomMessage,
+                PrchrAcptcYn = request.BuyerAcceptanceYn
+            },
+            ItemList = request.Items.Select(i => new SalesSaveItemRequest
+            {
+                ItemSeq = i.ItemSeq,
+                ItemClsCd = i.ItemClsCd,
+                ItemCd = i.ItemCd,
+                ItemNm = i.ItemNm,
+                Bcd = i.Bcd,
+                PkgUnitCd = i.PkgUnitCd,
+                Pkg = i.Pkg,
+                QtyUnitCd = i.QtyUnitCd,
+                Qty = i.Qty,
+                Prc = i.Prc,
+                SplyAmt = i.SplyAmt,
+                DcRt = i.DcRt,
+                DcAmt = i.DcAmt,
+                TaxTyCd = i.TaxTyCd,
+                TaxblAmt = i.TaxblAmt,
+                TaxAmt = i.TaxAmt,
+                TotAmt = i.TotAmt
+            }).ToList()
+        };
+
+        try
+        {
+            _logger.LogInformation(
+                "eTIMS sales-save request: POST {Url} invoice={InvoiceNumber} traderInvoice={TraderInvoiceNumber} items={ItemCount} total={Total}",
+                url, request.InvoiceNumber, request.TraderInvoiceNumber, request.Items.Count, request.TotalAmount);
+
+            using var response = await _httpClient.PostAsJsonAsync(url, wireRequest, cancellationToken);
+            var raw = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            _logger.LogInformation(
+                "eTIMS sales-save raw response ({StatusCode}, {Length} chars): {Raw}",
+                (int)response.StatusCode, raw.Length, raw);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return new EtimsSaleSaveResult(
+                    false, null, null, null, request.InvoiceNumber, null, null,
+                    null, null, null, null, null,
+                    $"VSCU JAR at {url} returned HTTP {(int)response.StatusCode}. Raw body: {raw}");
+            }
+
+            SalesSaveResponse? parsed;
+            try
+            {
+                parsed = JsonSerializer.Deserialize<SalesSaveResponse>(raw, JsonOpts);
+            }
+            catch (JsonException jex)
+            {
+                _logger.LogError(jex, "eTIMS sales-save response was not valid JSON. Raw body: {Raw}", raw);
+                return new EtimsSaleSaveResult(
+                    false, null, null, null, request.InvoiceNumber, null, null,
+                    null, null, null, null, null,
+                    "VSCU JAR returned an invalid JSON response.");
+            }
+
+            if (parsed is null)
+            {
+                return new EtimsSaleSaveResult(
+                    false, null, null, null, request.InvoiceNumber, null, null,
+                    null, null, null, null, null,
+                    "VSCU JAR returned an empty response body.");
+            }
+
+            DateTime? resultDate = null;
+            if (!string.IsNullOrWhiteSpace(parsed.ResultDt) &&
+                DateTime.TryParseExact(
+                    parsed.ResultDt,
+                    "yyyyMMddHHmmss",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal |
+                    System.Globalization.DateTimeStyles.AdjustToUniversal,
+                    out var parsedResultDate))
+            {
+                resultDate = parsedResultDate;
+            }
+
+            DateTime? publishedDate = null;
+            if (!string.IsNullOrWhiteSpace(parsed.Data?.VscuRcptPbctDate) &&
+                DateTime.TryParseExact(
+                    parsed.Data.VscuRcptPbctDate,
+                    "yyyyMMddHHmmss",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal |
+                    System.Globalization.DateTimeStyles.AdjustToUniversal,
+                    out var parsedPublishedDate))
+            {
+                publishedDate = parsedPublishedDate;
+            }
+
+            if (parsed.ResultCd != "000")
+            {
+                _logger.LogWarning(
+                    "eTIMS sales-save failed: resultCd={ResultCd} resultMsg={ResultMsg} invoice={InvoiceNumber}",
+                    parsed.ResultCd, parsed.ResultMsg, request.InvoiceNumber);
+
+                return new EtimsSaleSaveResult(
+                    false,
+                    parsed.ResultCd,
+                    parsed.ResultMsg,
+                    resultDate,
+                    request.InvoiceNumber,
+                    parsed.Data?.RcptNo,
+                    parsed.Data?.TotRcptNo,
+                    parsed.Data?.IntrlData,
+                    parsed.Data?.RcptSign,
+                    publishedDate,
+                    parsed.Data?.SdcId,
+                    parsed.Data?.MrcNo,
+                    parsed.ResultMsg);
+            }
+
+            return new EtimsSaleSaveResult(
+                true,
+                parsed.ResultCd,
+                parsed.ResultMsg,
+                resultDate,
+                request.InvoiceNumber,
+                parsed.Data?.RcptNo,
+                parsed.Data?.TotRcptNo,
+                parsed.Data?.IntrlData,
+                parsed.Data?.RcptSign,
+                publishedDate,
+                parsed.Data?.SdcId,
+                parsed.Data?.MrcNo,
+                null);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Could not reach the VSCU JAR at {Url} for sales save.", url);
+            return new EtimsSaleSaveResult(
+                false, null, null, null, request.InvoiceNumber, null, null,
+                null, null, null, null, null,
+                $"Could not reach the VSCU JAR at {baseUrl}. ({ex.Message})");
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogError(ex, "eTIMS sales-save request to {Url} timed out.", url);
+            return new EtimsSaleSaveResult(
+                false, null, null, null, request.InvoiceNumber, null, null,
+                null, null, null, null, null,
+                $"Request to the VSCU JAR at {baseUrl} timed out.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error calling eTIMS sales-save at {Url}.", url);
+            return new EtimsSaleSaveResult(
+                false, null, null, null, request.InvoiceNumber, null, null,
+                null, null, null, null, null,
+                $"Unexpected error: {ex.Message}");
+        }
+    }
+
     /// <summary>Returns a human-readable "missing config" message, or null if config is
     /// complete. Shared by the two fetch methods; InitDeviceAsync keeps its own inline
     /// copy of this check deliberately unchanged since it's already confirmed working —
@@ -439,6 +731,148 @@ public sealed class EtimsService : IEtimsService
         [JsonPropertyName("cdDesc")] public string? CdDesc { get; set; }
         [JsonPropertyName("srtOrd")] public int? SrtOrd { get; set; }
         [JsonPropertyName("useYn")] public string? UseYn { get; set; }
+    }
+
+    // --- /trnsSales/saveSales wire types ---
+    private sealed class SalesSaveRequest
+    {
+        [JsonPropertyName("tin")] public string Tin { get; set; } = string.Empty;
+        [JsonPropertyName("bhfId")] public string BhfId { get; set; } = string.Empty;
+        [JsonPropertyName("trdInvcNo")] public string TrdInvcNo { get; set; } = string.Empty;
+        [JsonPropertyName("invcNo")] public long InvcNo { get; set; }
+        [JsonPropertyName("orgInvcNo")] public long OrgInvcNo { get; set; }
+        [JsonPropertyName("custTin")] public string? CustTin { get; set; }
+        [JsonPropertyName("custNm")] public string? CustNm { get; set; }
+        [JsonPropertyName("salesTyCd")] public string SalesTyCd { get; set; } = string.Empty;
+        [JsonPropertyName("rcptTyCd")] public string RcptTyCd { get; set; } = string.Empty;
+        [JsonPropertyName("pmtTyCd")] public string? PmtTyCd { get; set; }
+        [JsonPropertyName("salesSttsCd")] public string SalesSttsCd { get; set; } = string.Empty;
+        [JsonPropertyName("cfmDt")] public string CfmDt { get; set; } = string.Empty;
+        [JsonPropertyName("salesDt")] public string SalesDt { get; set; } = string.Empty;
+        [JsonPropertyName("stockRlsDt")] public string? StockRlsDt { get; set; }
+        [JsonPropertyName("cnclReqDt")] public string? CnclReqDt { get; set; }
+        [JsonPropertyName("cnclDt")] public string? CnclDt { get; set; }
+        [JsonPropertyName("rfdDt")] public string? RfdDt { get; set; }
+        [JsonPropertyName("rfdRsnCd")] public string? RfdRsnCd { get; set; }
+        [JsonPropertyName("totItemCnt")] public int TotItemCnt { get; set; }
+        [JsonPropertyName("taxblAmtA")] public decimal TaxblAmtA { get; set; }
+        [JsonPropertyName("taxblAmtB")] public decimal TaxblAmtB { get; set; }
+        [JsonPropertyName("taxblAmtC")] public decimal TaxblAmtC { get; set; }
+        [JsonPropertyName("taxblAmtD")] public decimal TaxblAmtD { get; set; }
+        [JsonPropertyName("taxblAmtE")] public decimal TaxblAmtE { get; set; }
+        [JsonPropertyName("taxRtA")] public decimal TaxRtA { get; set; }
+        [JsonPropertyName("taxRtB")] public decimal TaxRtB { get; set; }
+        [JsonPropertyName("taxRtC")] public decimal TaxRtC { get; set; }
+        [JsonPropertyName("taxRtD")] public decimal TaxRtD { get; set; }
+        [JsonPropertyName("taxRtE")] public decimal TaxRtE { get; set; }
+        [JsonPropertyName("taxAmtA")] public decimal TaxAmtA { get; set; }
+        [JsonPropertyName("taxAmtB")] public decimal TaxAmtB { get; set; }
+        [JsonPropertyName("taxAmtC")] public decimal TaxAmtC { get; set; }
+        [JsonPropertyName("taxAmtD")] public decimal TaxAmtD { get; set; }
+        [JsonPropertyName("taxAmtE")] public decimal TaxAmtE { get; set; }
+        [JsonPropertyName("totTaxblAmt")] public decimal TotTaxblAmt { get; set; }
+        [JsonPropertyName("totTaxAmt")] public decimal TotTaxAmt { get; set; }
+        [JsonPropertyName("totAmt")] public decimal TotAmt { get; set; }
+        [JsonPropertyName("prchrAcptcYn")] public string PrchrAcptcYn { get; set; } = "N";
+        [JsonPropertyName("remark")] public string? Remark { get; set; }
+        [JsonPropertyName("regrId")] public string RegrId { get; set; } = string.Empty;
+        [JsonPropertyName("regrNm")] public string RegrNm { get; set; } = string.Empty;
+        [JsonPropertyName("modrId")] public string ModrId { get; set; } = string.Empty;
+        [JsonPropertyName("modrNm")] public string ModrNm { get; set; } = string.Empty;
+        [JsonPropertyName("receipt")] public SalesReceiptRequest Receipt { get; set; } = new();
+        [JsonPropertyName("itemList")] public List<SalesSaveItemRequest> ItemList { get; set; } = new();
+    }
+
+    private sealed class SalesReceiptRequest
+    {
+        [JsonPropertyName("custTin")] public string? CustTin { get; set; }
+        [JsonPropertyName("custMblNo")] public string? CustMblNo { get; set; }
+        [JsonPropertyName("rptNo")] public long RptNo { get; set; }
+        [JsonPropertyName("trdeNm")] public string? TrdeNm { get; set; }
+        [JsonPropertyName("adrs")] public string? Adrs { get; set; }
+        [JsonPropertyName("topMsg")] public string? TopMsg { get; set; }
+        [JsonPropertyName("btmMsg")] public string? BtmMsg { get; set; }
+        [JsonPropertyName("prchrAcptcYn")] public string PrchrAcptcYn { get; set; } = "N";
+    }
+
+    private sealed class SalesSaveItemRequest
+    {
+        [JsonPropertyName("itemSeq")] public int ItemSeq { get; set; }
+        [JsonPropertyName("itemClsCd")] public string ItemClsCd { get; set; } = string.Empty;
+        [JsonPropertyName("itemCd")] public string ItemCd { get; set; } = string.Empty;
+        [JsonPropertyName("itemNm")] public string ItemNm { get; set; } = string.Empty;
+        [JsonPropertyName("bcd")] public string? Bcd { get; set; }
+        [JsonPropertyName("pkgUnitCd")] public string PkgUnitCd { get; set; } = string.Empty;
+        [JsonPropertyName("pkg")] public decimal Pkg { get; set; }
+        [JsonPropertyName("qtyUnitCd")] public string QtyUnitCd { get; set; } = string.Empty;
+        [JsonPropertyName("qty")] public decimal Qty { get; set; }
+        [JsonPropertyName("prc")] public decimal Prc { get; set; }
+        [JsonPropertyName("splyAmt")] public decimal SplyAmt { get; set; }
+        [JsonPropertyName("dcRt")] public decimal DcRt { get; set; }
+        [JsonPropertyName("dcAmt")] public decimal DcAmt { get; set; }
+        [JsonPropertyName("isrccCd")] public string? IsrccCd { get; set; }
+        [JsonPropertyName("isrccNm")] public string? IsrccNm { get; set; }
+        [JsonPropertyName("isrcRt")] public decimal? IsrcRt { get; set; }
+        [JsonPropertyName("isrcAmt")] public decimal? IsrcAmt { get; set; }
+        [JsonPropertyName("taxTyCd")] public string TaxTyCd { get; set; } = string.Empty;
+        [JsonPropertyName("taxblAmt")] public decimal TaxblAmt { get; set; }
+        [JsonPropertyName("taxAmt")] public decimal TaxAmt { get; set; }
+        [JsonPropertyName("totAmt")] public decimal TotAmt { get; set; }
+    }
+
+    private sealed class SalesSaveResponse
+    {
+        [JsonPropertyName("resultCd")] public string? ResultCd { get; set; }
+        [JsonPropertyName("resultMsg")] public string? ResultMsg { get; set; }
+        [JsonPropertyName("resultDt")] public string? ResultDt { get; set; }
+        [JsonPropertyName("data")] public SalesSaveData? Data { get; set; }
+    }
+
+    private sealed class SalesSaveData
+    {
+        [JsonPropertyName("rcptNo")] public long? RcptNo { get; set; }
+        [JsonPropertyName("intrlData")] public string? IntrlData { get; set; }
+        [JsonPropertyName("rcptSign")] public string? RcptSign { get; set; }
+        [JsonPropertyName("totRcptNo")] public long? TotRcptNo { get; set; }
+        [JsonPropertyName("VSCURcptPbctDate")] public string? VscuRcptPbctDate { get; set; }
+        [JsonPropertyName("sdcId")] public string? SdcId { get; set; }
+        [JsonPropertyName("mrcNo")] public string? MrcNo { get; set; }
+    }
+
+    // --- /item/saveItem wire types ---
+    private sealed class ItemSaveRequest
+    {
+        [JsonPropertyName("tin")] public string Tin { get; set; } = string.Empty;
+        [JsonPropertyName("bhfId")] public string BhfId { get; set; } = string.Empty;
+        [JsonPropertyName("itemClsCd")] public string ItemClsCd { get; set; } = string.Empty;
+        [JsonPropertyName("itemCd")] public string ItemCd { get; set; } = string.Empty;
+        [JsonPropertyName("itemTyCd")] public string ItemTyCd { get; set; } = string.Empty;
+        [JsonPropertyName("itemNm")] public string ItemNm { get; set; } = string.Empty;
+        [JsonPropertyName("orgnNatCd")] public string OrgnNatCd { get; set; } = string.Empty;
+        [JsonPropertyName("pkgUnitCd")] public string PkgUnitCd { get; set; } = string.Empty;
+        [JsonPropertyName("qtyUnitCd")] public string QtyUnitCd { get; set; } = string.Empty;
+        [JsonPropertyName("taxTyCd")] public string TaxTyCd { get; set; } = string.Empty;
+        [JsonPropertyName("dftPrc")] public decimal DftPrc { get; set; }
+        [JsonPropertyName("isrcAplcbYn")] public string IsrcAplcbYn { get; set; } = string.Empty;
+        [JsonPropertyName("useYn")] public string UseYn { get; set; } = string.Empty;
+        [JsonPropertyName("regrId")] public string RegrId { get; set; } = string.Empty;
+        [JsonPropertyName("regrNm")] public string RegrNm { get; set; } = string.Empty;
+        [JsonPropertyName("modrId")] public string ModrId { get; set; } = string.Empty;
+        [JsonPropertyName("modrNm")] public string ModrNm { get; set; } = string.Empty;
+        [JsonPropertyName("itemStdNm")] public string? ItemStdNm { get; set; }
+        [JsonPropertyName("btchNo")] public string? BtchNo { get; set; }
+        [JsonPropertyName("bcd")] public string? Bcd { get; set; }
+    }
+    private sealed class ItemSaveResponse
+    {
+        [JsonPropertyName("resultCd")] public string? ResultCd { get; set; }
+        [JsonPropertyName("resultMsg")] public string? ResultMsg { get; set; }
+        [JsonPropertyName("resultDt")] public string? ResultDt { get; set; }
+        [JsonPropertyName("data")] public ItemSaveData? Data { get; set; }
+    }
+    private sealed class ItemSaveData
+    {
+        [JsonPropertyName("itemCd")] public string? ItemCd { get; set; }
     }
 
     // --- /itemClass/selectItemsClass wire types ---

@@ -18,13 +18,19 @@ public class ProductDto
     public int ReorderThreshold { get; set; }
     public int WarrantyMonths { get; set; }
     public bool IsActive { get; set; }
-    public int StockCount { get; set; } // computed from StockUnits
+    public int StockCount { get; set; }
 
-    // eTIMS classification (Step 26) — null until assigned via the classification picker.
+    // eTIMS classification
     public string? EtimsItemClassificationCode { get; set; }
-    /// <summary>Joined from EtimsItemClasses at read time (not stored on Product) — always
-    /// reflects the classification's current name even if KRA renames it on a later sync.</summary>
     public string? EtimsItemClassificationName { get; set; }
     public string? EtimsTaxTypeCode { get; set; }
     public DateTime? EtimsClassifiedAt { get; set; }
+
+    // eTIMS item registration
+    public string? EtimsItemCode { get; set; }
+    public string? EtimsItemTypeCode { get; set; }
+    public string? EtimsOriginCountryCode { get; set; }
+    public string? EtimsPackagingUnitCode { get; set; }
+    public string? EtimsQuantityUnitCode { get; set; }
+    public DateTime? EtimsRegisteredAt { get; set; }
 }

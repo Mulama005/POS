@@ -182,6 +182,11 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             e.Property(x => x.Total).HasColumnType("decimal(18,2)");
 
             e.HasIndex(x => x.EtimsInvoiceNumber);
+            e.Property(x => x.EtimsResultCode).HasMaxLength(3);
+            e.Property(x => x.EtimsSdcId).HasMaxLength(18);
+            e.Property(x => x.EtimsMrcNo).HasMaxLength(11);
+            e.Property(x => x.EtimsInternalData).HasMaxLength(26);
+            e.Property(x => x.EtimsReceiptSignature).HasMaxLength(16);
 
             e.HasOne(x => x.Register)
                 .WithMany(x => x.Sales)

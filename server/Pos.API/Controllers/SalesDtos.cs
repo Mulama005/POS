@@ -23,6 +23,7 @@ public sealed record PaymentRequest(
     string? MpesaPhoneNumber);
 
 public sealed record CompleteSaleRequest(
+    Guid ClientTransactionId,
     Guid RegisterId,
     Guid? CustomerId,
     IReadOnlyList<SaleItemRequest> Items,
@@ -60,4 +61,14 @@ public sealed record CompleteSaleResponse(
     decimal Total,
     string Status,
     IReadOnlyList<SaleItemResponse> Items,
-    IReadOnlyList<PaymentResponse> Payments);
+    IReadOnlyList<PaymentResponse> Payments,
+    string? EtimsInvoiceNumber = null,
+    long? EtimsReceiptNumber = null,
+    long? EtimsTotalReceiptNumber = null,
+    string? EtimsInternalData = null,
+    string? EtimsReceiptSignature = null,
+    DateTime? EtimsReceiptPublishedDate = null,
+    string? EtimsSdcId = null,
+    string? EtimsMrcNo = null,
+    string? EtimsResultCode = null,
+    bool EtimsSubmitted = false);
