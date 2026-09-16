@@ -224,3 +224,138 @@
   opacity: 0.5;
   cursor: default;
 }
+
+/* --- Search / filter row --------------------------------------------- */
+.receive-stock-search-row {
+    margin-bottom: 24px;
+}
+
+.receive-stock-search-row input {
+    font-family: var(--pos-font-body);
+    font-size: 17px;
+    padding: 10px 0;
+    border: none;
+    border-bottom: 1.5px solid var(--pos-rule);
+    border-radius: 0;
+    background: transparent;
+    color: var(--pos-ink);
+    width: 100%;
+    max-width: 480px;
+    outline: none;
+    transition: border-color 120ms ease;
+}
+
+.receive-stock-search-row input::placeholder {
+    color: var(--pos-ink-dim);
+}
+
+.receive-stock-search-row input:focus {
+    border-bottom-color: var(--pos-ink);
+}
+
+/* --- Product table --------------------------------------------------- */
+.receive-stock-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.receive-stock-table th,
+.receive-stock-table td {
+    text-align: left;
+    padding: 16px 16px 16px 0;
+    border-bottom: 1px solid var(--pos-border);
+    font-size: 14.5px;
+    vertical-align: baseline;
+}
+
+.receive-stock-table th {
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--pos-ink-muted);
+    border-bottom: 2px solid var(--pos-rule);
+    padding-bottom: 12px;
+}
+
+.receive-stock-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.receive-stock-table .receive-stock-col-stock {
+    font-family: var(--pos-font-mono);
+    font-size: 13px;
+    text-align: right;
+    width: 80px;
+}
+
+.receive-stock-table .receive-stock-col-action {
+    width: 120px;
+    text-align: right;
+}
+
+/* Select button — quiet underlined text, matching secondary actions
+   across the rest of the app. */
+.receive-stock-select-btn {
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    border: none;
+    border-bottom: 1.5px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    color: var(--pos-ink);
+    padding: 3px 0;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 120ms ease, color 120ms ease;
+}
+
+.receive-stock-select-btn:hover {
+    border-bottom-color: var(--pos-ink);
+}
+
+/* --- Pagination ------------------------------------------------------ */
+.receive-stock-pagination {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    justify-content: center;
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 1px solid var(--pos-border);
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--pos-ink-muted);
+}
+
+.receive-stock-pagination button {
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    border: none;
+    border-bottom: 1.5px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    color: var(--pos-ink);
+    padding: 4px 0;
+    cursor: pointer;
+    transition: border-color 120ms ease, opacity 120ms ease;
+}
+
+.receive-stock-pagination button:hover:not(:disabled) {
+    border-bottom-color: var(--pos-ink);
+}
+
+.receive-stock-pagination button:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
