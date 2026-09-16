@@ -8,6 +8,7 @@ import {
   updateProduct,
 } from '../services/ProductsService'
 import { listCategories } from '../services/categoriesService'
+import { registerProductWithEtims } from '../services/EtimsService'
 import type { Category, Product, ProductFormValues, TaxClass } from '../types/product'
 import type { ApiErrorBody } from '../types/auth'
 import { formatKes } from '../utils/currency'
@@ -16,6 +17,16 @@ import { EtimsClassificationPicker, type EtimsPickerTarget } from '../components
 import './ProductsPage.css'
 
 type EtimsFilter = 'all' | 'classified' | 'unclassified'
+/** Three real states, not just classified/unclassified — a product can be classified
+ * but not yet registered, which is its own actionable state (needs the Register step
+ * before it can be sold, per SalesController.Complete's eTIMS gate). */
+type EtimsStatus = 'unclassified' | 'classified' | 'registered'
+
+function getEtimsStatus(p: Product): EtimsStatus {
+  if (p.etimsItemCode) return 'registered'
+  if (p.etimsItemClassificationCode) return 'classified'
+  return 'unclassified'
+}
 
 const TAX_CLASSES: TaxClass[] = ['Standard', 'ZeroRated', 'Exempt']
 const PAGE_SIZE = 20
@@ -80,6 +91,9 @@ export function ProductsPage() {
 
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({})
   const [rowError, setRowError] = useState<Record<string, string>>({})
+
+  const [bulkRegistering, setBulkRegistering] = useState(false)
+  const [bulkRegisterError, setBulkRegisterError] = useState<string | null>(null)
 
   const loadCategories = async () => {
     try {
@@ -173,6 +187,51 @@ export function ProductsPage() {
       setRowError((prev) => ({ ...prev, [product.id]: getErrorMessage(err, 'Could not deactivate product.') }))
     } finally {
       setRowBusy((prev) => ({ ...prev, [product.id]: false }))
+    }
+  }
+
+  const handleRegister = async (product: Product) => {
+    setRowError((prev) => ({ ...prev, [product.id]: '' }))
+    setRowBusy((prev) => ({ ...prev, [product.id]: true }))
+    try {
+      await registerProductWithEtims(product.id)
+      await loadProducts()
+    } catch (err) {
+      setRowError((prev) => ({ ...prev, [product.id]: getErrorMessage(err, 'Could not register product with eTIMS.') }))
+    } finally {
+      setRowBusy((prev) => ({ ...prev, [product.id]: false }))
+    }
+  }
+
+  /** Registers every selected, classified-but-unregistered product one at a time —
+   * there's no bulk endpoint server-side (each registration is its own auditable KRA
+   * call with its own item-code sequence number), so this just sequences the same
+   * per-product call the row action uses and reports how many succeeded. */
+  const handleRegisterSelected = async () => {
+    const targets = products.filter(
+      (p) => selectedIds.has(p.id) && getEtimsStatus(p) === 'classified',
+    )
+    if (targets.length === 0) return
+
+    setBulkRegisterError(null)
+    setBulkRegistering(true)
+    let failed = 0
+    let lastError = ''
+    for (const product of targets) {
+      try {
+        await registerProductWithEtims(product.id)
+      } catch (err) {
+        failed += 1
+        lastError = getErrorMessage(err, 'Could not register product with eTIMS.')
+      }
+    }
+    setBulkRegistering(false)
+    setSelectedIds(new Set())
+    await loadProducts()
+    if (failed > 0) {
+      setBulkRegisterError(
+        `${targets.length - failed} of ${targets.length} registered. Last error: ${lastError}`,
+      )
     }
   }
 
@@ -375,11 +434,24 @@ export function ProductsPage() {
                   <button type="button" onClick={openPickerForSelection}>
                     Assign eTIMS classification
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleRegisterSelected()}
+                    disabled={
+                      bulkRegistering ||
+                      !products.some((p) => selectedIds.has(p.id) && getEtimsStatus(p) === 'classified')
+                    }
+                  >
+                    {bulkRegistering ? 'Registering…' : 'Register with eTIMS'}
+                  </button>
                   <button type="button" className="products-selection-bar-clear" onClick={() => setSelectedIds(new Set())}>
                     Clear selection
                   </button>
                 </div>
               </div>
+            )}
+            {bulkRegisterError && (
+              <p className="products-error" role="alert">{bulkRegisterError}</p>
             )}
           </RoleGate>
 
@@ -428,8 +500,12 @@ export function ProductsPage() {
                     {p.stockCount}
                   </td>
                   <td className="products-col-etims">
-                    {p.etimsItemClassificationCode ? (
-                      <span className="pos-badge pos-badge--success" title={p.etimsItemClassificationName ?? undefined}>
+                    {getEtimsStatus(p) === 'registered' ? (
+                      <span className="pos-badge pos-badge--success" title={`Item code ${p.etimsItemCode}`}>
+                        Registered
+                      </span>
+                    ) : getEtimsStatus(p) === 'classified' ? (
+                      <span className="pos-badge pos-badge--warn" title={p.etimsItemClassificationName ?? undefined}>
                         {p.etimsItemClassificationCode}
                       </span>
                     ) : (
@@ -444,6 +520,13 @@ export function ProductsPage() {
                       <button type="button" onClick={() => openPickerForProduct(p)} disabled={rowBusy[p.id]}>
                         {p.etimsItemClassificationCode ? 'Reclassify' : 'Classify'}
                       </button>
+                    </RoleGate>
+                    <RoleGate roles={['Manager', 'Admin']}>
+                      {getEtimsStatus(p) === 'classified' && (
+                        <button type="button" onClick={() => void handleRegister(p)} disabled={rowBusy[p.id]}>
+                          {rowBusy[p.id] ? 'Registering…' : 'Register'}
+                        </button>
+                      )}
                     </RoleGate>
                     <Link to={`/stock/receive?productId=${p.id}`} className="products-receive-link">
                       Receive stock →

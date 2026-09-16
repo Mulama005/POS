@@ -734,7 +734,15 @@ public sealed class SalesController : ControllerBase
         sale.EtimsMrcNo = result.MrcNo;
         sale.EtimsResultCode = result.ResultCode;
         sale.EtimsControlNumber = result.ReceiptNumber?.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        sale.EtimsQrCodeData = result.InternalData;
+
+        var qrDateTime = result.ReceiptPublishedDate ?? result.ResultDate;
+        sale.EtimsQrCodeData = BuildEtimsQrCodeData(
+            qrDateTime,
+            result.SdcId,
+            result.ReceiptNumber,
+            result.InternalData,
+            result.ReceiptSignature);
+
         sale.IsSynced = true;
         sale.UpdatedAt = DateTime.UtcNow;
 
@@ -761,7 +769,52 @@ public sealed class SalesController : ControllerBase
             sale.Id, sale.SaleDate, sale.Subtotal, sale.DiscountTotal, sale.TaxTotal, sale.Total,
             sale.Status.ToString(), items, payments,
             sale.EtimsInvoiceNumber, sale.EtimsReceiptNumber, sale.EtimsTotalReceiptNumber,
-            sale.EtimsInternalData, sale.EtimsReceiptSignature, sale.EtimsReceiptPublishedDate,
+            sale.EtimsInternalData,
+            sale.EtimsReceiptSignature,
+            sale.EtimsQrCodeData,
+            sale.EtimsReceiptPublishedDate,
             sale.EtimsSdcId, sale.EtimsMrcNo, sale.EtimsResultCode, sale.IsSynced);
+    }
+
+    /// <summary>
+    /// Builds the payload that gets embedded in the receipt's KRA eTIMS QR code, per the
+    /// VSCU spec's '#'-delimited format: date, time, CU/SDC number, receipt number, then
+    /// the internal data and receipt signature each grouped into 4-character chunks
+    /// (the same grouping KRA's own printed receipts use for readability). Returns null
+    /// if any required piece is missing — a QR code half-built from partial data would be
+    /// unscannable and misleading to show at all.
+    /// </summary>
+    private static string? BuildEtimsQrCodeData(
+        DateTime? receiptDateTime,
+        string? cuNumber,
+        long? receiptNumber,
+        string? internalData,
+        string? receiptSignature)
+    {
+        if (receiptDateTime is null ||
+            string.IsNullOrWhiteSpace(cuNumber) ||
+            receiptNumber is null ||
+            string.IsNullOrWhiteSpace(internalData) ||
+            string.IsNullOrWhiteSpace(receiptSignature))
+        {
+            return null;
+        }
+
+        static string GroupByFour(string value)
+        {
+            return string.Join("-",
+                Enumerable.Range(0, (value.Length + 3) / 4)
+                    .Select(i => value.Substring(
+                        i * 4,
+                        Math.Min(4, value.Length - (i * 4)))));
+        }
+
+        return string.Join("#",
+            receiptDateTime.Value.ToString("ddMMyyyy"),
+            receiptDateTime.Value.ToString("HHmmss"),
+            cuNumber,
+            receiptNumber.Value.ToString(),
+            GroupByFour(internalData),
+            GroupByFour(receiptSignature));
     }
 }

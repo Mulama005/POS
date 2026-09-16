@@ -35,3 +35,20 @@ export interface AssignEtimsClassificationResult {
   taxTyCd: string | null
   reclassifiedCount: number
 }
+
+/** Matches the response shape of POST /api/products/{id}/etims/register. */
+export interface EtimsRegistrationResult {
+  productId: string
+  sku: string
+  name: string
+  itemCd: string
+  itemClsCd: string
+  taxTyCd: string
+  itemTyCd: string
+  orgnNatCd: string
+  pkgUnitCd: string
+  qtyUnitCd: string
+  registeredAt: string
+  resultCode: string | null
+  resultMessage: string | null
+}

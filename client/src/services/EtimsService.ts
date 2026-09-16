@@ -4,6 +4,7 @@ import type {
   EtimsItemClassChildrenResponse,
   EtimsItemClassOption,
   EtimsItemClassSearchResponse,
+  EtimsRegistrationResult,
 } from '../types/etims'
 
 /**
@@ -68,6 +69,23 @@ export async function assignEtimsClassification(
       productIds,
       itemClsCd,
     },
+  )
+
+  return data
+}
+
+/**
+ * Register a single, already-classified product with KRA eTIMS
+ * (POST /api/products/{id}/etims/register). The server assigns the item
+ * code and submits it to VSCU — this call only succeeds once and is safe
+ * to surface directly as a button click, not a bulk/background job, since
+ * KRA registration is a one-way, auditable action per product.
+ */
+export async function registerProductWithEtims(
+  productId: string,
+): Promise<EtimsRegistrationResult> {
+  const { data } = await apiClient.post<EtimsRegistrationResult>(
+    `/api/products/${productId}/etims/register`,
   )
 
   return data

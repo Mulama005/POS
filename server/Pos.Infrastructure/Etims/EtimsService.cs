@@ -834,7 +834,7 @@ public sealed class EtimsService : IEtimsService
         [JsonPropertyName("intrlData")] public string? IntrlData { get; set; }
         [JsonPropertyName("rcptSign")] public string? RcptSign { get; set; }
         [JsonPropertyName("totRcptNo")] public long? TotRcptNo { get; set; }
-        [JsonPropertyName("VSCURcptPbctDate")] public string? VscuRcptPbctDate { get; set; }
+        [JsonPropertyName("vsdcRcptPbctDate")]public string? VscuRcptPbctDate { get; set; }
         [JsonPropertyName("sdcId")] public string? SdcId { get; set; }
         [JsonPropertyName("mrcNo")] public string? MrcNo { get; set; }
     }

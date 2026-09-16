@@ -19,13 +19,14 @@ export function buildProvisionalReceipt(
   const breakdowns = calculateLineBreakdowns(cart)
 
   return {
-    saleId: clientTransactionId, // no real server-issued id yet — this is what ties it back to the queue entry
+    saleId: clientTransactionId,
     saleDate: new Date().toISOString(),
     subtotal: totals.rawSubtotal,
     discountTotal: totals.discountTotal,
     taxTotal: totals.taxTotal,
     total: totals.total,
     status: 'PendingSync',
+
     items: breakdowns.map(({ line, finalLineAmount, lineTax }) => ({
       productId: line.product.id,
       productName: line.product.name,
@@ -36,17 +37,28 @@ export function buildProvisionalReceipt(
       taxAmount: lineTax,
       lineTotal: finalLineAmount,
     })),
+
     payments: payments.map((p) => ({
-      // No real server-issued Payment id yet — this sale hasn't reached the backend.
-      // Safe to synthesize: a provisional receipt's payment lines are never used to
-      // call the M-Pesa initiate/status endpoints (that only makes sense once online
-      // and actually completed), so this id is purely a placeholder for display.
       paymentId: crypto.randomUUID(),
       method: p.method,
       amount: p.amount,
       status: p.method === 'Cash' ? 'Success' : 'Pending',
       externalReference: null,
     })),
+
+    // No eTIMS data exists yet for an offline/provisional sale.
+    etimsInvoiceNumber: null,
+    etimsReceiptNumber: null,
+    etimsTotalReceiptNumber: null,
+    etimsInternalData: null,
+    etimsReceiptSignature: null,
+    etimsQrCodeData: null,
+    etimsReceiptPublishedDate: null,
+    etimsSdcId: null,
+    etimsMrcNo: null,
+    etimsResultCode: null,
+    etimsSubmitted: false,
+
     pending: true,
   }
 }

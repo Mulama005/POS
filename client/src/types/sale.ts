@@ -83,6 +83,18 @@ export interface CompleteSaleResult {
   status: string
   items: SaleItemResult[]
   payments: PaymentResult[]
+  // eTIMS
+  etimsInvoiceNumber: string | null
+  etimsReceiptNumber: number | null
+  etimsTotalReceiptNumber: number | null
+  etimsInternalData: string | null
+  etimsReceiptSignature: string | null
+  etimsQrCodeData: string | null
+  etimsReceiptPublishedDate: string | null
+  etimsSdcId: string | null
+  etimsMrcNo: string | null
+  etimsResultCode: string | null
+  etimsSubmitted: boolean
 }
 
 /** Thrown by salesService when the server responds 428 Precondition Required —

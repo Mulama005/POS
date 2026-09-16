@@ -1,0 +1,305 @@
+/* --- M-Pesa waiting modal ----------------------------------------------
+   Same square-ink-frame modal language as CheckoutPage's other modals
+   (.checkout-modal), kept as its own file/class family since this
+   component is used standalone during payment collection, not just from
+   CheckoutPage. Monochrome by default; colour appears only for the two
+   outcomes that matter — success and failure/timeout. */
+
+.mpesa-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(26, 26, 26, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 60;
+    padding: 32px;
+}
+
+.mpesa-modal {
+    background: var(--pos-bg);
+    border: 3px solid var(--pos-ink);
+    border-radius: 0;
+    padding: 40px;
+    width: 440px;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+/* --- Header ------------------------------------------------------------ */
+.mpesa-modal-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 16px;
+    margin-bottom: 4px;
+    border-bottom: 3px solid var(--pos-rule);
+}
+
+.mpesa-modal-title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.mpesa-modal-title-row h2 {
+    font-family: var(--pos-font-display);
+    font-size: 28px;
+    font-weight: 400;
+    letter-spacing: -0.015em;
+    margin: 0;
+}
+
+.mpesa-modal-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1.5px solid var(--pos-ink);
+    border-radius: 50%;
+    color: var(--pos-ink);
+    flex-shrink: 0;
+}
+
+/* --- Amount, the one large figure in the modal -------------------------
+   Mono, like every other money figure in the ledger aesthetic. */
+.mpesa-modal-amount {
+    font-family: var(--pos-font-mono);
+    font-size: 36px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--pos-ink);
+    margin: 20px 0 28px;
+}
+
+/* --- Phone entry stage --------------------------------------------------- */
+.mpesa-modal-label {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--pos-ink-muted);
+    margin-bottom: 4px;
+}
+
+.mpesa-modal-label input {
+    font-family: var(--pos-font-mono);
+    font-size: 20px;
+    letter-spacing: 0.02em;
+    padding: 10px 0;
+    border: none;
+    border-bottom: 1.5px solid var(--pos-rule);
+    border-radius: 0;
+    background: transparent;
+    color: var(--pos-ink);
+    outline: none;
+    width: 100%;
+    transition: border-color 120ms ease;
+}
+
+.mpesa-modal-label input::placeholder {
+    color: var(--pos-ink-dim);
+}
+
+.mpesa-modal-label input:focus {
+    border-bottom-color: var(--pos-ink);
+}
+
+.mpesa-modal-label input:disabled {
+    opacity: 0.5;
+}
+
+.mpesa-modal-error {
+    color: var(--pos-danger);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    margin: 16px 0 0;
+    padding: 10px 0;
+    border-top: 1px solid var(--pos-danger);
+    border-bottom: 1px solid var(--pos-danger);
+}
+
+/* --- Actions ------------------------------------------------------------- */
+.mpesa-modal-actions {
+    display: flex;
+    gap: 16px;
+    margin-top: 28px;
+}
+
+.mpesa-modal-actions--split .mpesa-modal-secondary-btn,
+.mpesa-modal-actions--split .mpesa-modal-primary-btn {
+    flex: 1;
+}
+
+.mpesa-modal-primary-btn {
+    flex: 1;
+    font-family: var(--pos-font-body);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 14px 20px;
+    border-radius: 0;
+    border: 1.5px solid var(--pos-ink);
+    background: var(--pos-ink);
+    color: var(--pos-bg);
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+.mpesa-modal-primary-btn:hover:not(:disabled) {
+    background: transparent;
+    color: var(--pos-ink);
+}
+.mpesa-modal-primary-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.mpesa-modal-secondary-btn {
+    font-family: var(--pos-font-body);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 14px 20px;
+    border-radius: 0;
+    border: 1.5px solid var(--pos-border);
+    background: transparent;
+    color: var(--pos-ink);
+    cursor: pointer;
+    transition: border-color 120ms ease, background 120ms ease;
+}
+.mpesa-modal-secondary-btn:hover {
+    border-color: var(--pos-ink);
+}
+
+/* --- Waiting stage --------------------------------------------------------
+   Progress bar drains left-to-right against the 90s client-side timeout,
+   turning to the danger colour in the final 15s so a cashier watching a
+   busy counter still notices without needing to read the number. */
+.mpesa-waiting {
+    padding: 8px 0 4px;
+}
+
+.mpesa-waiting-hint {
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--pos-ink);
+    margin: 0 0 28px;
+}
+.mpesa-waiting-hint strong {
+    font-family: var(--pos-font-mono);
+    font-weight: 600;
+}
+
+.mpesa-progress-track {
+    width: 100%;
+    height: 3px;
+    background: var(--pos-border);
+    margin-bottom: 16px;
+}
+
+.mpesa-progress-fill {
+    height: 100%;
+    background: var(--pos-ink);
+    transition: width 1000ms linear;
+}
+.mpesa-progress-track.urgent .mpesa-progress-fill {
+    background: var(--pos-danger);
+}
+
+.mpesa-countdown {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--pos-font-mono);
+    font-size: 13px;
+    letter-spacing: 0.02em;
+    color: var(--pos-ink-muted);
+}
+.mpesa-countdown.urgent {
+    color: var(--pos-danger);
+}
+
+.mpesa-pulse-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+    animation: mpesa-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes mpesa-pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+}
+
+/* --- Resolved stage ---------------------------------------------------- */
+.mpesa-resolved {
+    padding: 12px 0 4px;
+    text-align: center;
+}
+
+.mpesa-resolved-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: 1.5px solid currentColor;
+    margin: 0 auto 20px;
+}
+.mpesa-resolved-icon.success {
+    color: var(--pos-success);
+}
+.mpesa-resolved-icon.failed {
+    color: var(--pos-danger);
+}
+
+.mpesa-resolved-hint {
+    margin: 0 0 12px;
+}
+
+.mpesa-resolved-detail {
+    font-size: 14px;
+    color: var(--pos-ink-muted);
+    margin: 0 0 4px;
+    text-align: left;
+}
+
+.mpesa-modal-note {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--pos-ink-muted);
+    font-style: italic;
+    text-align: left;
+    margin: 16px 0 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--pos-border);
+}
+
+/* --- Responsive ---------------------------------------------------------- */
+@media (max-width: 520px) {
+    .mpesa-modal {
+        padding: 28px 24px;
+        width: 100%;
+    }
+    .mpesa-modal-title-row h2 {
+        font-size: 24px;
+    }
+    .mpesa-modal-amount {
+        font-size: 28px;
+    }
+    .mpesa-modal-actions--split {
+        flex-direction: column;
+    }
+}

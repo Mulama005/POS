@@ -67,6 +67,7 @@ public sealed record CompleteSaleResponse(
     long? EtimsTotalReceiptNumber = null,
     string? EtimsInternalData = null,
     string? EtimsReceiptSignature = null,
+    string? EtimsQrCodeData = null,
     DateTime? EtimsReceiptPublishedDate = null,
     string? EtimsSdcId = null,
     string? EtimsMrcNo = null,

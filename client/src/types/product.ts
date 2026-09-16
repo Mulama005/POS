@@ -56,6 +56,11 @@ export interface Product {
   etimsItemClassificationName: string | null
   etimsTaxTypeCode: string | null
   etimsClassifiedAt: string | null
+
+  // eTIMS item registration (Step 26) — null until registered with KRA via the
+  // /api/products/{id}/etims/register endpoint. Requires a classification first.
+  etimsItemCode: string | null
+  etimsRegisteredAt: string | null
 }
 
 export interface ProductListResponse {

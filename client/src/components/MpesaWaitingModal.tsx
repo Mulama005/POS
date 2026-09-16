@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { getPaymentStatus, initiateMpesaPayment, type MpesaPaymentStatus } from '../services/mpesaService'
 import type { PaymentResult } from '../types/sale'
 import { formatKes } from '../utils/currency'
+import './MpesaWaitingModal.css'
 
 interface MpesaWaitingModalProps {
   saleId: string
