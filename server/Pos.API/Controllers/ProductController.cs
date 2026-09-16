@@ -4,13 +4,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Pos.Application.Features.Products;
 using Pos.Domain.Entities;
 using Pos.Domain.Enums;
 using Pos.Infrastructure.Persistence;
+using Pos.Infrastructure.Etims;
 using Pos.Application.Common.Interfaces;
 using System.Security.Claims;
-
 namespace Pos.Api.Controllers;
 
 [ApiController]
@@ -21,16 +22,22 @@ public class ProductsController : ControllerBase
     private readonly PosDbContext _context;
     private readonly IStorageService _storageService;
     private readonly IAuditService _auditService;
+    private readonly IEtimsService _etimsService;
+    private readonly EtimsOptions _etimsOptions;
 
     public ProductsController(
-        PosDbContext context,
-        IAuditService auditService,
-        IStorageService storageService)
-    {
-        _context = context;
-        _storageService = storageService;
-        _auditService = auditService;
-    }
+    PosDbContext context,
+    IAuditService auditService,
+    IStorageService storageService,
+    IEtimsService etimsService,
+    IOptions<EtimsOptions> etimsOptions)
+{
+    _context = context;
+    _storageService = storageService;
+    _auditService = auditService;
+    _etimsService = etimsService;
+    _etimsOptions = etimsOptions.Value;
+}
 
     [HttpGet]
     public async Task<IActionResult> List(

@@ -1,3 +1,4 @@
+import { QRCodeSVG } from 'qrcode.react'
 import { useCallback, useEffect, useState } from 'react'
 import { isAxiosError } from 'axios'
 import { useAuth } from '../hooks/useAuth'
@@ -454,12 +455,19 @@ export function CheckoutPage() {
         <div className="checkout-modal-backdrop" role="dialog" aria-modal="true">
           <div className="checkout-modal">
             <h2>Sale complete</h2>
-            {receipt.pending && (
+
+            {receipt.pending ? (
               <p className="checkout-modal__offline-notice">
                 Saved on this register — no connection right now. It'll sync automatically once back online.
               </p>
+            ) : (
+              <p className="checkout-modal__subtitle">eTIMS submission successful</p>
             )}
-            <p className="checkout-modal__subtitle">Total: {receipt.total.toFixed(2)} KES</p>
+
+            <p className="checkout-modal__subtitle">
+              Total: {receipt.total.toFixed(2)} KES
+            </p>
+
             <ul className="receipt-items">
               {receipt.items.map((item) => (
                 <li key={item.productId}>
@@ -467,6 +475,46 @@ export function CheckoutPage() {
                 </li>
               ))}
             </ul>
+
+            {!receipt.pending && receipt.etimsSubmitted && (
+              <div className="receipt-etims">
+                <h3>eTIMS receipt</h3>
+
+                <div className="receipt-etims__fields">
+                  {receipt.etimsInvoiceNumber && (
+                    <p><strong>Invoice no.</strong><span>{receipt.etimsInvoiceNumber}</span></p>
+                  )}
+                  {receipt.etimsReceiptNumber !== null && (
+                    <p><strong>Receipt no.</strong><span>{receipt.etimsReceiptNumber}</span></p>
+                  )}
+                  {receipt.etimsSdcId && (
+                    <p><strong>SDC ID</strong><span>{receipt.etimsSdcId}</span></p>
+                  )}
+                  {receipt.etimsMrcNo && (
+                    <p><strong>MRC no.</strong><span>{receipt.etimsMrcNo}</span></p>
+                  )}
+                  {receipt.etimsReceiptPublishedDate && (
+                    <p><strong>Published</strong><span>{new Date(receipt.etimsReceiptPublishedDate).toLocaleString()}</span></p>
+                  )}
+                  {receipt.etimsResultCode && (
+                    <p><strong>eTIMS result</strong><span>{receipt.etimsResultCode}</span></p>
+                  )}
+                </div>
+
+                {receipt.etimsQrCodeData && (
+                  <div className="receipt-etims__qr">
+                    <QRCodeSVG
+                      value={receipt.etimsQrCodeData}
+                      size={168}
+                      level="M"
+                      marginSize={4}
+                    />
+                    <p className="receipt-etims__qr-hint">Scan to verify with KRA eTIMS</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="checkout-modal__actions">
               <button type="button" onClick={() => setReceipt(null)}>
                 New sale

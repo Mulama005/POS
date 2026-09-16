@@ -762,6 +762,81 @@
     border-bottom: none;
 }
 
+/* --- eTIMS receipt block ----------------------------------------------
+   Sits below the item list once a sale has actually been submitted to
+   KRA. A ledger of key-value fields, then the QR code on its own line —
+   framed by a hairline above so it reads as an appendix to the receipt,
+   not a separate card. */
+.receipt-etims {
+    margin-top: 8px;
+    padding-top: 20px;
+    border-top: 1.5px solid var(--pos-rule);
+}
+
+.receipt-etims h3 {
+    font-family: var(--pos-font-body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--pos-ink-muted);
+    margin: 0 0 14px;
+}
+
+.receipt-etims__fields {
+    display: flex;
+    flex-direction: column;
+}
+
+.receipt-etims__fields p {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 0;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--pos-border);
+    font-size: 13px;
+}
+.receipt-etims__fields p:last-child {
+    border-bottom: none;
+}
+
+.receipt-etims__fields strong {
+    font-weight: 400;
+    color: var(--pos-ink-muted);
+}
+
+.receipt-etims__fields span {
+    font-family: var(--pos-font-mono);
+    color: var(--pos-ink);
+    text-align: right;
+    word-break: break-word;
+}
+
+.receipt-etims__qr {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--pos-border);
+}
+
+.receipt-etims__qr svg {
+    background: #fff;
+    padding: 8px;
+}
+
+.receipt-etims__qr-hint {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--pos-ink-muted);
+    margin: 0;
+}
+
 /* --- M-Pesa waiting modal ------------------------------------------- */
 .mpesa-waiting {
     text-align: center;
