@@ -44,6 +44,7 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<EtimsSyncState> EtimsSyncStates => Set<EtimsSyncState>();
 
     public DbSet<SentWhatsAppMessage> SentWhatsAppMessages => Set<SentWhatsAppMessage>();
+    public DbSet<OperatingExpense> OperatingExpenses => Set<OperatingExpense>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -309,6 +310,15 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
                 .WithMany()
                 .HasForeignKey(x => x.AdjustedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ---------- OperatingExpense ----------
+        modelBuilder.Entity<OperatingExpense>(e =>
+        {
+            e.Property(x => x.Name).IsRequired().HasMaxLength(120);
+            e.Property(x => x.Category).IsRequired().HasMaxLength(80);
+            e.Property(x => x.MonthlyAmount).HasColumnType("decimal(18,2)");
+            e.HasIndex(x => new { x.Name, x.IsActive });
         });
 
         // ---------- PricingTier ----------

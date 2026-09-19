@@ -150,6 +150,7 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
           label: "Insights",
           items: [
               { id: "reports", label: "Reports", icon: "reports", path: "/reports" },
+              { id: "financial-setup", label: "Operating costs", icon: "list", path: "/financial-setup" },
           ],
       },
     {
@@ -182,6 +183,7 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
           label: "Insights",
           items: [
               { id: "reports", label: "Reports", icon: "reports", path: "/reports" },
+              { id: "financial-setup", label: "Operating costs", icon: "list", path: "/financial-setup" },
           ],
       },
     {
