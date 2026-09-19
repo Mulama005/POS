@@ -18,6 +18,7 @@ import { ManagerDashboard } from './pages/ManagerDashboard'
 import { DashboardLayout } from './layouts/DashboardLayouts'
 import AuditLogPage from "./pages/AuditLogPage.tsx";
 import ReportsPage from "./pages/ReportsPage.tsx";
+import OperatingCostsPage from "./pages/OperatingCostsPage.tsx";
 import { RequireAuth, RequireRole } from './components/RouteGuards'
 import { useAuth } from './hooks/useAuth'
 import type { UserRole } from './types/auth'
@@ -79,6 +80,7 @@ function App() {
           <Route path="/stock/receive" element={<ReceiveStock />} />
             <Route path="/audit" element={<AuditLogPage />} />
             <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/financial-setup" element={<OperatingCostsPage />} />
         </Route>
       </Route>
 

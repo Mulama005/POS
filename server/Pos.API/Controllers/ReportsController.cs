@@ -18,6 +18,7 @@ namespace Pos.Api.Controllers;
 [Authorize(Roles = "Manager,Admin")]
 public class ReportsController : ControllerBase
 {
+    private static readonly TimeSpan NairobiOffset = TimeSpan.FromHours(3);
     private readonly PosDbContext _context;
     private readonly IAuditService _auditService;
 
@@ -30,6 +31,241 @@ public class ReportsController : ControllerBase
     // ═══════════════════════════════════════════════════════════════════════
     //  READ ENDPOINTS
     // ═══════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Month-over-month sales insight using Nairobi (EAT) calendar boundaries.
+    /// Credit ledger sales are deliberately returned separately: they are not Sale rows
+    /// and therefore are not included in total sales until the two flows are linked.
+    /// </summary>
+    [HttpGet("monthly-summary")]
+    public async Task<IActionResult> MonthlySummary([FromQuery] int? year = null, [FromQuery] int? month = null)
+    {
+        var nowNairobi = DateTimeOffset.UtcNow.ToOffset(NairobiOffset);
+        var selectedYear = year ?? nowNairobi.Year;
+        var selectedMonth = month ?? nowNairobi.Month;
+
+        if (selectedMonth is < 1 or > 12 || selectedYear is < 2000 or > 9999)
+            return BadRequest("Provide a valid year and month.");
+
+        var requestedMonthStart = NairobiMonthStart(selectedYear, selectedMonth);
+        var currentMonthStart = NairobiMonthStart(nowNairobi.Year, nowNairobi.Month);
+        if (requestedMonthStart > currentMonthStart)
+            return BadRequest("Reports are only available for the current or a past month.");
+
+        var isCurrentMonth = requestedMonthStart == currentMonthStart;
+        var currentStart = requestedMonthStart;
+        var currentEnd = isCurrentMonth ? nowNairobi : requestedMonthStart.AddMonths(1);
+        var previousStart = requestedMonthStart.AddMonths(-1);
+        // For an in-progress month, compare precisely the same elapsed local period.
+        var previousEnd = isCurrentMonth
+            ? previousStart.Add(currentEnd - currentStart)
+            : currentStart;
+
+        var currentStartUtc = currentStart.UtcDateTime;
+        var currentEndUtc = currentEnd.UtcDateTime;
+        var previousStartUtc = previousStart.UtcDateTime;
+        var previousEndUtc = previousEnd.UtcDateTime;
+
+        var sales = await _context.Sales.AsNoTracking()
+            .Where(s => s.Status == SaleStatus.Completed
+                     && s.SaleDate >= previousStartUtc
+                     && s.SaleDate < currentEndUtc)
+            .Select(s => new MonthlySale(s.SaleDate, s.Subtotal, s.DiscountTotal, s.TaxTotal, s.Total))
+            .ToListAsync();
+
+        var saleItems = await _context.SaleItems.AsNoTracking()
+            .Where(item => item.Sale.Status == SaleStatus.Completed
+                        && item.Sale.SaleDate >= previousStartUtc
+                        && item.Sale.SaleDate < currentEndUtc)
+            .Select(item => new MonthlySaleItem(
+                item.Sale.SaleDate,
+                item.LineTotal,
+                item.TaxAmount,
+                item.Quantity,
+                item.ProductId,
+                item.Product.Sku,
+                item.Product.Name,
+                item.Product.CostPrice,
+                item.Product.CategoryId,
+                item.Product.Category.Name))
+            .ToListAsync();
+
+        var payments = await _context.Payments.AsNoTracking()
+            .Where(payment => payment.Status == PaymentStatus.Success
+                           && payment.Method != PaymentMethod.Credit
+                           && payment.Sale.Status == SaleStatus.Completed
+                           && payment.Sale.SaleDate >= previousStartUtc
+                           && payment.Sale.SaleDate < currentEndUtc)
+            .Select(payment => new { payment.Sale.SaleDate, payment.Method, payment.Amount })
+            .ToListAsync();
+
+        var creditTransactions = await _context.CreditTransactions.AsNoTracking()
+            .Where(transaction => transaction.Type == CreditTransactionType.CreditSale
+                               // PostgreSQL timestamptz accepts DateTimeOffset parameters only in UTC.
+                               // The Nairobi boundaries above are converted here without changing the instant.
+                               && transaction.Timestamp >= previousStart.ToUniversalTime()
+                               && transaction.Timestamp < currentEnd.ToUniversalTime())
+            .Select(transaction => new { transaction.Timestamp, transaction.Amount })
+            .ToListAsync();
+
+        var currentPeriod = BuildPeriod(sales, currentStartUtc, currentEndUtc, currentStart, currentEnd, isCurrentMonth);
+        var previousPeriod = BuildPeriod(sales, previousStartUtc, previousEndUtc, previousStart, previousEnd, isCurrentMonth);
+        var salesPerformance = BuildSalesPerformance(
+            sales, saleItems, currentStartUtc, currentEndUtc, previousStartUtc, previousEndUtc);
+
+        var paymentBreakdown = payments
+            .GroupBy(p => p.Method)
+            .Select(g => new
+            {
+                Method = g.Key.ToString(),
+                CurrentTotal = g.Where(p => IsInRange(p.SaleDate, currentStartUtc, currentEndUtc)).Sum(p => p.Amount),
+                PreviousTotal = g.Where(p => IsInRange(p.SaleDate, previousStartUtc, previousEndUtc)).Sum(p => p.Amount)
+            })
+            .Select(x =>
+            {
+                var delta = CreateDelta(x.CurrentTotal, x.PreviousTotal);
+                return new PaymentMethodBreakdownDto(x.Method, x.CurrentTotal, x.PreviousTotal, delta.Absolute, delta.Percent);
+            })
+            .OrderByDescending(x => Math.Abs(x.AbsoluteDelta));
+
+        var categoryBreakdown = saleItems
+            .GroupBy(item => new { item.CategoryId, item.CategoryName })
+            .Select(g => new
+            {
+                g.Key.CategoryId,
+                Name = g.Key.CategoryName,
+                CurrentTotal = g.Where(item => IsInRange(item.SaleDate, currentStartUtc, currentEndUtc)).Sum(item => item.LineTotal),
+                PreviousTotal = g.Where(item => IsInRange(item.SaleDate, previousStartUtc, previousEndUtc)).Sum(item => item.LineTotal)
+            })
+            .Select(x =>
+            {
+                var delta = CreateDelta(x.CurrentTotal, x.PreviousTotal);
+                return new CategoryBreakdownDto(x.CategoryId, x.Name, x.CurrentTotal, x.PreviousTotal, delta.Absolute, delta.Percent);
+            })
+            .OrderByDescending(x => Math.Abs(x.AbsoluteDelta));
+
+        var productBreakdown = saleItems
+            .GroupBy(item => new { item.ProductId, item.ProductName })
+            .Select(g => new
+            {
+                g.Key.ProductId,
+                Name = g.Key.ProductName,
+                CurrentTotal = g.Where(item => IsInRange(item.SaleDate, currentStartUtc, currentEndUtc)).Sum(item => item.LineTotal),
+                PreviousTotal = g.Where(item => IsInRange(item.SaleDate, previousStartUtc, previousEndUtc)).Sum(item => item.LineTotal)
+            })
+            .Select(x =>
+            {
+                var delta = CreateDelta(x.CurrentTotal, x.PreviousTotal);
+                return new ProductBreakdownDto(x.ProductId, x.Name, x.CurrentTotal, x.PreviousTotal, delta.Absolute, delta.Percent);
+            })
+            .OrderByDescending(x => Math.Abs(x.AbsoluteDelta))
+            .Take(10);
+
+        var currentCreditTotal = creditTransactions
+            .Where(t => t.Timestamp >= currentStart && t.Timestamp < currentEnd)
+            .Sum(t => t.Amount);
+        var previousCreditTotal = creditTransactions
+            .Where(t => t.Timestamp >= previousStart && t.Timestamp < previousEnd)
+            .Sum(t => t.Amount);
+
+        var trailingStart = requestedMonthStart.AddMonths(-11);
+        var trailingSales = await _context.Sales.AsNoTracking()
+            .Where(s => s.Status == SaleStatus.Completed
+                     && s.SaleDate >= trailingStart.UtcDateTime
+                     && s.SaleDate < currentEndUtc)
+            .Select(s => new { s.SaleDate, s.Total })
+            .ToListAsync();
+
+        var trailingMonths = Enumerable.Range(0, 12)
+            .Select(i => requestedMonthStart.AddMonths(i - 11))
+            .Select(monthStart =>
+            {
+                var monthEnd = monthStart == requestedMonthStart && isCurrentMonth ? currentEnd : monthStart.AddMonths(1);
+                return new
+                {
+                    Month = monthStart.ToString("yyyy-MM"),
+                    Label = monthStart.ToString("MMM yyyy", CultureInfo.InvariantCulture),
+                    Total = trailingSales
+                        .Where(s => IsInRange(s.SaleDate, monthStart.UtcDateTime, monthEnd.UtcDateTime))
+                        .Sum(s => s.Total)
+                };
+            });
+
+        var currentSales = sales.Where(s => IsInRange(s.SaleDate, currentStartUtc, currentEndUtc)).ToList();
+        var peakHours = Enumerable.Range(0, 24)
+            .Select(hour => new PeakPeriodDto(
+                hour.ToString("00") + ":00",
+                currentSales.Where(s => ToNairobiTime(s.SaleDate).Hour == hour).Sum(s => s.Total),
+                currentSales.Count(s => ToNairobiTime(s.SaleDate).Hour == hour)));
+        var peakDays = Enumerable.Range(0, 7)
+            .Select(day => new PeakPeriodDto(
+                CultureInfo.InvariantCulture.DateTimeFormat.AbbreviatedDayNames[day],
+                currentSales.Where(s => (int)ToNairobiTime(s.SaleDate).DayOfWeek == day).Sum(s => s.Total),
+                currentSales.Count(s => (int)ToNairobiTime(s.SaleDate).DayOfWeek == day)));
+
+        var inventoryValues = await _context.Products.AsNoTracking()
+            .Where(product => product.IsActive)
+            .Select(product => new
+            {
+                product.BulkQuantityOnHand,
+                product.CostPrice,
+                SerializedInStock = product.StockUnits.Count(unit => unit.Status == "InStock")
+            })
+            .ToListAsync();
+        var endingInventoryValue = inventoryValues.Sum(product =>
+            (product.BulkQuantityOnHand + product.SerializedInStock) * product.CostPrice);
+        var operatingCostRows = await _context.OperatingExpenses.AsNoTracking()
+            .Where(cost => cost.IsActive)
+            .OrderBy(cost => cost.Category).ThenBy(cost => cost.Name)
+            .Select(cost => new OperatingCostDto(cost.Name, cost.Category, cost.MonthlyAmount))
+            .ToListAsync();
+
+        var activeProducts = await _context.Products.AsNoTracking()
+            .Where(product => product.IsActive)
+            .Select(product => new { product.Id, product.Sku, product.Name, product.CostPrice })
+            .ToListAsync();
+        var currentItemGroups = saleItems
+            .Where(item => IsInRange(item.SaleDate, currentStartUtc, currentEndUtc))
+            .GroupBy(item => item.ProductId)
+            .ToDictionary(group => group.Key, group => group.ToList());
+        var skuPerformance = activeProducts
+            .Select(product =>
+            {
+                currentItemGroups.TryGetValue(product.Id, out var items);
+                var unitsSold = items?.Sum(item => item.Quantity) ?? 0;
+                var revenue = items?.Sum(item => item.LineTotal - item.TaxAmount) ?? 0m;
+                var cogs = items?.Sum(item => item.Quantity * item.CostPrice) ?? 0m;
+                return new SkuPerformanceDto(product.Id, product.Sku, product.Name, unitsSold, revenue, revenue - cogs);
+            })
+            .ToList();
+
+        return Ok(new
+        {
+            currentPeriod,
+            previousPeriod,
+            delta = CreateDelta(currentPeriod.Total, previousPeriod.Total),
+            salesPerformance,
+            inventoryPerformance = new InventoryPerformanceDto(
+                endingInventoryValue,
+                salesPerformance.Current.Cogs,
+                null,
+                "Inventory turnover needs opening and closing inventory snapshots. The current data model only stores the present on-hand value."),
+            operatingCosts = new OperatingCostsSummaryDto(operatingCostRows.Sum(cost => cost.MonthlyAmount), operatingCostRows),
+            paymentMethodBreakdown = paymentBreakdown,
+            creditSales = new CreditSalesDto(
+                currentCreditTotal,
+                previousCreditTotal,
+                CreateDelta(currentCreditTotal, previousCreditTotal).Absolute,
+                CreateDelta(currentCreditTotal, previousCreditTotal).Percent),
+            categoryBreakdown,
+            productBreakdown,
+            topSkuPerformance = skuPerformance.OrderByDescending(item => item.Revenue).ThenBy(item => item.Name).Take(10),
+            slowSkuPerformance = skuPerformance.OrderBy(item => item.Revenue).ThenBy(item => item.Name).Take(10),
+            peakHours,
+            peakDays,
+            trailingMonths
+        });
+    }
 
     [HttpGet("sales")]
     public async Task<IActionResult> SalesReport(
@@ -389,9 +625,26 @@ public class ReportsController : ControllerBase
         var totalRevenue = completedSales.Sum(s => s.Total);
         var totalTax = completedSales.Sum(s => s.TaxTotal);
         var totalDiscounts = completedSales.Sum(s => s.DiscountTotal);
-
-        // Keep identical to /financial GET above.
-        var netRevenue = totalRevenue - totalDiscounts - totalTax;
+        var soldItems = await _context.SaleItems.AsNoTracking()
+            .Where(item => item.Sale.Status == SaleStatus.Completed
+                        && item.Sale.SaleDate >= from
+                        && item.Sale.SaleDate < toExclusive)
+            .Select(item => new { item.LineTotal, item.TaxAmount, item.Quantity, item.Product.CostPrice })
+            .ToListAsync();
+        var netRevenue = soldItems.Sum(item => item.LineTotal - item.TaxAmount);
+        var cogs = soldItems.Sum(item => item.Quantity * item.CostPrice);
+        var grossProfit = netRevenue - cogs;
+        var inventoryValue = await _context.Products.AsNoTracking()
+            .Where(product => product.IsActive)
+            .Select(product => (product.BulkQuantityOnHand + product.StockUnits.Count(unit => unit.Status == "InStock")) * product.CostPrice)
+            .SumAsync();
+        var periodDays = Math.Max(1, (displayTo - from).Days + 1);
+        var operatingCostItems = await _context.OperatingExpenses.AsNoTracking()
+            .Where(cost => cost.IsActive)
+            .OrderBy(cost => cost.Category).ThenBy(cost => cost.Name)
+            .Select(cost => new FinancialExpenseLine(cost.Category, cost.Name, cost.MonthlyAmount))
+            .ToListAsync();
+        var operatingCosts = operatingCostItems.Sum(cost => cost.MonthlyAmount);
 
         var outstandingCredit = await _context.Customers
             .SumAsync(c => c.CurrentCreditBalance);
@@ -404,6 +657,16 @@ public class ReportsController : ControllerBase
             TotalTax = totalTax,
             TotalDiscounts = totalDiscounts,
             NetRevenue = netRevenue,
+            Cogs = cogs,
+            GrossProfit = grossProfit,
+            GrossMarginPercent = netRevenue == 0 ? null : grossProfit / netRevenue * 100m,
+            InventoryValue = inventoryValue,
+            Gmroi = inventoryValue == 0 ? null : grossProfit / inventoryValue,
+            EstimatedDaysInStock = cogs == 0 ? null : inventoryValue / cogs * periodDays,
+            OperatingCosts = operatingCosts,
+            OperatingExpenseItems = operatingCostItems,
+            OperatingProfit = grossProfit - operatingCosts,
+            BreakEvenRevenue = netRevenue == 0 || grossProfit <= 0 ? null : operatingCosts / (grossProfit / netRevenue),
             OutstandingCredit = outstandingCredit
         };
 
@@ -610,7 +873,30 @@ public class ReportsController : ControllerBase
 
             col.Item().PaddingTop(28);
 
-            ComposeSection(col, "2. MEMORANDUM — CREDIT POSITION", new List<FinancialLine>
+            ComposeSection(col, "2. PROFITABILITY & INVENTORY CAPITAL", new List<FinancialLine>
+            {
+                new("Cost of Goods Sold", dto.Cogs, LineStyle.Deduct),
+                new("GROSS PROFIT", dto.GrossProfit, LineStyle.Subtotal),
+                new("Gross Margin", dto.GrossMarginPercent ?? 0m, LineStyle.Percent),
+                new("Inventory Holding Value at Cost", dto.InventoryValue, LineStyle.Amount),
+                new("GMROI (gross profit / current inventory value)", dto.Gmroi ?? 0m, LineStyle.Multiple),
+                new("Estimated Days in Stock", dto.EstimatedDaysInStock ?? 0m, LineStyle.Days),
+            });
+
+            col.Item().PaddingTop(12);
+
+            ComposeSection(col, "3. OPERATING COSTS & BREAKEVEN", new List<FinancialLine>
+            {
+                new("Saved Monthly Operating Costs", dto.OperatingCosts, LineStyle.Deduct),
+                new("OPERATING PROFIT (before tax and finance costs)", dto.OperatingProfit, LineStyle.Subtotal),
+                new("Breakeven Sales Revenue", dto.BreakEvenRevenue ?? 0m, LineStyle.Amount),
+            });
+
+            ComposeOperatingCostBreakdown(col, dto.OperatingExpenseItems);
+
+            col.Item().PaddingTop(12);
+
+            ComposeSection(col, "4. MEMORANDUM — CREDIT POSITION", new List<FinancialLine>
             {
                 new("Outstanding Customer Credit (Deni)",
                     dto.OutstandingCredit, LineStyle.Amount),
@@ -644,9 +930,14 @@ public class ReportsController : ControllerBase
 
                 row.ConstantItem(130).AlignRight().Text(t =>
                 {
-                    var display = line.Style == LineStyle.Deduct
-                        ? $"({line.Amount:N2})"
-                        : $"{line.Amount:N2}";
+                    var display = line.Style switch
+                    {
+                        LineStyle.Deduct => $"({line.Amount:N2})",
+                        LineStyle.Percent => $"{line.Amount:N1}%",
+                        LineStyle.Multiple => $"{line.Amount:N2}x",
+                        LineStyle.Days => $"{line.Amount:N0} days",
+                        _ => $"{line.Amount:N2}"
+                    };
 
                     if (line.Style == LineStyle.Subtotal)
                         t.Span(display).Bold();
@@ -656,6 +947,29 @@ public class ReportsController : ControllerBase
             });
         }
 
+        col.Item().PaddingBottom(16);
+    }
+
+    private void ComposeOperatingCostBreakdown(ColumnDescriptor col, IReadOnlyList<FinancialExpenseLine> costs)
+    {
+        col.Item().PaddingBottom(8).Text("OPERATING COST BREAKDOWN")
+            .FontSize(9).Bold().FontColor(Colors.Grey.Darken1);
+
+        if (costs.Count == 0)
+        {
+            col.Item().PaddingBottom(16).Text("No active monthly operating costs have been saved.")
+                .FontSize(9).FontColor(Colors.Grey.Darken1);
+            return;
+        }
+
+        foreach (var cost in costs)
+        {
+            col.Item().PaddingVertical(2).Row(row =>
+            {
+                row.RelativeItem().Text($"{cost.Category} · {cost.Name}").FontSize(9);
+                row.ConstantItem(130).AlignRight().Text($"{cost.MonthlyAmount:N2}").FontSize(9);
+            });
+        }
         col.Item().PaddingBottom(16);
     }
 
@@ -671,14 +985,25 @@ public class ReportsController : ControllerBase
     private IActionResult ExportFinancialCsv(FinancialReportDto dto)
     {
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine("Section,Metric,Amount");
+        sb.AppendLine("Section,Metric,Value,Calculation");
 
-        sb.AppendLine($"1. Revenue & Trading Metrics,Gross Register Revenue,{dto.TotalRevenue:F2}");
-        sb.AppendLine($",Less: Total Customer Discounts,{dto.TotalDiscounts:F2}");
-        sb.AppendLine($",Less: VAT Output Tax (16%),{dto.TotalTax:F2}");
-        sb.AppendLine($",NET TRADING REVENUE,{dto.NetRevenue:F2}");
+        sb.AppendLine($"1. Revenue & Trading Metrics,Gross Register Revenue,{dto.TotalRevenue:F2},Sum of completed Sale.Total");
+        sb.AppendLine($",Less: Total Customer Discounts,{dto.TotalDiscounts:F2},Sum of completed Sale.DiscountTotal");
+        sb.AppendLine($",Less: VAT Output Tax,{dto.TotalTax:F2},Sum of completed Sale.TaxTotal");
+        sb.AppendLine($",NET TRADING REVENUE,{dto.NetRevenue:F2},Sum of sold line totals less line tax");
+        sb.AppendLine($"2. Profitability & Inventory Capital,Cost of Goods Sold,{dto.Cogs:F2},Sold units x current product cost");
+        sb.AppendLine($",GROSS PROFIT,{dto.GrossProfit:F2},Net trading revenue - COGS");
+        sb.AppendLine($",Gross Margin,{dto.GrossMarginPercent?.ToString("F1", CultureInfo.InvariantCulture) ?? ""}%,Gross profit / net trading revenue");
+        sb.AppendLine($",Inventory Holding Value,{dto.InventoryValue:F2},On-hand units x current product cost");
+        sb.AppendLine($",GMROI,{dto.Gmroi?.ToString("F2", CultureInfo.InvariantCulture) ?? ""}x,Gross profit / current inventory value");
+        sb.AppendLine($",Estimated Days in Stock,{dto.EstimatedDaysInStock?.ToString("F0", CultureInfo.InvariantCulture) ?? ""} days,Current inventory value / COGS x reporting days");
+        sb.AppendLine($"3. Operating Costs & Breakeven,Saved Monthly Operating Costs,{dto.OperatingCosts:F2},Sum of active operating costs saved in Financial Setup");
+        foreach (var cost in dto.OperatingExpenseItems)
+            sb.AppendLine($"3. Operating Costs & Breakeven,{Escape(cost.Category + " - " + cost.Name)},{cost.MonthlyAmount:F2},Saved monthly operating cost");
+        sb.AppendLine($",Operating Profit before tax and finance costs,{dto.OperatingProfit:F2},Gross profit - operating costs");
+        sb.AppendLine($",Breakeven Sales Revenue,{dto.BreakEvenRevenue?.ToString("F2", CultureInfo.InvariantCulture) ?? ""},Operating costs / gross margin ratio");
         sb.AppendLine();
-        sb.AppendLine($"2. Memorandum — Credit Position,Outstanding Customer Credit,{dto.OutstandingCredit:F2}");
+        sb.AppendLine($"4. Memorandum — Credit Position,Outstanding Customer Credit,{dto.OutstandingCredit:F2},Current customer credit balance");
 
         var bytes = System.Text.Encoding.UTF8.GetBytes(sb.ToString());
         var fileName = $"Financial_Report_{dto.PeriodFrom:yyyyMMdd}_{dto.PeriodTo:yyyyMMdd}.csv";
@@ -952,6 +1277,104 @@ public class ReportsController : ControllerBase
         if (p.Length < 8) return p;
         return p[..4] + "****" + p[^3..];
     }
+
+    private static DateTimeOffset NairobiMonthStart(int year, int month) =>
+        new(year, month, 1, 0, 0, 0, NairobiOffset);
+
+    private static bool IsInRange(DateTime value, DateTime startUtc, DateTime endUtc)
+    {
+        var utc = value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+        return utc >= startUtc && utc < endUtc;
+    }
+
+    private static MonthlyPeriodDto BuildPeriod(
+        IEnumerable<MonthlySale> sales,
+        DateTime startUtc,
+        DateTime endUtc,
+        DateTimeOffset start,
+        DateTimeOffset end,
+        bool isMonthToDate)
+    {
+        var periodSales = sales.Where(s => IsInRange(s.SaleDate, startUtc, endUtc)).ToList();
+        var endDate = end.AddTicks(-1);
+        var label = $"{start.ToString("MMM d", CultureInfo.InvariantCulture)}–{endDate.ToString("d, yyyy", CultureInfo.InvariantCulture)}";
+        if (isMonthToDate) label += " (MTD)";
+
+        return new MonthlyPeriodDto(
+            label,
+            start,
+            end,
+            periodSales.Sum(s => s.Total),
+            periodSales.Sum(s => s.Subtotal),
+            periodSales.Sum(s => s.DiscountTotal),
+            periodSales.Sum(s => s.TaxTotal));
+    }
+
+    private static SalesPerformanceDto BuildSalesPerformance(
+        IEnumerable<MonthlySale> sales,
+        IEnumerable<MonthlySaleItem> items,
+        DateTime currentStartUtc,
+        DateTime currentEndUtc,
+        DateTime previousStartUtc,
+        DateTime previousEndUtc)
+    {
+        PeriodOperationsDto Calculate(DateTime startUtc, DateTime endUtc)
+        {
+            var periodSales = sales.Where(s => IsInRange(s.SaleDate, startUtc, endUtc)).ToList();
+            var periodItems = items.Where(item => IsInRange(item.SaleDate, startUtc, endUtc)).ToList();
+            var transactions = periodSales.Count;
+            var unitsSold = periodItems.Sum(item => item.Quantity);
+            var netRevenue = periodItems.Sum(item => item.LineTotal - item.TaxAmount);
+            var cogs = periodItems.Sum(item => item.Quantity * item.CostPrice);
+            return new PeriodOperationsDto(
+                periodSales.Sum(s => s.Total),
+                transactions,
+                unitsSold,
+                netRevenue,
+                cogs,
+                periodSales.Sum(s => s.DiscountTotal));
+        }
+
+        var current = Calculate(currentStartUtc, currentEndUtc);
+        var previous = Calculate(previousStartUtc, previousEndUtc);
+        var growth = CreateDelta(current.TotalSales, previous.TotalSales);
+        var currentAov = current.Transactions == 0 ? 0 : current.TotalSales / current.Transactions;
+        var previousAov = previous.Transactions == 0 ? 0 : previous.TotalSales / previous.Transactions;
+        var currentUpt = current.Transactions == 0 ? 0 : (decimal)current.UnitsSold / current.Transactions;
+        var previousUpt = previous.Transactions == 0 ? 0 : (decimal)previous.UnitsSold / previous.Transactions;
+        decimal? currentMargin = current.NetRevenue == 0 ? null : (current.NetRevenue - current.Cogs) / current.NetRevenue * 100m;
+        decimal? previousMargin = previous.NetRevenue == 0 ? null : (previous.NetRevenue - previous.Cogs) / previous.NetRevenue * 100m;
+        decimal? currentDiscountRate = current.TotalSales == 0 ? null : current.Discounts / current.TotalSales * 100m;
+        decimal? previousDiscountRate = previous.TotalSales == 0 ? null : previous.Discounts / previous.TotalSales * 100m;
+
+        return new SalesPerformanceDto(
+            growth.Percent,
+            BuildMetric(currentAov, previousAov),
+            BuildMetric(currentUpt, previousUpt),
+            new GrossProfitMetricDto(current.NetRevenue - current.Cogs, current.Cogs, currentMargin, previousMargin),
+            BuildMetric(currentDiscountRate, previousDiscountRate),
+            current,
+            previous);
+    }
+
+    private static PerformanceMetricDto BuildMetric(decimal? current, decimal? previous)
+    {
+        if (!current.HasValue || !previous.HasValue)
+            return new PerformanceMetricDto(current, previous, null, null);
+
+        var delta = CreateDelta(current.Value, previous.Value);
+        return new PerformanceMetricDto(current, previous, delta.Absolute, delta.Percent);
+    }
+
+    private static DateTimeOffset ToNairobiTime(DateTime value)
+    {
+        var utc = value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+        return new DateTimeOffset(utc).ToOffset(NairobiOffset);
+    }
+
+    private static MetricDeltaDto CreateDelta(decimal currentTotal, decimal previousTotal) =>
+        new(currentTotal - previousTotal,
+            previousTotal == 0 ? null : Math.Round((currentTotal - previousTotal) / previousTotal * 100m, 1));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -982,6 +1405,16 @@ public class FinancialReportDto
     public decimal TotalTax { get; set; }
     public decimal TotalDiscounts { get; set; }
     public decimal NetRevenue { get; set; }
+    public decimal Cogs { get; set; }
+    public decimal GrossProfit { get; set; }
+    public decimal? GrossMarginPercent { get; set; }
+    public decimal InventoryValue { get; set; }
+    public decimal? Gmroi { get; set; }
+    public decimal? EstimatedDaysInStock { get; set; }
+    public decimal OperatingCosts { get; set; }
+    public IReadOnlyList<FinancialExpenseLine> OperatingExpenseItems { get; set; } = Array.Empty<FinancialExpenseLine>();
+    public decimal OperatingProfit { get; set; }
+    public decimal? BreakEvenRevenue { get; set; }
     public decimal OutstandingCredit { get; set; }
 }
 
@@ -989,7 +1422,91 @@ public enum LineStyle
 {
     Amount,
     Deduct,
-    Subtotal
+    Subtotal,
+    Percent,
+    Multiple,
+    Days
 }
 
 public record FinancialLine(string Label, decimal Amount, LineStyle Style);
+public record FinancialExpenseLine(string Category, string Name, decimal MonthlyAmount);
+
+public record MonthlySale(DateTime SaleDate, decimal Subtotal, decimal DiscountTotal, decimal TaxTotal, decimal Total);
+
+public record MonthlySaleItem(
+    DateTime SaleDate,
+    decimal LineTotal,
+    decimal TaxAmount,
+    int Quantity,
+    Guid ProductId,
+    string Sku,
+    string ProductName,
+    decimal CostPrice,
+    Guid CategoryId,
+    string CategoryName);
+
+public record MonthlyPeriodDto(
+    string Label,
+    DateTimeOffset StartDate,
+    DateTimeOffset EndDate,
+    decimal Total,
+    decimal Subtotal,
+    decimal DiscountTotal,
+    decimal TaxTotal);
+
+public record MetricDeltaDto(decimal Absolute, decimal? Percent);
+
+public record CreditSalesDto(decimal CurrentTotal, decimal PreviousTotal, decimal AbsoluteDelta, decimal? Percent);
+
+public record PeriodOperationsDto(
+    decimal TotalSales,
+    int Transactions,
+    int UnitsSold,
+    decimal NetRevenue,
+    decimal Cogs,
+    decimal Discounts);
+
+public record PerformanceMetricDto(decimal? Current, decimal? Previous, decimal? AbsoluteDelta, decimal? Percent);
+
+public record GrossProfitMetricDto(decimal CurrentGrossProfit, decimal CurrentCogs, decimal? CurrentMarginPercent, decimal? PreviousMarginPercent);
+
+public record SalesPerformanceDto(
+    decimal? SalesGrowthRate,
+    PerformanceMetricDto AverageOrderValue,
+    PerformanceMetricDto UnitsPerTransaction,
+    GrossProfitMetricDto GrossProfit,
+    PerformanceMetricDto DiscountPercentage,
+    PeriodOperationsDto Current,
+    PeriodOperationsDto Previous);
+
+public record InventoryPerformanceDto(decimal EndingInventoryValue, decimal Cogs, decimal? TurnoverRate, string TurnoverNote);
+
+public record OperatingCostDto(string Name, string Category, decimal MonthlyAmount);
+public record OperatingCostsSummaryDto(decimal MonthlyTotal, IReadOnlyList<OperatingCostDto> Items);
+
+public record SkuPerformanceDto(Guid ProductId, string Sku, string Name, int UnitsSold, decimal Revenue, decimal GrossProfit);
+
+public record PeakPeriodDto(string Label, decimal Total, int Transactions);
+
+public record PaymentMethodBreakdownDto(
+    string Method,
+    decimal CurrentTotal,
+    decimal PreviousTotal,
+    decimal AbsoluteDelta,
+    decimal? Percent);
+
+public record CategoryBreakdownDto(
+    Guid CategoryId,
+    string Name,
+    decimal CurrentTotal,
+    decimal PreviousTotal,
+    decimal AbsoluteDelta,
+    decimal? Percent);
+
+public record ProductBreakdownDto(
+    Guid ProductId,
+    string Name,
+    decimal CurrentTotal,
+    decimal PreviousTotal,
+    decimal AbsoluteDelta,
+    decimal? Percent);
