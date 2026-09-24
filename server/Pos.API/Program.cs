@@ -192,12 +192,16 @@ using (var scope = app.Services.CreateScope())
     {
         try
         {
+            var database = scope.ServiceProvider.GetRequiredService<PosDbContext>().Database;
+            await database.MigrateAsync();
+            app.Logger.LogInformation("Database migrations are up to date.");
+
             await IdentitySeeder.SeedAsync(scope.ServiceProvider, app.Configuration, app.Environment.IsDevelopment());
             await DevProductSeeder.SeedAsync(scope.ServiceProvider, app.Environment.IsDevelopment());
         }
         catch (Exception ex)
         {
-            app.Logger.LogWarning(ex, "Identity seeding skipped because the database is unavailable or misconfigured.");
+            app.Logger.LogWarning(ex, "Database initialization skipped because the database is unavailable or misconfigured.");
         }
     }
     else

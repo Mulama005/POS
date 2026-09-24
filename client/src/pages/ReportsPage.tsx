@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import LoadingScreen from "../components/LoadingScreen";
+import { apiClient } from "../services/apiClient";
 import "./ReportsPage.css";
 
 interface Period { label: string; startDate: string; endDate: string; total: number; subtotal: number; discountTotal: number; taxTotal: number; }
@@ -136,17 +137,14 @@ export default function ReportsPage() {
             setLoading(true);
             setError("");
             try {
-                const params = new URLSearchParams();
+                const params: { year?: string; month?: string } = {};
                 if (selectedMonth) {
                     const [year, month] = selectedMonth.split("-");
-                    params.set("year", year);
-                    params.set("month", month);
+                    params.year = year;
+                    params.month = month;
                 }
-                const response = await fetch(`/api/reports/monthly-summary?${params}`, {
-                    headers: { Authorization: `Bearer ${accessToken}` }, credentials: "include"
-                });
-                if (!response.ok) throw new Error("Unable to load the monthly report.");
-                setSummary(await response.json());
+                const { data } = await apiClient.get<MonthlySummary>("/api/reports/monthly-summary", { params });
+                setSummary(data);
             } catch (requestError) {
                 console.error(requestError);
                 setError("We could not load this monthly report. Please try again.");
@@ -166,10 +164,13 @@ export default function ReportsPage() {
     const downloadSalesExport = async (format: "csv" | "pdf") => {
         const [year, month] = reportMonth.split("-");
         const lastDay = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate().toString().padStart(2, "0");
-        const response = await fetch(`/api/reports/export/sales?format=${format}&fromDate=${year}-${month}-01&toDate=${year}-${month}-${lastDay}`, { headers: { Authorization: `Bearer ${accessToken}` }, credentials: "include" });
-        if (!response.ok) { setError("We could not create the sales export. Please try again."); return; }
-        const url = URL.createObjectURL(await response.blob());
-        const link = document.createElement("a"); link.href = url; link.download = `sales-performance-${reportMonth}.${format}`; link.click(); URL.revokeObjectURL(url);
+        try {
+            const { data } = await apiClient.get<Blob>("/api/reports/export/sales", { params: { format, fromDate: `${year}-${month}-01`, toDate: `${year}-${month}-${lastDay}` }, responseType: "blob" });
+            const url = URL.createObjectURL(data);
+            const link = document.createElement("a"); link.href = url; link.download = `sales-performance-${reportMonth}.${format}`; link.click(); URL.revokeObjectURL(url);
+        } catch {
+            setError("We could not create the sales export. Please try again.");
+        }
     };
     const downloadInsightsCsv = () => downloadCsv(`monthly-insights-${reportMonth}.csv`, [
         ["Monthly Sales Insights", summary.currentPeriod.label], ["Metric", "Current", "Previous", "Calculation"],
@@ -196,10 +197,13 @@ export default function ReportsPage() {
     const downloadFinancialExport = async (format: "csv" | "pdf") => {
         const [year, month] = reportMonth.split("-");
         const lastDay = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate().toString().padStart(2, "0");
-        const response = await fetch(`/api/reports/export/financial?format=${format}&fromDate=${year}-${month}-01&toDate=${year}-${month}-${lastDay}`, { headers: { Authorization: `Bearer ${accessToken}` }, credentials: "include" });
-        if (!response.ok) { setError("We could not create the financial export. Please try again."); return; }
-        const url = URL.createObjectURL(await response.blob());
-        const link = document.createElement("a"); link.href = url; link.download = `financial-summary-${reportMonth}.${format}`; link.click(); URL.revokeObjectURL(url);
+        try {
+            const { data } = await apiClient.get<Blob>("/api/reports/export/financial", { params: { format, fromDate: `${year}-${month}-01`, toDate: `${year}-${month}-${lastDay}` }, responseType: "blob" });
+            const url = URL.createObjectURL(data);
+            const link = document.createElement("a"); link.href = url; link.download = `financial-summary-${reportMonth}.${format}`; link.click(); URL.revokeObjectURL(url);
+        } catch {
+            setError("We could not create the financial export. Please try again.");
+        }
     };
     const periodDays = Math.max(1, Math.ceil((new Date(summary.currentPeriod.endDate).getTime() - new Date(summary.currentPeriod.startDate).getTime()) / 86_400_000));
     const grossProfit = summary.salesPerformance.grossProfit.currentGrossProfit;
