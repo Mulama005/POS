@@ -32,7 +32,7 @@ export function AcceptInvitePage() {
       <div className="login-screen">
         <div className="login-card">
           <div className="login-card__header">
-            <span className="login-wordmark">Ayiya<span className="login-wordmark__accent">POS</span></span>
+            <span className="login-wordmark">EddTech<span className="login-wordmark__accent">POS</span></span>
           </div>
           <p className="login-error" role="alert">
             This invite link is missing required information. Ask whoever invited you to send a new one.
@@ -71,7 +71,7 @@ export function AcceptInvitePage() {
     <div className="login-screen">
       <div className="login-card">
         <div className="login-card__header">
-          <span className="login-wordmark">Ayiya<span className="login-wordmark__accent">POS</span></span>
+          <span className="login-wordmark">EddTech<span className="login-wordmark__accent">POS</span></span>
           <p className="login-tagline">Set your password to get started</p>
         </div>
 
