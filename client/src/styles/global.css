@@ -34,3 +34,67 @@
     transform: scale(1.01);
     background: linear-gradient(145deg, #ffffff 0%, #f0f0ea 100%);
 }
+
+/* One consistent, tactile button treatment across every screen. */
+#root button:not(.group-label):not(.toggle-btn):not(.mobile-nav-backdrop) {
+    min-height: 42px;
+    padding: 9px 16px;
+    border: 1px solid var(--pos-ink);
+    border-radius: 6px;
+    background: var(--pos-ink);
+    color: var(--pos-bg);
+    font: 600 12px/1.2 var(--pos-font-body);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+    -webkit-tap-highlight-color: transparent;
+}
+#root button:not(.group-label):not(.toggle-btn):not(.mobile-nav-backdrop):hover:not(:disabled) {
+    background: var(--pos-shell-bg);
+    color: var(--pos-ink);
+    box-shadow: 0 2px 7px rgba(26,26,26,.10);
+}
+#root button:not(.group-label):not(.toggle-btn):not(.mobile-nav-backdrop):active:not(:disabled) { transform: translateY(1px); }
+#root button:focus-visible { outline: 3px solid color-mix(in srgb, var(--pos-ink) 35%, transparent); outline-offset: 2px; }
+#root button:disabled { opacity: .48; cursor: not-allowed; }
+.export-toast {
+    position: fixed;
+    right: max(20px, env(safe-area-inset-right));
+    bottom: max(20px, env(safe-area-inset-bottom));
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: max-content;
+    max-width: min(440px, calc(100vw - 32px));
+    box-sizing: border-box;
+    padding: 14px 18px;
+    border: 1px solid var(--pos-border);
+    border-left: 4px solid var(--pos-ink);
+    border-radius: 7px;
+    background: var(--pos-shell-bg);
+    color: var(--pos-ink);
+    box-shadow: 0 8px 28px rgba(26, 26, 26, .14);
+    font-size: 14px;
+    line-height: 1.35;
+    animation: export-toast-in 180ms ease-out both;
+}
+.export-toast__mark {
+    display: grid;
+    place-items: center;
+    width: 27px;
+    height: 27px;
+    flex: 0 0 auto;
+    border: 1px solid var(--pos-border);
+    border-radius: 50%;
+    font-size: 17px;
+}
+@keyframes export-toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 700px) {
+    #root button:not(.group-label):not(.toggle-btn):not(.mobile-nav-backdrop) { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    #root button { transition: none !important; }
+    .export-toast { animation: none; }
+}

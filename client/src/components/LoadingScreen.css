@@ -1,36 +1,29 @@
-﻿.loading-screen {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.loading-screen {
+    display: grid;
+    place-items: center;
     min-height: 100vh;
+    min-height: 100svh;
+    padding: 24px;
+    box-sizing: border-box;
     background: linear-gradient(145deg, var(--pos-bg) 0%, var(--pos-surface) 100%);
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: var(--pos-font-body);
 }
-
-.loading-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 24px;
+.loading-content { width: min(100%, 560px); display: grid; justify-items: center; gap: 24px; }
+.loading-brand { font: 400 30px/1 var(--pos-font-display); letter-spacing: -.02em; }
+.loading-insight {
+    width: 100%; box-sizing: border-box; overflow: hidden; position: relative;
+    padding: clamp(28px, 7vw, 52px); background: var(--pos-shell-bg);
+    border: 1px solid var(--pos-border); border-top: 3px solid var(--pos-ink);
+    animation: insight-in 350ms ease both;
 }
-
-.loading-spinner {
-    width: 48px;
-    height: 48px;
-    border: 4px solid var(--pos-border);
-    border-top-color: var(--pos-accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
-}
-
-.loading-message {
-    font-size: 16px;
-    font-weight: 500;
-    color: var(--pos-ink-muted);
-    margin: 0;
-    letter-spacing: 0.02em;
-}
+.loading-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .17em; text-transform: uppercase; color: var(--pos-ink-muted); }
+.loading-insight h1 { margin: 18px 0 12px; max-width: 12ch; font: 400 clamp(30px, 7vw, 44px)/1.08 var(--pos-font-display); letter-spacing: -.02em; }
+.loading-insight > p { color: var(--pos-ink-muted); font-size: 16px; line-height: 1.55; max-width: 40ch; }
+.loading-progress { height: 4px; margin: 34px calc(clamp(28px, 7vw, 52px) * -1) calc(clamp(28px, 7vw, 52px) * -1); background: var(--pos-border); }
+.loading-progress span { display: block; width: 38%; height: 100%; background: var(--pos-ink); animation: progress 2.4s ease-in-out infinite alternate; }
+.loading-message { display: flex; align-items: center; gap: 10px; color: var(--pos-ink-muted); font-size: 13px; }
+.loading-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--pos-border); border-top-color: var(--pos-ink); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes progress { from { transform: translateX(0); width: 22%; } to { transform: translateX(165%); width: 38%; } }
+@keyframes insight-in { from { opacity: .55; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .loading-spinner, .loading-progress span, .loading-insight { animation: none; } }

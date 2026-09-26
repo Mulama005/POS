@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import LoadingScreen from "../components/LoadingScreen";
 import { apiClient } from "../services/apiClient";
+import { downloadBlob, downloadCsvFile } from "../utils/downloadFile";
 import "./ReportsPage.css";
 
 interface Period { label: string; startDate: string; endDate: string; total: number; subtotal: number; discountTotal: number; taxTotal: number; }
@@ -46,13 +47,6 @@ const signedMoney = (value: number) => `${value >= 0 ? "+" : "−"}${money(Math.
 const signedPercent = (value: number | null) => value === null ? "New" : `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
 const percent = (value: number | null) => value === null ? "—" : `${value.toFixed(1)}%`;
 
-const csvCell = (value: string | number | null) => `"${String(value ?? "").replaceAll("\"", "\"\"")}"`;
-const downloadCsv = (filename: string, rows: Array<Array<string | number | null>>) => {
-    const blob = new Blob([rows.map(row => row.map(csvCell).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url; link.download = filename; link.click(); URL.revokeObjectURL(url);
-};
 const currentNairobiMonth = () => {
     const parts = new Intl.DateTimeFormat("en", { timeZone: "Africa/Nairobi", year: "numeric", month: "2-digit" }).formatToParts(new Date());
     return `${parts.find(part => part.type === "year")?.value}-${parts.find(part => part.type === "month")?.value}`;
@@ -125,12 +119,59 @@ function RankedSkuChart({ title, rows, value = "revenue" }: { title: string; row
     </section>;
 }
 
+function MonthlySalesLineChart({ rows }: { rows: TrendMonth[] }) {
+    const width = 920;
+    const height = 300;
+    const plot = { left: 76, right: 14, top: 20, bottom: 48 };
+    const plotWidth = width - plot.left - plot.right;
+    const plotHeight = height - plot.top - plot.bottom;
+    const maximum = Math.max(...rows.map(row => row.total), 1);
+    const points = rows.map((row, index) => ({
+        x: plot.left + (rows.length <= 1 ? 0 : index * plotWidth / (rows.length - 1)),
+        y: plot.top + (1 - row.total / maximum) * plotHeight,
+        row,
+    }));
+    const line = points.map(point => `${point.x},${point.y}`).join(" ");
+    const formatAxis = (value: number) => value >= 1_000_000 ? `KES ${(value / 1_000_000).toFixed(1)}m` : value >= 1_000 ? `KES ${(value / 1_000).toFixed(0)}k` : `KES ${value.toFixed(0)}`;
+    return <div className="monthly-line-chart">
+        <div className="monthly-line-chart__legend"><span><i />Monthly completed sales</span><b>12-month trend</b></div>
+        <div className="monthly-line-chart__scroll">
+            <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Twelve-month monthly sales line chart">
+                {[0, 0.25, 0.5, 0.75, 1].map(tick => {
+                    const y = plot.top + (1 - tick) * plotHeight;
+                    return <g key={tick}>
+                        <line className="chart-gridline" x1={plot.left} x2={width - plot.right} y1={y} y2={y} />
+                        <text className="chart-axis-label chart-axis-label--y" x={plot.left - 10} y={y + 4}>{formatAxis(maximum * tick)}</text>
+                    </g>;
+                })}
+                {points.map(point => <line className="chart-gridline chart-gridline--vertical" key={`grid-${point.row.month}`} x1={point.x} x2={point.x} y1={plot.top} y2={height - plot.bottom} />)}
+                <line className="chart-axis" x1={plot.left} x2={plot.left} y1={plot.top} y2={height - plot.bottom} />
+                <line className="chart-axis" x1={plot.left} x2={width - plot.right} y1={height - plot.bottom} y2={height - plot.bottom} />
+                <polyline className="monthly-sales-line" points={line} />
+                {points.map(point => <g key={point.row.month}>
+                    <circle className="monthly-sales-point" cx={point.x} cy={point.y} r="5" />
+                    <title>{`${point.row.label}: ${money(point.row.total)}`}</title>
+                    <text className="chart-axis-label chart-axis-label--x" x={point.x} y={height - 18}>{point.row.label.split(" ")[0]}</text>
+                </g>)}
+            </svg>
+        </div>
+    </div>;
+}
+
 export default function ReportsPage() {
     const { accessToken } = useAuth();
     const [selectedMonth, setSelectedMonth] = useState("");
     const [summary, setSummary] = useState<MonthlySummary | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [exportNotice, setExportNotice] = useState("");
+    const exportNoticeTimer = useRef<number | null>(null);
+
+    const showExportNotice = (message: string, dismissAfterMs?: number) => {
+        if (exportNoticeTimer.current !== null) window.clearTimeout(exportNoticeTimer.current);
+        setExportNotice(message);
+        if (dismissAfterMs) exportNoticeTimer.current = window.setTimeout(() => setExportNotice(""), dismissAfterMs);
+    };
 
     useEffect(() => {
         const load = async () => {
@@ -158,21 +199,40 @@ export default function ReportsPage() {
     if (loading && !summary) return <LoadingScreen message="Loading monthly insights..." />;
     if (!summary) return <main className="reports-page"><p className="report-empty">{error}</p></main>;
 
-    const maxTrend = Math.max(...summary.trailingMonths.map((item) => item.total), 1);
     const paymentRows: Breakdown[] = summary.paymentMethodBreakdown.map((item) => ({ ...item, name: item.method }));
     const reportMonth = selectedMonth || currentNairobiMonth();
+    const [reportYear, reportMonthNumber] = reportMonth.split("-");
+    const exportCsv = (filename: string, rows: Array<Array<string | number | null>>) => {
+        downloadCsvFile(filename, rows);
+        showExportNotice("Your CSV is downloading now — nice and tidy.", 4500);
+    };
+    const downloadPdf = async (endpoint: string, filename: string, params: Record<string, string>) => {
+        showExportNotice("Putting your PDF together…");
+        try {
+            const { data } = await apiClient.get<Blob>(endpoint, { params, responseType: "blob" });
+            downloadBlob(data, filename);
+            showExportNotice("Your PDF is downloading now.", 4500);
+        } catch {
+            setError("We could not create this PDF. Please try again.");
+            showExportNotice("That PDF didn’t come through. Please try again.", 6000);
+        }
+    };
+    const downloadInsightsPdf = () => downloadPdf("/api/reports/export/monthly-insights", `monthly-insights-${reportMonth}.pdf`, { year: reportYear, month: reportMonthNumber });
+    const downloadSkuPdf = (kind: "top" | "slow") => downloadPdf("/api/reports/export/sku-performance", `${kind}-moving-stock-${reportMonth}.pdf`, { kind, year: reportYear, month: reportMonthNumber });
     const downloadSalesExport = async (format: "csv" | "pdf") => {
+        showExportNotice(format === "pdf" ? "Putting your PDF together…" : "Preparing your CSV…");
         const [year, month] = reportMonth.split("-");
         const lastDay = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate().toString().padStart(2, "0");
         try {
             const { data } = await apiClient.get<Blob>("/api/reports/export/sales", { params: { format, fromDate: `${year}-${month}-01`, toDate: `${year}-${month}-${lastDay}` }, responseType: "blob" });
-            const url = URL.createObjectURL(data);
-            const link = document.createElement("a"); link.href = url; link.download = `sales-performance-${reportMonth}.${format}`; link.click(); URL.revokeObjectURL(url);
+            downloadBlob(data, `sales-performance-${reportMonth}.${format}`);
+            showExportNotice(`Your ${format.toUpperCase()} is downloading now.`, 4500);
         } catch {
             setError("We could not create the sales export. Please try again.");
+            showExportNotice(`That ${format.toUpperCase()} didn’t come through. Please try again.`, 6000);
         }
     };
-    const downloadInsightsCsv = () => downloadCsv(`monthly-insights-${reportMonth}.csv`, [
+    const downloadInsightsCsv = () => exportCsv(`monthly-insights-${reportMonth}.csv`, [
         ["Monthly Sales Insights", summary.currentPeriod.label], ["Metric", "Current", "Previous", "Calculation"],
         ["Total sales", summary.currentPeriod.total, summary.previousPeriod.total, "Sum of completed Sale.Total"],
         ["Sales growth rate", percent(summary.salesPerformance.salesGrowthRate), "", "(Current sales - Previous sales) / Previous sales x 100"],
@@ -181,28 +241,30 @@ export default function ReportsPage() {
         ["Gross margin", percent(summary.salesPerformance.grossProfit.currentMarginPercent), percent(summary.salesPerformance.grossProfit.previousMarginPercent), "(Net revenue - COGS) / Net revenue x 100"],
         ["Markdown percentage", percent(summary.salesPerformance.discountPercentage.current), percent(summary.salesPerformance.discountPercentage.previous), "Discounts / total sales x 100"]
     ]);
-    const downloadInventoryCsv = () => downloadCsv(`inventory-performance-${reportMonth}.csv`, [
+    const downloadInventoryCsv = () => exportCsv(`inventory-performance-${reportMonth}.csv`, [
         ["Inventory Performance", summary.currentPeriod.label], ["Metric", "Value", "Calculation / note"],
         ["On-hand inventory value", summary.inventoryPerformance.endingInventoryValue, "Current bulk and serialized on-hand units x current cost price"],
         ["Period COGS", summary.inventoryPerformance.cogs, "Units sold x current product cost price"],
         ["Inventory turnover", summary.inventoryPerformance.turnoverRate, summary.inventoryPerformance.turnoverNote]
     ]);
-    const downloadSkuCsv = () => downloadCsv(`sku-performance-${reportMonth}.csv`, [["Stock movement", "SKU", "Product", "Units", "Revenue", "Gross profit"],
+    const downloadSkuCsv = () => exportCsv(`sku-performance-${reportMonth}.csv`, [["Stock movement", "SKU", "Product", "Units", "Revenue", "Gross profit"],
         ...summary.topSkuPerformance.map(row => ["Top", row.sku, row.name, row.unitsSold, row.revenue, row.grossProfit]),
         ...summary.slowSkuPerformance.map(row => ["Slow", row.sku, row.name, row.unitsSold, row.revenue, row.grossProfit])]);
-    const downloadSingleSkuCsv = (kind: "top" | "slow", rows: SkuPerformance[]) => downloadCsv(`${kind}-moving-stock-${reportMonth}.csv`, [
+    const downloadSingleSkuCsv = (kind: "top" | "slow", rows: SkuPerformance[]) => exportCsv(`${kind}-moving-stock-${reportMonth}.csv`, [
         [kind === "top" ? "Top-moving stock" : "Slow-moving stock", "SKU", "Product", "Units sold", "Revenue", "Gross profit"],
         ...rows.map(row => [kind, row.sku, row.name, row.unitsSold, row.revenue, row.grossProfit])
     ]);
     const downloadFinancialExport = async (format: "csv" | "pdf") => {
+        showExportNotice(format === "pdf" ? "Putting your PDF together…" : "Preparing your CSV…");
         const [year, month] = reportMonth.split("-");
         const lastDay = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate().toString().padStart(2, "0");
         try {
             const { data } = await apiClient.get<Blob>("/api/reports/export/financial", { params: { format, fromDate: `${year}-${month}-01`, toDate: `${year}-${month}-${lastDay}` }, responseType: "blob" });
-            const url = URL.createObjectURL(data);
-            const link = document.createElement("a"); link.href = url; link.download = `financial-summary-${reportMonth}.${format}`; link.click(); URL.revokeObjectURL(url);
+            downloadBlob(data, `financial-summary-${reportMonth}.${format}`);
+            showExportNotice(`Your ${format.toUpperCase()} is downloading now.`, 4500);
         } catch {
             setError("We could not create the financial export. Please try again.");
+            showExportNotice(`That ${format.toUpperCase()} didn’t come through. Please try again.`, 6000);
         }
     };
     const periodDays = Math.max(1, Math.ceil((new Date(summary.currentPeriod.endDate).getTime() - new Date(summary.currentPeriod.startDate).getTime()) / 86_400_000));
@@ -218,6 +280,7 @@ export default function ReportsPage() {
     const breakEvenRevenue = grossMargin === null || grossMargin <= 0 ? null : monthlyOperatingCosts / (grossMargin / 100);
 
     return <main className="reports-page">
+        {exportNotice && <div className="export-toast" role="status" aria-live="polite"><span className="export-toast__mark">↓</span>{exportNotice}</div>}
         <header className="page-header report-masthead">
             <div><p className="report-eyebrow">Nairobi time · EAT (UTC+3)</p><h1>Monthly sales insights</h1></div>
             <label className="month-picker">Reporting month<input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} /></label>
@@ -312,12 +375,8 @@ export default function ReportsPage() {
         </section>
 
         <section className="report-section">
-            <div className="section-header"><div><h2>Monthly sales insights</h2><p>Completed retail sales only.</p></div><div className="export-buttons"><button onClick={downloadInsightsCsv}>CSV</button></div></div>
-            <div className="trend-chart" aria-label="Trailing twelve-month sales trend">
-                {summary.trailingMonths.map((item) => <div className="trend-column" key={item.month} title={`${item.label}: ${money(item.total)}`}>
-                    <span className="trend-value">{money(item.total)}</span><div className="trend-bar-wrap"><div className="trend-bar" style={{ height: `${Math.max((item.total / maxTrend) * 100, item.total ? 4 : 0)}%` }} /></div><span className="trend-label">{item.label.split(" ")[0]}</span>
-                </div>)}
-            </div>
+            <div className="section-header"><div><h2>Monthly sales insights</h2><p>Completed retail sales only.</p></div><div className="export-buttons"><button onClick={downloadInsightsPdf}>PDF</button><button onClick={downloadInsightsCsv}>CSV</button></div></div>
+            <MonthlySalesLineChart rows={summary.trailingMonths} />
             <div className="calculation-grid calculation-grid--two">
                 <CalculationNote title="Monthly totals" formula="sum of completed sale totals in each Nairobi calendar month" evidence={`The selected period contains ${summary.salesPerformance.current.transactions} completed transactions.`} />
                 <CalculationNote title="Period comparison" formula="current period is matched with the same elapsed days in the prior month" evidence={`This keeps month-to-date comparisons fair when the month is still in progress.`} />
@@ -329,8 +388,8 @@ export default function ReportsPage() {
             <BreakdownTable title="Category movers" rows={summary.categoryBreakdown} firstColumn="Category" />
         </section>
         <section className="report-section report-tables">
-            <div><SkuTable title="Top-performing SKUs" rows={summary.topSkuPerformance} /><div className="table-export"><button className="btn-export" onClick={() => downloadSingleSkuCsv("top", summary.topSkuPerformance)}>Download CSV</button></div></div>
-            <div><SkuTable title="Slow-moving SKUs" rows={summary.slowSkuPerformance} /><div className="table-export"><button className="btn-export" onClick={() => downloadSingleSkuCsv("slow", summary.slowSkuPerformance)}>Download CSV</button></div></div>
+            <div><SkuTable title="Top-performing SKUs" rows={summary.topSkuPerformance} /><div className="table-export"><button className="btn-export" onClick={() => downloadSkuPdf("top")}>PDF</button><button className="btn-export" onClick={() => downloadSingleSkuCsv("top", summary.topSkuPerformance)}>CSV</button></div></div>
+            <div><SkuTable title="Slow-moving SKUs" rows={summary.slowSkuPerformance} /><div className="table-export"><button className="btn-export" onClick={() => downloadSkuPdf("slow")}>PDF</button><button className="btn-export" onClick={() => downloadSingleSkuCsv("slow", summary.slowSkuPerformance)}>CSV</button></div></div>
         </section>
         <div className="report-section__export"><button className="btn-export" onClick={downloadSkuCsv}>Download combined SKU CSV</button></div>
 

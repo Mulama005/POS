@@ -341,3 +341,33 @@
         transition: none;
     }
 }
+
+.dashboard-layout .topbar-brand { display: block; color: var(--pos-ink); font: 400 23px/1 var(--pos-font-display); letter-spacing: -.02em; text-decoration: none; white-space: nowrap; }
+.dashboard-layout .mobile-menu-btn, .dashboard-layout .mobile-nav-backdrop { display: none; }
+@media (max-width: 700px) {
+    .dashboard-layout { height: 100vh; height: 100dvh; overflow: hidden; }
+    .dashboard-layout .sidebar, .dashboard-layout .sidebar.collapsed { position: fixed; inset: 0 auto 0 0; z-index: 50; width: min(82vw, 300px); min-width: 0; transform: translateX(-105%); transition: transform 180ms ease; box-shadow: 12px 0 36px rgba(26,26,26,.12); }
+    .dashboard-layout .sidebar.mobile-open { transform: translateX(0); }
+    .dashboard-layout .sidebar .logo-text, .dashboard-layout .sidebar .nav-link .label { display: initial; }
+    .dashboard-layout .sidebar .nav .group-label { display: flex; }
+    .dashboard-layout .sidebar .logo-area { justify-content: flex-start; padding: 0 22px; }
+    .dashboard-layout .sidebar .nav-link, .dashboard-layout .sidebar.collapsed .nav-link { justify-content: flex-start; padding: 13px 22px; }
+    .dashboard-layout .sidebar .toggle-area { display: none; }
+    .dashboard-layout .mobile-nav-backdrop { display: block; position: fixed; inset: 0; z-index: 40; border: 0; padding: 0; background: rgba(26,26,26,.38); }
+    .dashboard-layout .topbar { height: auto; min-height: 64px; padding: 10px 14px; gap: 10px; }
+    .dashboard-layout .topbar .mobile-menu-btn { display: inline-flex; flex: 0 0 auto; width: 40px; height: 40px; align-items: center; justify-content: center; padding: 0; font-size: 20px; }
+    .dashboard-layout .topbar-brand { margin-right: auto; font-size: 22px; }
+    .dashboard-layout .topbar .left { display: none; }
+    .dashboard-layout .topbar .right { gap: 10px; }
+    .dashboard-layout .topbar .user-block { gap: 0; }
+    .dashboard-layout .topbar .user-info, .dashboard-layout .topbar .divider { display: none; }
+    .dashboard-layout .topbar .avatar { width: 34px; height: 34px; }
+    .dashboard-layout .topbar .logout-btn { font-size: 10px; letter-spacing: .08em; }
+    .dashboard-layout .page-content { min-width: 0; }
+}
+@media (max-width: 360px) {
+    .dashboard-layout .topbar { padding-inline: 9px; }
+    .dashboard-layout .topbar-brand { font-size: 19px; }
+    .dashboard-layout .topbar .right { gap: 7px; }
+    .dashboard-layout .topbar .logout-btn { gap: 4px; font-size: 9px; }
+}

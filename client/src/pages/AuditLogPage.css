@@ -1,275 +1,46 @@
-﻿.audit-page {
-    padding: 64px 72px 96px;
-    font-family: var(--pos-font-body);
-    color: var(--pos-ink);
-    max-width: 1360px;
+.audit-page { width: min(100%, 1440px); box-sizing: border-box; padding: clamp(24px, 5vw, 64px) clamp(18px, 5.5vw, 72px) 72px; color: var(--pos-ink); }
+.audit-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 30px; padding-bottom: 22px; border-bottom: 3px solid var(--pos-rule); }
+.audit-eyebrow { margin: 0 0 10px; color: var(--pos-ink-muted); font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+.audit-header h1 { margin: 0 0 8px; font: 400 clamp(34px, 5vw, 46px)/1.05 var(--pos-font-display); letter-spacing: -.02em; }
+.audit-subtitle { color: var(--pos-ink-muted); font-size: 15px; }
+.audit-header-actions { display: flex; align-items: center; gap: 20px; flex-shrink: 0; }
+.audit-count { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; color: var(--pos-ink-muted); font-size: 12px; text-transform: uppercase; letter-spacing: .12em; }
+.audit-count strong { color: var(--pos-ink); font: 400 30px/1 var(--pos-font-display); letter-spacing: 0; }
+.audit-filter-card, .audit-table-card { background: var(--pos-shell-bg); border: 1px solid var(--pos-border); }
+.audit-filter-card { margin-bottom: 24px; padding: clamp(18px, 3vw, 28px); }
+.audit-filter-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+.audit-filter-heading h2 { margin: 0; font: 400 23px/1.1 var(--pos-font-display); }
+.audit-filter-heading > span { color: var(--pos-ink-muted); font-size: 13px; }
+.audit-filters { display: grid; grid-template-columns: repeat(5, minmax(130px, 1fr)) auto; align-items: end; gap: 14px; }
+.audit-filters label { display: grid; gap: 7px; color: var(--pos-ink-muted); font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
+.audit-filters input { width: 100%; min-width: 0; box-sizing: border-box; padding: 10px 11px; border: 1px solid var(--pos-border); border-radius: 5px; background: var(--pos-bg); color: var(--pos-ink); font: 14px var(--pos-font-body); }
+.audit-filters input:focus { border-color: var(--pos-ink-muted); outline: 2px solid color-mix(in srgb, var(--pos-ink) 12%, transparent); }
+.audit-filters button, .audit-export { white-space: nowrap; }
+.audit-export-error { margin: -12px 0 20px; color: var(--pos-danger); font-size: 14px; }
+.audit-table-card { overflow: hidden; }
+.audit-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.audit-table { width: 100%; min-width: 820px; border-collapse: collapse; }
+.audit-table th, .audit-table td { padding: 13px 14px; border-bottom: 1px solid var(--pos-border); text-align: left; vertical-align: top; font-size: 13px; }
+.audit-table th { position: sticky; top: 0; background: var(--pos-shell-bg); color: var(--pos-ink-muted); font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; border-bottom: 2px solid var(--pos-rule); }
+.audit-table tbody tr:hover { background: color-mix(in srgb, var(--pos-bg) 70%, var(--pos-shell-bg)); }
+.audit-table td:nth-child(1), .audit-table td:nth-child(6) { white-space: nowrap; font: 11px var(--pos-font-mono); color: var(--pos-ink-muted); }
+.audit-table td:nth-child(2) { font-weight: 600; white-space: nowrap; }
+.audit-table td:nth-child(3) { white-space: nowrap; }
+.audit-action { display: inline-flex; padding: 4px 7px; border: 1px solid var(--pos-border); border-radius: 3px; background: var(--pos-bg); font: 10px var(--pos-font-mono); }
+.audit-table td:nth-child(5) { max-width: 360px; color: var(--pos-ink-muted); overflow-wrap: anywhere; }
+.audit-empty { padding: 34px !important; color: var(--pos-ink-muted); text-align: center !important; }
+.audit-loading { padding: 38px; color: var(--pos-ink-muted); text-align: center; }
+.pagination { display: flex; align-items: center; justify-content: center; gap: 20px; padding: 16px; color: var(--pos-ink-muted); font-size: 13px; }
+@media (max-width: 1000px) { .audit-filters { grid-template-columns: repeat(3, minmax(130px, 1fr)); } }
+@media (max-width: 680px) {
+    .audit-page { padding: 24px 16px 40px; }
+    .audit-header { align-items: flex-start; flex-direction: column; }
+    .audit-header-actions { width: 100%; justify-content: space-between; }
+    .audit-count { align-items: flex-start; }
+    .audit-filter-heading { align-items: flex-start; flex-direction: column; }
+    .audit-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .audit-filters label { grid-column: span 1; }
+    .audit-filters button { grid-column: 1 / -1; }
+    .pagination { gap: 12px; justify-content: space-between; }
 }
-
-/* --- Masthead --------------------------------------------------------- */
-.audit-page h1 {
-    font-family: var(--pos-font-display);
-    font-size: 46px;
-    font-weight: 400;
-    line-height: 1.05;
-    letter-spacing: -0.015em;
-    margin: 0 0 40px;
-    padding-bottom: 16px;
-    border-bottom: 3px solid var(--pos-rule);
-}
-
-/* --- Filter row -------------------------------------------------------
-   Four underline-only inputs plus a square ink button, all baseline
-   aligned on a single ruled row. */
-.audit-filters {
-    display: flex;
-    align-items: flex-end;
-    gap: 28px;
-    margin-bottom: 48px;
-    padding-bottom: 24px;
-    border-bottom: 1px solid var(--pos-border);
-    flex-wrap: wrap;
-}
-
-.audit-filters input {
-    font-family: var(--pos-font-body);
-    font-size: 14px;
-    padding: 8px 0;
-    border: none;
-    border-bottom: 1.5px solid var(--pos-rule);
-    border-radius: 0;
-    background: transparent;
-    color: var(--pos-ink);
-    outline: none;
-    min-width: 160px;
-    flex: 1 1 160px;
-    transition: border-color 120ms ease;
-}
-
-.audit-filters input::placeholder {
-    color: var(--pos-ink-dim);
-    letter-spacing: 0.02em;
-}
-
-.audit-filters input:focus {
-    border-bottom-color: var(--pos-ink);
-}
-
-/* Date inputs render in monospace so the figures line up cleanly. */
-.audit-filters input[type="date"] {
-    font-family: var(--pos-font-mono);
-    font-size: 13px;
-    letter-spacing: 0.02em;
-    flex: 0 1 160px;
-    min-width: 140px;
-}
-
-.audit-filters button {
-    font-family: var(--pos-font-body);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--pos-bg);
-    background: var(--pos-ink);
-    border: 1.5px solid var(--pos-ink);
-    border-radius: 0;
-    padding: 12px 24px;
-    cursor: pointer;
-    flex: 0 0 auto;
-    transition: background 120ms ease, color 120ms ease;
-}
-
-.audit-filters button:hover {
-    background: transparent;
-    color: var(--pos-ink);
-}
-
-/* --- Loading state ---------------------------------------------------- */
-.audit-page > div {
-    font-family: var(--pos-font-body);
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--pos-ink-muted);
-    padding: 64px 0;
-    text-align: left;
-}
-
-/* --- Table -----------------------------------------------------------
-   A running ledger. Timestamps and identifiers in monospace; the action
-   column reads in body weight. Hairline rows, uppercase letter-spaced
-   headers closed by a 2px ink rule. */
-.audit-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.audit-table th,
-.audit-table td {
-    text-align: left;
-    padding: 14px 20px 14px 0;
-    border-bottom: 1px solid var(--pos-border);
-    font-size: 13.5px;
-    vertical-align: baseline;
-}
-
-.audit-table th {
-    font-family: var(--pos-font-body);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--pos-ink-muted);
-    border-bottom: 2px solid var(--pos-rule);
-    padding-bottom: 12px;
-}
-
-.audit-table tbody tr:last-child td {
-    border-bottom: none;
-}
-
-/* Timestamp column — monospace, muted. */
-.audit-table td:nth-child(1) {
-    font-family: var(--pos-font-mono);
-    font-size: 12px;
-    color: var(--pos-ink-muted);
-    white-space: nowrap;
-    letter-spacing: 0;
-}
-
-/* User column — body weight, ink. */
-.audit-table td:nth-child(2) {
-    font-weight: 500;
-    color: var(--pos-ink);
-    white-space: nowrap;
-}
-
-/* Action column — the TSX wraps this in <strong>, so target that.
-   Reads as a monospace code rather than emphasised prose. */
-.audit-table td:nth-child(3) strong {
-    font-family: var(--pos-font-mono);
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    color: var(--pos-ink);
-    text-transform: uppercase;
-}
-
-/* Entity column — monospace, muted. */
-.audit-table td:nth-child(4) {
-    font-family: var(--pos-font-mono);
-    font-size: 12px;
-    color: var(--pos-ink-muted);
-    white-space: nowrap;
-}
-
-/* Details column — truncate long strings. */
-.audit-table td:nth-child(5) {
-    color: var(--pos-ink-muted);
-    max-width: 420px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* IP column — monospace, muted. */
-.audit-table td:nth-child(6) {
-    font-family: var(--pos-font-mono);
-    font-size: 12px;
-    color: var(--pos-ink-muted);
-    white-space: nowrap;
-}
-
-/* Row hover — subtle padding-left shift on the first cell. */
-.audit-table tbody tr td:first-child {
-    transition: padding-left 120ms ease;
-}
-.audit-table tbody tr:hover td:first-child {
-    padding-left: 8px;
-}
-
-/* --- Pagination ------------------------------------------------------ */
-.pagination {
-    display: flex;
-    align-items: center;
-    gap: 24px;
-    justify-content: center;
-    margin-top: 48px;
-    padding-top: 24px;
-    border-top: 1px solid var(--pos-border);
-    font-family: var(--pos-font-body);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--pos-ink-muted);
-}
-
-.pagination button {
-    font-family: var(--pos-font-body);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    border: none;
-    border-bottom: 1.5px solid transparent;
-    border-radius: 0;
-    background: transparent;
-    color: var(--pos-ink);
-    padding: 4px 0;
-    cursor: pointer;
-    transition: border-color 120ms ease, color 120ms ease, opacity 120ms ease;
-}
-
-.pagination button:hover:not(:disabled) {
-    border-bottom-color: var(--pos-ink);
-}
-
-.pagination button:disabled {
-    opacity: 0.35;
-    cursor: default;
-}
-
-/* --- Responsive ------------------------------------------------------ */
-@media (max-width: 900px) {
-    .audit-page {
-        padding: 40px 24px 64px;
-    }
-    .audit-page h1 {
-        font-size: 34px;
-    }
-    .audit-filters {
-        gap: 20px;
-    }
-    .audit-filters input,
-    .audit-filters input[type="date"] {
-        flex: 1 1 100%;
-        min-width: 0;
-    }
-    .audit-filters button {
-        flex: 1 1 100%;
-    }
-    /* Collapse table to a two-column ledger on narrow screens; secondary
-       columns wrap onto a second line per entry. */
-    .audit-table th:nth-child(4),
-    .audit-table td:nth-child(4),
-    .audit-table th:nth-child(6),
-    .audit-table td:nth-child(6) {
-        display: none;
-    }
-    .audit-table td:nth-child(5) {
-        max-width: 200px;
-    }
-}
-
-@media (max-width: 600px) {
-    .audit-table th,
-    .audit-table td {
-        padding: 12px 12px 12px 0;
-        font-size: 13px;
-    }
-    .audit-table td:nth-child(5) {
-        display: none;
-    }
-}
+@media (max-width: 380px) { .audit-filters { grid-template-columns: 1fr; } .audit-filters label, .audit-filters button { grid-column: 1; } }

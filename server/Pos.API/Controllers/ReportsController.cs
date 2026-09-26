@@ -679,6 +679,89 @@ public class ReportsController : ControllerBase
         return BadRequest("Unsupported format. Use 'csv' or 'pdf'.");
     }
 
+    [HttpGet("export/monthly-insights")]
+    public async Task<IActionResult> ExportMonthlyInsightsPdf([FromQuery] int? year = null, [FromQuery] int? month = null)
+    {
+        var nowNairobi = DateTimeOffset.UtcNow.ToOffset(NairobiOffset);
+        var selectedYear = year ?? nowNairobi.Year;
+        var selectedMonth = month ?? nowNairobi.Month;
+        if (selectedMonth is < 1 or > 12 || selectedYear is < 2000 or > 9999)
+            return BadRequest("Provide a valid year and month.");
+
+        var monthStart = NairobiMonthStart(selectedYear, selectedMonth);
+        var currentMonthStart = NairobiMonthStart(nowNairobi.Year, nowNairobi.Month);
+        if (monthStart > currentMonthStart)
+            return BadRequest("Reports are only available for the current or a past month.");
+
+        var periodEnd = monthStart == currentMonthStart ? nowNairobi : monthStart.AddMonths(1);
+        var priorStart = monthStart.AddMonths(-1);
+        var priorEnd = monthStart == currentMonthStart ? priorStart.Add(periodEnd - monthStart) : monthStart;
+
+        var sales = await _context.Sales.AsNoTracking()
+            .Where(s => s.Status == SaleStatus.Completed && s.SaleDate >= priorStart.UtcDateTime && s.SaleDate < periodEnd.UtcDateTime)
+            .Select(s => new { s.SaleDate, s.Total, s.Subtotal, s.DiscountTotal, s.TaxTotal })
+            .ToListAsync();
+        var trailingStart = monthStart.AddMonths(-11);
+        var trailing = await _context.Sales.AsNoTracking()
+            .Where(s => s.Status == SaleStatus.Completed && s.SaleDate >= trailingStart.UtcDateTime && s.SaleDate < periodEnd.UtcDateTime)
+            .Select(s => new { s.SaleDate, s.Total })
+            .ToListAsync();
+
+        var currentSales = sales.Where(s => IsInRange(s.SaleDate, monthStart.UtcDateTime, periodEnd.UtcDateTime)).ToList();
+        var priorSales = sales.Where(s => IsInRange(s.SaleDate, priorStart.UtcDateTime, priorEnd.UtcDateTime)).ToList();
+        var dto = new MonthlyInsightsPdfDto(
+            monthStart.ToString("MMMM yyyy", CultureInfo.InvariantCulture), monthStart, periodEnd,
+            currentSales.Sum(s => s.Total), currentSales.Sum(s => s.Subtotal), currentSales.Sum(s => s.DiscountTotal), currentSales.Sum(s => s.TaxTotal), currentSales.Count,
+            priorSales.Sum(s => s.Total),
+            Enumerable.Range(0, 12).Select(i => monthStart.AddMonths(i - 11)).Select(start =>
+            {
+                var end = start == monthStart && monthStart == currentMonthStart ? periodEnd : start.AddMonths(1);
+                return new MonthlyTrendPdfPoint(start.ToString("MMM", CultureInfo.InvariantCulture), trailing.Where(s => IsInRange(s.SaleDate, start.UtcDateTime, end.UtcDateTime)).Sum(s => s.Total));
+            }).ToList());
+
+        await LogExportAsync("Monthly insights", monthStart.UtcDateTime, periodEnd.UtcDateTime.AddTicks(-1), "pdf");
+        return ExportMonthlyInsightsPdf(dto);
+    }
+
+    [HttpGet("export/sku-performance")]
+    public async Task<IActionResult> ExportSkuPerformancePdf([FromQuery] string kind = "top", [FromQuery] int? year = null, [FromQuery] int? month = null)
+    {
+        if (!string.Equals(kind, "top", StringComparison.OrdinalIgnoreCase) && !string.Equals(kind, "slow", StringComparison.OrdinalIgnoreCase))
+            return BadRequest("Kind must be 'top' or 'slow'.");
+
+        var nowNairobi = DateTimeOffset.UtcNow.ToOffset(NairobiOffset);
+        var selectedYear = year ?? nowNairobi.Year;
+        var selectedMonth = month ?? nowNairobi.Month;
+        if (selectedMonth is < 1 or > 12 || selectedYear is < 2000 or > 9999)
+            return BadRequest("Provide a valid year and month.");
+
+        var monthStart = NairobiMonthStart(selectedYear, selectedMonth);
+        var currentMonthStart = NairobiMonthStart(nowNairobi.Year, nowNairobi.Month);
+        if (monthStart > currentMonthStart)
+            return BadRequest("Reports are only available for the current or a past month.");
+        var periodEnd = monthStart == currentMonthStart ? nowNairobi : monthStart.AddMonths(1);
+
+        var products = await _context.Products.AsNoTracking().Where(p => p.IsActive)
+            .Select(p => new { p.Id, p.Sku, p.Name, p.CostPrice }).ToListAsync();
+        var soldItems = await _context.SaleItems.AsNoTracking()
+            .Where(i => i.Sale.Status == SaleStatus.Completed && i.Sale.SaleDate >= monthStart.UtcDateTime && i.Sale.SaleDate < periodEnd.UtcDateTime)
+            .Select(i => new { i.ProductId, i.Quantity, i.LineTotal, i.TaxAmount, i.Product.CostPrice }).ToListAsync();
+        var groupedItems = soldItems.GroupBy(i => i.ProductId).ToDictionary(g => g.Key, g => g.ToList());
+        var rows = products.Select(product =>
+        {
+            groupedItems.TryGetValue(product.Id, out var items);
+            var units = items?.Sum(i => i.Quantity) ?? 0;
+            var revenue = items?.Sum(i => i.LineTotal - i.TaxAmount) ?? 0m;
+            return new SkuPerformancePdfRow(product.Sku, product.Name, units, revenue, revenue - units * product.CostPrice);
+        });
+        var orderedRows = string.Equals(kind, "top", StringComparison.OrdinalIgnoreCase)
+            ? rows.OrderByDescending(r => r.Revenue).ThenBy(r => r.Name).Take(10).ToList()
+            : rows.OrderBy(r => r.Revenue).ThenBy(r => r.Name).Take(10).ToList();
+        var title = string.Equals(kind, "top", StringComparison.OrdinalIgnoreCase) ? "Top-performing SKUs" : "Slow-moving SKUs";
+        await LogExportAsync(title, monthStart.UtcDateTime, periodEnd.UtcDateTime.AddTicks(-1), "pdf");
+        return ExportSkuPerformancePdf(title, monthStart, periodEnd, orderedRows);
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     //  AUDIT HELPER
     // ═══════════════════════════════════════════════════════════════════════
@@ -707,6 +790,155 @@ public class ReportsController : ControllerBase
     // ═══════════════════════════════════════════════════════════════════════
     //  GENERIC EXPORT HELPERS (used by inventory and staff)
     // ═══════════════════════════════════════════════════════════════════════
+
+    private IActionResult ExportMonthlyInsightsPdf(MonthlyInsightsPdfDto dto)
+    {
+        var previousLabel = dto.PeriodStart.AddMonths(-1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
+        var delta = dto.TotalSales - dto.PreviousSales;
+        var document = Document.Create(container => container.Page(page =>
+        {
+            page.Size(PageSizes.A4);
+            page.Margin(1.6f, Unit.Centimetre);
+            page.DefaultTextStyle(style => style.FontFamily("Helvetica").FontSize(9).FontColor(Colors.Grey.Darken4));
+            page.Header().Column(header =>
+            {
+                header.Item().Text("AYIYAPOS").FontSize(9).SemiBold().FontColor(Colors.Teal.Darken3).LetterSpacing(1.5f);
+                header.Item().PaddingTop(5).Text("Monthly sales insights").FontSize(25).Bold().FontColor(Colors.BlueGrey.Darken4);
+                header.Item().PaddingTop(4).Text($"{dto.Label} | Nairobi time (EAT) | Generated {DateTime.Now:dd MMM yyyy, HH:mm}").FontColor(Colors.Grey.Darken1);
+                header.Item().PaddingTop(14).LineHorizontal(1).LineColor(Colors.Teal.Lighten2);
+            });
+            page.Content().PaddingTop(18).Column(content =>
+            {
+                content.Item().Row(row =>
+                {
+                    InsightMetricCard(row.RelativeItem(), "TOTAL SALES", dto.TotalSales.ToString("KES N2"), $"{dto.Transactions:N0} completed transactions", Colors.Teal.Darken3);
+                    row.ConstantItem(10);
+                    InsightMetricCard(row.RelativeItem(), "CHANGE VS " + previousLabel.ToUpperInvariant(), $"{(delta >= 0 ? "+" : "-")}KES {Math.Abs(delta):N2}", dto.PreviousSales == 0 ? "New sales period" : $"{delta / dto.PreviousSales * 100m:+0.0;-0.0}%", delta >= 0 ? Colors.Green.Darken2 : Colors.Red.Darken2);
+                    row.ConstantItem(10);
+                    InsightMetricCard(row.RelativeItem(), "AVERAGE ORDER", dto.Transactions == 0 ? "KES 0.00" : $"KES {dto.TotalSales / dto.Transactions:N2}", "Completed retail sales", Colors.Blue.Darken2);
+                });
+                content.Item().PaddingTop(22).Background(Colors.Grey.Lighten4).Padding(16).Column(chart =>
+                {
+                    chart.Item().Text("12-MONTH SALES MOMENTUM").FontSize(10).SemiBold().FontColor(Colors.BlueGrey.Darken3).LetterSpacing(1.1f);
+                    chart.Item().PaddingTop(4).Text("Monthly completed-sale value across the trailing 12 months.").FontSize(8).FontColor(Colors.Grey.Darken1);
+                    chart.Item().PaddingTop(10).Svg(CreateMonthlyInsightsChartSvg(dto.Trend)).FitWidth();
+                });
+                content.Item().PaddingTop(22).Row(row =>
+                {
+                    row.RelativeItem().Background(Colors.Teal.Lighten5).Padding(14).Column(card =>
+                    {
+                        card.Item().Text("REVENUE COMPOSITION").FontSize(9).SemiBold().FontColor(Colors.Teal.Darken3);
+                        card.Item().PaddingTop(10).Text($"Subtotal  KES {dto.Subtotal:N2}");
+                        card.Item().PaddingTop(5).Text($"Discounts  KES {dto.Discounts:N2}");
+                        card.Item().PaddingTop(5).Text($"Tax  KES {dto.Tax:N2}");
+                    });
+                    row.ConstantItem(12);
+                    row.RelativeItem().Background(Colors.BlueGrey.Lighten5).Padding(14).Column(card =>
+                    {
+                        card.Item().Text("READING THIS REPORT").FontSize(9).SemiBold().FontColor(Colors.BlueGrey.Darken3);
+                        card.Item().PaddingTop(10).Text("Sales compare the selected month with the matching elapsed period in the prior month.").FontSize(8.5f);
+                        card.Item().PaddingTop(8).Text("All figures exclude incomplete and cancelled sales.").FontSize(8.5f);
+                    });
+                });
+            });
+            page.Footer().AlignCenter().Text(text => { text.Span("AyiyaPOS | Monthly insights | Page "); text.CurrentPageNumber(); text.Span(" of "); text.TotalPages(); });
+        }));
+        return File(document.GeneratePdf(), "application/pdf", $"Monthly_Insights_{dto.PeriodStart:yyyyMM}.pdf");
+    }
+
+    private static string CreateMonthlyInsightsChartSvg(IReadOnlyList<MonthlyTrendPdfPoint> points)
+    {
+        const double width = 920, height = 280, left = 78, right = 14, top = 16, bottom = 42;
+        var plotWidth = width - left - right;
+        var plotHeight = height - top - bottom;
+        var maximum = Math.Max(points.Select(point => point.Total).DefaultIfEmpty(0m).Max(), 1m);
+        var coordinates = points.Select((point, index) => new
+        {
+            Point = point,
+            X = left + (points.Count <= 1 ? 0 : index * plotWidth / (points.Count - 1)),
+            Y = top + (1 - (double)(point.Total / maximum)) * plotHeight
+        }).ToList();
+        static string F(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+        string CompactAmount(decimal value) => value >= 1_000_000m
+            ? $"KES {(value / 1_000_000m).ToString("0.#", CultureInfo.InvariantCulture)}m"
+            : value >= 1_000m
+                ? $"KES {(value / 1_000m).ToString("0.#", CultureInfo.InvariantCulture)}k"
+                : $"KES {value.ToString("0", CultureInfo.InvariantCulture)}";
+        var horizontalGrid = Enumerable.Range(0, 5).Select(index =>
+        {
+            var fraction = index / 4d;
+            var y = top + (1 - fraction) * plotHeight;
+            var amount = maximum * (decimal)fraction;
+            return $"<line x1=\"{F(left)}\" y1=\"{F(y)}\" x2=\"{F(width - right)}\" y2=\"{F(y)}\" stroke=\"#D8D5CE\" stroke-width=\"1\"/><text x=\"{F(left - 8)}\" y=\"{F(y + 3)}\" text-anchor=\"end\" font-family=\"Helvetica,Arial,sans-serif\" font-size=\"10\" fill=\"#6B6B6B\">{CompactAmount(amount)}</text>";
+        });
+        var verticalGrid = coordinates.Select(point => $"<line x1=\"{F(point.X)}\" y1=\"{F(top)}\" x2=\"{F(point.X)}\" y2=\"{F(height - bottom)}\" stroke=\"#D8D5CE\" stroke-width=\"1\" stroke-opacity=\".62\"/>");
+        var polyline = string.Join(" ", coordinates.Select(point => $"{F(point.X)},{F(point.Y)}"));
+        var markers = coordinates.Select(point => $"<circle cx=\"{F(point.X)}\" cy=\"{F(point.Y)}\" r=\"5\" fill=\"#EFEDE8\" stroke=\"#1A1A1A\" stroke-width=\"3\"/><text x=\"{F(point.X)}\" y=\"{F(height - 15)}\" text-anchor=\"middle\" font-family=\"Helvetica,Arial,sans-serif\" font-size=\"10\" fill=\"#6B6B6B\">{point.Point.Label}</text>");
+        return $"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{F(width)}\" height=\"{F(height)}\" viewBox=\"0 0 {F(width)} {F(height)}\">{string.Concat(horizontalGrid)}{string.Concat(verticalGrid)}<line x1=\"{F(left)}\" y1=\"{F(top)}\" x2=\"{F(left)}\" y2=\"{F(height - bottom)}\" stroke=\"#6B6B6B\" stroke-width=\"1.5\"/><line x1=\"{F(left)}\" y1=\"{F(height - bottom)}\" x2=\"{F(width - right)}\" y2=\"{F(height - bottom)}\" stroke=\"#6B6B6B\" stroke-width=\"1.5\"/><polyline points=\"{polyline}\" fill=\"none\" stroke=\"#1A1A1A\" stroke-width=\"4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>{string.Concat(markers)}</svg>";
+    }
+
+    private static void InsightMetricCard(IContainer container, string label, string value, string detail, string accent)
+    {
+        container.BorderTop(3).BorderColor(accent).Background(Colors.Grey.Lighten4).Padding(12).Column(card =>
+        {
+            card.Item().Text(label).FontSize(7.5f).SemiBold().FontColor(Colors.Grey.Darken1).LetterSpacing(0.9f);
+            card.Item().PaddingTop(8).Text(value).FontSize(15).Bold().FontColor(Colors.BlueGrey.Darken4);
+            card.Item().PaddingTop(5).Text(detail).FontSize(8).FontColor(accent);
+        });
+    }
+
+    private IActionResult ExportSkuPerformancePdf(string title, DateTimeOffset periodStart, DateTimeOffset periodEnd, IReadOnlyList<SkuPerformancePdfRow> rows)
+    {
+        var totalRevenue = rows.Sum(row => row.Revenue);
+        var totalUnits = rows.Sum(row => row.UnitsSold);
+        var document = Document.Create(container => container.Page(page =>
+        {
+            page.Size(PageSizes.A4);
+            page.Margin(1.7f, Unit.Centimetre);
+            page.DefaultTextStyle(style => style.FontFamily("Helvetica").FontSize(9).FontColor(Colors.Grey.Darken4));
+            page.Header().Column(header =>
+            {
+                header.Item().Text("AYIYAPOS | STOCK PERFORMANCE").FontSize(9).SemiBold().FontColor(Colors.Teal.Darken3).LetterSpacing(1.2f);
+                header.Item().PaddingTop(5).Text(title).FontSize(23).Bold().FontColor(Colors.BlueGrey.Darken4);
+                header.Item().PaddingTop(4).Text($"{periodStart:dd MMM yyyy} - {periodEnd.AddTicks(-1):dd MMM yyyy} | Nairobi time (EAT)").FontColor(Colors.Grey.Darken1);
+                header.Item().PaddingTop(14).LineHorizontal(1).LineColor(Colors.Teal.Lighten2);
+            });
+            page.Content().PaddingTop(18).Column(content =>
+            {
+                content.Item().Row(row =>
+                {
+                    InsightMetricCard(row.RelativeItem(), "SKUS SHOWN", rows.Count.ToString(), "Ranked products", Colors.Teal.Darken3);
+                    row.ConstantItem(10);
+                    InsightMetricCard(row.RelativeItem(), "NET REVENUE", $"KES {totalRevenue:N2}", "Excludes tax", Colors.Blue.Darken2);
+                    row.ConstantItem(10);
+                    InsightMetricCard(row.RelativeItem(), "UNITS MOVED", totalUnits.ToString("N0"), "Completed sales only", Colors.Green.Darken2);
+                });
+                content.Item().PaddingTop(22).Table(table =>
+                {
+                    table.ColumnsDefinition(columns => { columns.ConstantColumn(32); columns.ConstantColumn(70); columns.RelativeColumn(); columns.ConstantColumn(45); columns.ConstantColumn(76); columns.ConstantColumn(76); });
+                    table.Header(header =>
+                    {
+                        foreach (var heading in new[] { "#", "SKU", "PRODUCT", "UNITS", "NET REVENUE", "GROSS PROFIT" })
+                            header.Cell().Background(Colors.BlueGrey.Darken4).PaddingVertical(8).PaddingHorizontal(6).Text(heading).FontSize(7.5f).SemiBold().FontColor(Colors.White);
+                    });
+                    for (var index = 0; index < rows.Count; index++)
+                    {
+                        var item = rows[index]; var fill = index % 2 == 0 ? Colors.Grey.Lighten4 : Colors.White;
+                        table.Cell().Background(fill).Padding(7).Text((index + 1).ToString());
+                        table.Cell().Background(fill).Padding(7).Text(item.Sku).SemiBold();
+                        table.Cell().Background(fill).Padding(7).Text(item.Name);
+                        table.Cell().Background(fill).Padding(7).AlignRight().Text(item.UnitsSold.ToString("N0"));
+                        table.Cell().Background(fill).Padding(7).AlignRight().Text($"KES {item.Revenue:N2}");
+                        table.Cell().Background(fill).Padding(7).AlignRight().Text($"KES {item.GrossProfit:N2}");
+                    }
+                });
+                if (rows.Count == 0) content.Item().PaddingTop(16).Text("No active products were available for this period.").FontColor(Colors.Grey.Darken1);
+            });
+            page.Footer().AlignCenter().Text(text => { text.Span("AyiyaPOS | Stock performance | Page "); text.CurrentPageNumber(); text.Span(" of "); text.TotalPages(); });
+        }));
+        var slug = title.StartsWith("Top", StringComparison.Ordinal) ? "Top_Performing_SKUs" : "Slow_Moving_SKUs";
+        return File(document.GeneratePdf(), "application/pdf", $"{slug}_{periodStart:yyyyMM}.pdf");
+    }
 
     private IActionResult ExportData<T>(IEnumerable<T> data, string format, string baseFileName)
     {
@@ -1430,6 +1662,20 @@ public enum LineStyle
 
 public record FinancialLine(string Label, decimal Amount, LineStyle Style);
 public record FinancialExpenseLine(string Category, string Name, decimal MonthlyAmount);
+
+public record MonthlyTrendPdfPoint(string Label, decimal Total);
+public record MonthlyInsightsPdfDto(
+    string Label,
+    DateTimeOffset PeriodStart,
+    DateTimeOffset PeriodEnd,
+    decimal TotalSales,
+    decimal Subtotal,
+    decimal Discounts,
+    decimal Tax,
+    int Transactions,
+    decimal PreviousSales,
+    IReadOnlyList<MonthlyTrendPdfPoint> Trend);
+public record SkuPerformancePdfRow(string Sku, string Name, decimal UnitsSold, decimal Revenue, decimal GrossProfit);
 
 public record MonthlySale(DateTime SaleDate, decimal Subtotal, decimal DiscountTotal, decimal TaxTotal, decimal Total);
 
