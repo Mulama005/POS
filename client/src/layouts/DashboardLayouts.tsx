@@ -222,7 +222,7 @@ const HOME_PATH: Record<UserRole, string> = {
   Technician: '/repairs',
 }
 
-function Sidebar({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
+function Sidebar({ expanded, mobileOpen, onToggle, onNavigate }: { expanded: boolean; mobileOpen: boolean; onToggle: () => void; onNavigate: () => void }) {
   const { user } = useAuth()
   const role: UserRole = user?.role ?? 'Cashier'
   const groups = NAV_BY_ROLE[role]
@@ -232,7 +232,7 @@ function Sidebar({ expanded, onToggle }: { expanded: boolean; onToggle: () => vo
     setCollapsedGroups((prev) => ({ ...prev, [label]: !prev[label] }))
 
   return (
-    <aside className={`sidebar ${expanded ? '' : 'collapsed'}`}>
+    <aside className={`sidebar ${expanded ? '' : 'collapsed'} ${mobileOpen ? 'mobile-open' : ''}`}>
       <NavLink to={HOME_PATH[role]} className="logo-link">
         <div className="logo-area">
           {/* Signature mark — a barcode rhythm in brass, not a generic
@@ -274,6 +274,7 @@ function Sidebar({ expanded, onToggle }: { expanded: boolean; onToggle: () => vo
                   <NavLink
                     key={item.id}
                     to={item.path}
+                    onClick={onNavigate}
                     title={!expanded ? item.label : undefined}
                     className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                   >
@@ -295,7 +296,7 @@ function Sidebar({ expanded, onToggle }: { expanded: boolean; onToggle: () => vo
   )
 }
 
-function TopBar() {
+function TopBar({ onMenuToggle }: { onMenuToggle: () => void }) {
   const { user, logout } = useAuth()
   const [registers, setRegisters] = useState<RegisterSummary[]>([])
 
@@ -324,8 +325,10 @@ function TopBar() {
     void logout()
   }
 
-  return (
-    <header className="topbar">
+    return (
+      <header className="topbar">
+      <button type="button" className="mobile-menu-btn" onClick={onMenuToggle} aria-label="Open navigation">☰</button>
+      <NavLink to={HOME_PATH[role]} className="topbar-brand">AyiyaPOS</NavLink>
       <div className="left">
         <div className="register-badge"><Icon name="monitor" size={13} /> {registerLabel}</div>
         <div className="online-badge"><span className="dot" /> Online</div>
@@ -349,11 +352,13 @@ function TopBar() {
 
 export function DashboardLayout() {
   const [sidebarExpanded, setSidebarExpanded] = useState(true)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   return (
     <div className="dashboard-layout">
-      <Sidebar expanded={sidebarExpanded} onToggle={() => setSidebarExpanded((v) => !v)} />
+      {mobileNavOpen && <button type="button" className="mobile-nav-backdrop" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} />}
+      <Sidebar expanded={sidebarExpanded} mobileOpen={mobileNavOpen} onNavigate={() => setMobileNavOpen(false)} onToggle={() => setSidebarExpanded((v) => !v)} />
       <div className="main">
-        <TopBar />
+        <TopBar onMenuToggle={() => setMobileNavOpen((open) => !open)} />
         <main className="page-content"><Outlet /></main>
       </div>
     </div>

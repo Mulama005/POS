@@ -282,6 +282,21 @@
 .trend-bar-wrap { display: flex; align-items: end; height: 190px; background: color-mix(in srgb, var(--pos-border) 35%, transparent); }
 .trend-bar { width: 100%; background: var(--pos-ink); min-height: 0; transition: height 180ms ease; }
 .trend-label { color: var(--pos-ink-muted); font: 11px var(--pos-font-mono); }
+.monthly-line-chart { padding: 22px 24px 14px; border: 1px solid var(--pos-border); background: var(--pos-shell-bg); }
+.monthly-line-chart__legend { display: flex; justify-content: space-between; align-items: center; gap: 16px; color: var(--pos-ink-muted); font: 11px var(--pos-font-mono); letter-spacing: .05em; text-transform: uppercase; }
+.monthly-line-chart__legend span { display: flex; align-items: center; gap: 8px; }
+.monthly-line-chart__legend i { display: inline-block; width: 12px; height: 12px; background: var(--pos-ink); }
+.monthly-line-chart__legend b { font-weight: 500; }
+.monthly-line-chart__scroll { margin-top: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.monthly-line-chart svg { display: block; width: 100%; min-width: 680px; height: auto; }
+.monthly-line-chart .chart-gridline { stroke: var(--pos-border); stroke-width: 1; }
+.monthly-line-chart .chart-gridline--vertical { stroke-opacity: .62; }
+.monthly-line-chart .chart-axis { stroke: var(--pos-ink-muted); stroke-width: 1.5; }
+.monthly-line-chart .monthly-sales-line { fill: none; stroke: var(--pos-ink); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.monthly-line-chart .monthly-sales-point { fill: var(--pos-shell-bg); stroke: var(--pos-ink); stroke-width: 3; }
+.monthly-line-chart .chart-axis-label { fill: var(--pos-ink-muted); font-family: var(--pos-font-mono); font-size: 11px; }
+.monthly-line-chart .chart-axis-label--y { text-anchor: end; }
+.monthly-line-chart .chart-axis-label--x { text-anchor: middle; }
 .report-tables { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px; }
 .report-breakdown h3 { margin-bottom: 20px; }
 .report-breakdown table { width: 100%; border-collapse: collapse; }
@@ -385,6 +400,7 @@
     .report-kpi, .report-kpi:not(:first-child) { border-right: 0; border-top: 1px solid var(--pos-border); padding: 24px 0; }
     .report-kpi:first-child { border-top: 0; }
     .trend-chart { grid-template-columns: repeat(12, 52px); }
+    .monthly-line-chart { padding: 18px 12px 10px; }
     .performance-grid, .performance-grid--two { grid-template-columns: 1fr; }
     .financial-metrics, .financial-metrics--three { grid-template-columns: 1fr; }
     .operating-cost-list { grid-template-columns: 1fr; }
