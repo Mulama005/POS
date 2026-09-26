@@ -89,7 +89,7 @@ export default function AuditLogPage() {
                 headers: { Authorization: `Bearer ${accessToken}` }, credentials: "include",
             });
             if (!response.ok) throw new Error("Failed to export audit log");
-            downloadBlob(await response.blob(), `AyiyaPOS-audit-log-${new Date().toISOString().slice(0, 10)}.pdf`);
+            downloadBlob(await response.blob(), `EddTechPOS-audit-log-${new Date().toISOString().slice(0, 10)}.pdf`);
             setExportNotice("Your audit PDF is downloading now.");
             window.setTimeout(() => setExportNotice(""), 4500);
         } catch (err) {

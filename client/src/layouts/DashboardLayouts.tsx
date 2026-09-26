@@ -250,7 +250,7 @@ function Sidebar({ expanded, mobileOpen, onToggle, onNavigate }: { expanded: boo
           </div>
           {expanded && (
             <div className="logo-text">
-              <div className="brand">AyiyaPOS</div>
+              <div className="brand">EddTechPOS</div>
             </div>
           )}
         </div>
@@ -328,7 +328,7 @@ function TopBar({ onMenuToggle }: { onMenuToggle: () => void }) {
     return (
       <header className="topbar">
       <button type="button" className="mobile-menu-btn" onClick={onMenuToggle} aria-label="Open navigation">☰</button>
-      <NavLink to={HOME_PATH[role]} className="topbar-brand">AyiyaPOS</NavLink>
+      <NavLink to={HOME_PATH[role]} className="topbar-brand">EddTechPOS</NavLink>
       <div className="left">
         <div className="register-badge"><Icon name="monitor" size={13} /> {registerLabel}</div>
         <div className="online-badge"><span className="dot" /> Online</div>

@@ -75,7 +75,7 @@ export function LoginPage() {
     <div className="login-screen">
       <div className="login-card">
         <div className="login-card__header">
-          <span className="login-wordmark">Ayiya<span className="login-wordmark__accent">POS</span></span>
+          <span className="login-wordmark">EddTech<span className="login-wordmark__accent">POS</span></span>
           <p className="login-tagline">Sign in to your till</p>
         </div>
 

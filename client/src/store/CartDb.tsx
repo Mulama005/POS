@@ -16,18 +16,48 @@ import type { Cart } from '../types/sale'
  */
 class CartDatabase extends Dexie {
   carts!: Table<Cart, string>
+  migrationState!: Table<{ key: string; value: string }, string>
 
   constructor() {
-    super('AyiyaPosCartDb')
+    super('EddTechPosCartDb')
     this.version(1).stores({
       // Indexed on registerId + status so "show this register's held sales" is a fast
       // lookup rather than a full-table scan as the held list grows over a shift.
       carts: 'id, registerId, status, updatedAt',
     })
+    this.version(2).stores({
+      carts: 'id, registerId, status, updatedAt',
+      migrationState: 'key',
+    })
   }
 }
 
 export const cartDb = new CartDatabase()
+
+// Bring forward saved carts from the previous database name before normal
+// cart operations begin. Keep the old database as a recovery copy.
+cartDb.on('ready', async (db) => {
+  const imported = await db.table<{ key: string; value: string }, string>('migrationState').get('legacy-cart-import')
+  if (imported) return
+
+  const oldDatabaseName = 'AyiyaPosCartDb'
+  const databaseList = await (indexedDB as IDBFactory & { databases?: () => Promise<Array<{ name?: string }>> }).databases?.()
+  if (databaseList && !databaseList.some((database) => database.name === oldDatabaseName)) {
+    await db.table('migrationState').put({ key: 'legacy-cart-import', value: 'not-present' })
+    return
+  }
+
+  const oldDatabase = new Dexie(oldDatabaseName)
+  oldDatabase.version(1).stores({ carts: 'id, registerId, status, updatedAt' })
+  try {
+    await oldDatabase.open()
+    const savedCarts = await oldDatabase.table<Cart, string>('carts').toArray()
+    if (savedCarts.length > 0) await db.table<Cart, string>('carts').bulkPut(savedCarts)
+    await db.table('migrationState').put({ key: 'legacy-cart-import', value: new Date().toISOString() })
+  } finally {
+    oldDatabase.close()
+  }
+})
 
 function nowIso(): string {
   return new Date().toISOString()
