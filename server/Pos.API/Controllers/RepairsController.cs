@@ -220,6 +220,107 @@ public sealed class RepairsController : ControllerBase
         return Ok(new { message = "Part consumed and inventory updated." });
     }
 
+    /// <summary>
+    /// Finalizes what the customer owes for this repair and charges it to their credit
+    /// ledger — the same CreditTransaction/Customer.CurrentCreditBalance mechanism
+    /// checkout's "pay on credit" and CustomersController use, so a repair's cost shows
+    /// up in the customer's one ledger rather than a parallel, repair-only balance.
+    /// Only callable once (see SetFinalCostRequest's doc comment).
+    /// </summary>
+    [HttpPut("{id:guid}/cost")]
+    public async Task<IActionResult> SetFinalCost(Guid id, [FromBody] SetFinalCostRequest request, CancellationToken cancellationToken)
+    {
+        if (request.FinalCost <= 0) return BadRequest("Final cost must be positive.");
+
+        var job = await _db.RepairJobs.FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
+        if (job is null) return NotFound();
+
+        var isManagerOrAdmin = User.IsInRole("Manager") || User.IsInRole("Admin");
+        var isAssignedTechnician = User.IsInRole("Technician") && job.AssignedTechnicianId == CurrentUserId;
+        if (!isManagerOrAdmin && !isAssignedTechnician) return Forbid();
+
+        if (job.FinalCost is not null)
+        {
+            return BadRequest("This repair's cost has already been finalized.");
+        }
+
+        var customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == job.CustomerId, cancellationToken);
+        if (customer is null) return NotFound("Customer record for this repair no longer exists.");
+
+        job.FinalCost = request.FinalCost;
+        job.UpdatedAt = DateTimeOffset.UtcNow;
+
+        customer.CurrentCreditBalance += request.FinalCost;
+        _db.CreditTransactions.Add(new CreditTransaction
+        {
+            Id = Guid.NewGuid(),
+            CustomerId = customer.Id,
+            Type = CreditTransactionType.CreditSale,
+            Amount = request.FinalCost,
+            Notes = $"Repair {job.TicketNumber} — {job.DeviceDescription}",
+            RecordedByUserId = CurrentUserId,
+            BalanceAfter = customer.CurrentCreditBalance,
+        });
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return Ok(new { message = "Cost finalized and charged to customer.", finalCost = job.FinalCost, customerBalance = customer.CurrentCreditBalance });
+    }
+
+    /// <summary>
+    /// Records money collected against an already-finalized repair — typically at
+    /// pickup, but nothing stops a partial payment earlier. Open to any authenticated
+    /// staff member (not just Manager/Admin/the assigned technician): a cashier at the
+    /// counter, not a technician, is who usually takes payment at collection time.
+    /// </summary>
+    [HttpPost("{id:guid}/payment")]
+    public async Task<IActionResult> RecordPayment(Guid id, [FromBody] RecordRepairPaymentRequest request, CancellationToken cancellationToken)
+    {
+        if (request.Amount <= 0) return BadRequest("Amount must be positive.");
+
+        var job = await _db.RepairJobs.FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
+        if (job is null) return NotFound();
+
+        if (job.FinalCost is null)
+        {
+            return BadRequest("Finalize this repair's cost before recording a payment.");
+        }
+
+        var customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == job.CustomerId, cancellationToken);
+        if (customer is null) return NotFound("Customer record for this repair no longer exists.");
+
+        job.AmountPaid += request.Amount;
+        job.UpdatedAt = DateTimeOffset.UtcNow;
+
+        customer.CurrentCreditBalance -= request.Amount;
+        // Not clamped at zero, same as CustomersController.RecordPayment — an
+        // overpayment is meaningful information (customer now in credit), not an error.
+
+        _db.CreditTransactions.Add(new CreditTransaction
+        {
+            Id = Guid.NewGuid(),
+            CustomerId = customer.Id,
+            Type = CreditTransactionType.Payment,
+            Amount = request.Amount,
+            PaymentMethod = request.PaymentMethod,
+            Notes = request.Notes is null
+                ? $"Repair {job.TicketNumber} payment"
+                : $"Repair {job.TicketNumber} payment — {request.Notes}",
+            RecordedByUserId = CurrentUserId,
+            BalanceAfter = customer.CurrentCreditBalance,
+        });
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            message = "Payment recorded.",
+            amountPaid = job.AmountPaid,
+            balance = job.FinalCost - job.AmountPaid,
+            customerBalance = customer.CurrentCreditBalance,
+        });
+    }
+
     // ---------- Step 31: Status interfaces ----------
 
     /// <summary>Technician's own queue — only jobs assigned to them. This is enforced by
@@ -231,7 +332,11 @@ public sealed class RepairsController : ControllerBase
         var jobs = await _db.RepairJobs
             .Where(r => r.AssignedTechnicianId == CurrentUserId && r.Status != RepairStatus.Collected)
             .OrderBy(r => r.CreatedAt)
-            .Select(r => new { r.Id, r.TicketNumber, r.DeviceDescription, r.ReportedFault, Status = r.Status.ToString(), r.CreatedAt })
+            .Select(r => new {
+                r.Id, r.TicketNumber, r.DeviceDescription, r.ReportedFault, Status = r.Status.ToString(), r.CreatedAt,
+                r.QuotedCost, r.FinalCost, r.AmountPaid,
+                Balance = r.FinalCost != null ? r.FinalCost - r.AmountPaid : (decimal?)null,
+            })
             .ToListAsync(cancellationToken);
 
         return Ok(jobs);
@@ -249,6 +354,8 @@ public sealed class RepairsController : ControllerBase
                 r.Id, r.TicketNumber, r.DeviceDescription, r.ReportedFault,
                 Status = r.Status.ToString(), r.AssignedTechnicianId, r.CreatedAt,
                 AssignedTechnicianName = _db.DomainUsers.Where(u => u.Id == r.AssignedTechnicianId).Select(u => u.FullName).FirstOrDefault(),
+                r.QuotedCost, r.FinalCost, r.AmountPaid,
+                Balance = r.FinalCost != null ? r.FinalCost - r.AmountPaid : (decimal?)null,
             })
             .ToListAsync(cancellationToken);
 
