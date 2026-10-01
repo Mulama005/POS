@@ -15,6 +15,9 @@ export interface Repair {
   deviceDescription: string
   reportedFault: string
   quotedCost: number | null
+  finalCost: number | null
+  amountPaid: number
+  balance: number | null
   assignedTechnicianId: string | null
   assignedTechnicianName?: string | null
   status: RepairStatus

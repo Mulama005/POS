@@ -27,6 +27,13 @@ public class RepairJob
     public decimal? QuotedCost { get; set; }
     public decimal? FinalCost { get; set; }
 
+    // Amount actually collected from the customer against FinalCost, via
+    // /api/repairs/{id}/payment. Kept here (rather than derived by summing
+    // CreditTransactions every read) so the repair list can show a balance
+    // without an extra join — the CreditTransaction rows remain the
+    // authoritative, auditable source of truth for the money itself.
+    public decimal AmountPaid { get; set; } = 0m;
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? UpdatedAt { get; set; }
     public DateTimeOffset? CollectedAt { get; set; }

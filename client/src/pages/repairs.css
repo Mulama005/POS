@@ -140,8 +140,9 @@
 }
 
 /* --- Buttons ----------------------------------------------------------
-   Primary = square ink. Quiet/danger variants are underline-only text
-   actions. */
+   Primary = square ink with a hard stamped shadow (see index.css's
+   --pos-stamp). Quiet is upgraded from a bare underline to a hollow
+   bordered box — real button weight, still no fill. */
 .service-button {
     font-family: var(--pos-font-body);
     font-size: 12px;
@@ -152,34 +153,42 @@
     background: var(--pos-ink);
     border: 1.5px solid var(--pos-ink);
     border-radius: 0;
-    padding: 14px 24px;
+    padding: 13px 24px;
     cursor: pointer;
-    transition: background 120ms ease, color 120ms ease;
+    box-shadow: var(--pos-stamp);
+    transform: translate(0, 0);
+    transition: transform 110ms ease, box-shadow 110ms ease, background 110ms ease, color 110ms ease, opacity 110ms ease;
 }
 
 .service-button:hover:not(:disabled) {
-    background: transparent;
-    color: var(--pos-ink);
+    transform: translate(-1px, -1px);
+    box-shadow: var(--pos-stamp-lifted);
+}
+.service-button:active:not(:disabled) {
+    transform: translate(2px, 2px);
+    box-shadow: none;
 }
 
 .service-button:disabled {
     opacity: 0.35;
     cursor: not-allowed;
+    box-shadow: none;
 }
 
-/* Quiet variant — bare underlined text action. */
+/* Quiet variant — now a hollow bordered box, not a bare underline. */
 .service-button--quiet {
     color: var(--pos-ink);
     background: transparent;
-    border: none;
-    border-bottom: 1.5px solid var(--pos-ink);
-    padding: 4px 0;
+    border: 1.5px solid var(--pos-ink);
+    padding: 11.5px 22px;
     border-radius: 0;
+    box-shadow: none;
+    transform: none;
 }
 .service-button--quiet:hover:not(:disabled) {
-    color: var(--pos-ink-muted);
-    border-bottom-color: var(--pos-ink-muted);
-    background: transparent;
+    background: var(--pos-accent-soft);
+    transform: none;
+    box-shadow: none;
 }
 
 /* Danger variant — bare underlined text in danger ink. */
@@ -242,6 +251,31 @@
     gap: 20px;
     align-items: end;
     margin-top: 20px;
+}
+
+/* --- Payment ------------------------------------------------------------
+   Sits below the assign row, separated by its own hairline so cost/payment
+   reads as a distinct concern from status/assignment. */
+.repair-item__payment {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--pos-border);
+}
+.repair-item__quoted-cost {
+    font-family: var(--pos-font-mono);
+    font-size: 13px;
+    color: var(--pos-ink-muted);
+    margin: 0 0 10px;
+}
+.repair-item__cost-summary {
+    font-family: var(--pos-font-mono);
+    font-size: 13.5px;
+    color: var(--pos-ink);
+    margin: 0 0 12px;
+}
+.service-alert--row {
+    margin: 10px 0 0;
+    font-size: 12.5px;
 }
 
 /* --- Status indicator -------------------------------------------------
@@ -348,7 +382,7 @@
 .customer-select:hover,
 .customer-select--active {
     border-color: var(--pos-border);
-    background: transparent;
+    background: var(--pos-accent-soft);
     padding-left: 8px;
     color: var(--pos-ink);
 }
