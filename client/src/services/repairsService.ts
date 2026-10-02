@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient'
+import type { RepairReceiptDto } from '../utils/receiptBuilders'
 import type { Customer, LedgerEntry, PublicRepairStatus, Repair, RepairStatus, TechnicianSummary } from '../types/phase6'
 
 export const listCustomers = async () => (await apiClient.get<Customer[]>('/api/customers')).data
@@ -26,3 +27,5 @@ export const recordRepairPayment = (id: string, amount: number, paymentMethod: s
 export const listTechnicians = async () => (await apiClient.get<TechnicianSummary[]>('/api/staff/technicians')).data
 export const trackRepair = async (ticketNumber: string, phoneLast4: string) =>
   (await apiClient.get<PublicRepairStatus>(`/api/repairs/track/${encodeURIComponent(ticketNumber)}`, { params: { phoneLast4 } })).data
+export const getRepairReceipt = async (id: string) =>
+  (await apiClient.get<RepairReceiptDto>(`/api/repairs/${id}/receipt`)).data

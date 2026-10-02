@@ -1,9 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { isAxiosError } from 'axios'
 import { useAuth } from '../hooks/useAuth'
 import {
   assignRepair,
   createRepair,
+  getRepairReceipt,
   listCustomers,
   listRepairs,
   listTechnicians,
@@ -12,6 +13,10 @@ import {
   setRepairFinalCost,
   updateRepairStatus,
 } from '../services/repairsService'
+import { ReceiptPreview, type ReceiptData } from '../components/receipt/ReceiptSheet'
+import { buildRepairReceipt } from '../utils/receiptBuilders'
+import { MpesaWaitingModal } from '../components/MpesaWaitingModal'
+import { getRepairPaymentStatus, initiateRepairMpesaPayment } from '../services/mpesaService'
 import type { Customer, Repair, RepairStatus, TechnicianSummary } from '../types/phase6'
 import './repairs.css'
 
@@ -40,6 +45,9 @@ export function RepairsPage() {
   const [costInputs, setCostInputs] = useState<Record<string, string>>({})
   const [paymentAmounts, setPaymentAmounts] = useState<Record<string, string>>({})
   const [paymentMethods, setPaymentMethods] = useState<Record<string, string>>({})
+  const [mpesaTarget, setMpesaTarget] = useState<{ repair: Repair; amount: number } | null>(null)
+  const [receiptView, setReceiptView] = useState<ReceiptData | null>(null)
+  const mpesaPaymentId = useRef<string | null>(null)
   const [rowError, setRowError] = useState<Record<string, string>>({})
 
   const canManage = user?.role === 'Admin' || user?.role === 'Manager'
@@ -125,6 +133,14 @@ export function RepairsPage() {
     }
   }
 
+  const openReceipt = async (repairId: string) => {
+    try {
+      setReceiptView(buildRepairReceipt(await getRepairReceipt(repairId)))
+    } catch (e) {
+      setRowError((prev) => ({ ...prev, [repairId]: errorText(e) }))
+    }
+  }
+
   const takePayment = async (repair: Repair) => {
     const raw = paymentAmounts[repair.id]
     const amount = Number(raw)
@@ -133,6 +149,11 @@ export function RepairsPage() {
       return
     }
     setRowError((prev) => ({ ...prev, [repair.id]: '' }))
+    if ((paymentMethods[repair.id] ?? PAYMENT_METHODS[0]) === 'M-Pesa') {
+      // Real STK Push: the balance only changes once Safaricom confirms (server-side).
+      setMpesaTarget({ repair, amount: Math.round(amount) })
+      return
+    }
     setBusy(true)
     try {
       await recordRepairPayment(repair.id, amount, paymentMethods[repair.id] ?? PAYMENT_METHODS[0])
@@ -294,6 +315,9 @@ export function RepairsPage() {
                           )}
                         </>
                       )}
+                      <button className="service-button service-button--quiet" onClick={() => void openReceipt(repair.id)}>
+                        {repair.finalCost === null ? 'Print intake slip' : 'Receipt'}
+                      </button>
                       {rowError[repair.id] && <p className="service-alert service-alert--row">{rowError[repair.id]}</p>}
                     </div>
                   </article>
@@ -303,6 +327,37 @@ export function RepairsPage() {
           </div>
         </section>
       </div>
+
+      {receiptView && (
+        <div className="rcpt-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="rcpt-modal">
+            <ReceiptPreview data={receiptView} />
+            <button type="button" className="rcpt-close-btn" onClick={() => setReceiptView(null)}>Close</button>
+          </div>
+        </div>
+      )}
+
+      {mpesaTarget && (
+        <MpesaWaitingModal
+          key={mpesaTarget.repair.id}
+          amount={mpesaTarget.amount}
+          initiate={async (phone) => {
+            const res = await initiateRepairMpesaPayment(mpesaTarget.repair.id, mpesaTarget.amount, phone)
+            mpesaPaymentId.current = res.paymentId
+          }}
+          checkStatus={() => getRepairPaymentStatus(mpesaTarget.repair.id, mpesaPaymentId.current!)}
+          failureNote="No money was recorded against this repair. Retry, or take the payment another way."
+          onResolved={(finalStatus) => {
+            setMpesaTarget(null)
+            mpesaPaymentId.current = null
+            if (finalStatus === 'Success') {
+              setPaymentAmounts((prev) => ({ ...prev, [mpesaTarget.repair.id]: '' }))
+              void openReceipt(mpesaTarget.repair.id)
+            }
+            void load()
+          }}
+        />
+      )}
     </main>
   )
 }

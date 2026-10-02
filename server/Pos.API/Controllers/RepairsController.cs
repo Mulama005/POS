@@ -321,6 +321,57 @@ public sealed class RepairsController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Everything needed to print a repair receipt (or the intake slip, while the cost
+    /// is still unfinalized). Payments are read from the customer's CreditTransaction
+    /// ledger - the authoritative record - filtered to entries written for this ticket.
+    /// </summary>
+    [HttpGet("{id:guid}/receipt")]
+    public async Task<IActionResult> GetReceipt(Guid id, CancellationToken cancellationToken)
+    {
+        var job = await _db.RepairJobs.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
+        if (job is null) return NotFound();
+
+        var customer = await _db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == job.CustomerId, cancellationToken);
+
+        // Both payment paths (manual + M-Pesa callback) write Notes starting with this prefix.
+        var prefix = $"Repair {job.TicketNumber} payment";
+        var rows = await _db.CreditTransactions.AsNoTracking()
+            .Where(t => t.CustomerId == job.CustomerId
+                        && t.Type == CreditTransactionType.Payment
+                        && t.Notes != null && t.Notes.StartsWith(prefix))
+            .OrderBy(t => t.Timestamp)
+            .Select(t => new { t.Timestamp, t.PaymentMethod, t.Amount, t.Notes })
+            .ToListAsync(cancellationToken);
+
+        var payments = rows.Select(t =>
+        {
+            // The M-Pesa callback writes "... - M-Pesa <RECEIPT>"; surface just the code.
+            string? reference = null;
+            var marker = "M-Pesa ";
+            var at = t.Notes!.LastIndexOf(marker, StringComparison.Ordinal);
+            if (at >= 0) reference = t.Notes[(at + marker.Length)..].Trim();
+            return new { timestamp = t.Timestamp, method = t.PaymentMethod, amount = t.Amount, reference };
+        }).ToList();
+
+        return Ok(new
+        {
+            job.TicketNumber,
+            job.CreatedAt,
+            job.CollectedAt,
+            Status = job.Status.ToString(),
+            CustomerName = customer?.FullName ?? "Customer",
+            CustomerPhone = customer?.Phone,
+            job.DeviceDescription,
+            job.ReportedFault,
+            job.QuotedCost,
+            job.FinalCost,
+            job.AmountPaid,
+            Balance = job.FinalCost != null ? job.FinalCost - job.AmountPaid : (decimal?)null,
+            Payments = payments,
+        });
+    }
+
     // ---------- Step 31: Status interfaces ----------
 
     /// <summary>Technician's own queue — only jobs assigned to them. This is enforced by

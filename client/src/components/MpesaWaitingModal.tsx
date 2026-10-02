@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { getPaymentStatus, initiateMpesaPayment, type MpesaPaymentStatus } from '../services/mpesaService'
-import type { PaymentResult } from '../types/sale'
+import type { MpesaPaymentStatus } from '../services/mpesaService'
 import { formatKes } from '../utils/currency'
 import './MpesaWaitingModal.css'
 
 interface MpesaWaitingModalProps {
-  saleId: string
-  payment: PaymentResult
+  /** Amount shown to the cashier (what the customer will be prompted for). */
+  amount: number
+  /** Sends the STK Push prompt to this phone number. Throw on failure. */
+  initiate: (phoneNumber: string) => Promise<unknown>
+  /** Polled for the payment's current state while waiting. */
+  checkStatus: () => Promise<MpesaPaymentStatus>
+  /** Shown on the failed/timed-out screen. Defaults to the retail-sale wording. */
+  failureNote?: string
   /** When more than one M-Pesa line is queued on this sale, e.g. "1 of 2" — omitted
    * (both undefined) when there's only a single M-Pesa payment on the sale. */
   queuePosition?: number
@@ -62,7 +67,7 @@ function XIcon() {
  * follow-up (collect cash directly, reconcile later); it isn't silently converted to
  * anything here.
  */
-export function MpesaWaitingModal({ saleId, payment, queuePosition, queueTotal, onResolved }: MpesaWaitingModalProps) {
+export function MpesaWaitingModal({ amount, initiate, checkStatus, failureNote, queuePosition, queueTotal, onResolved }: MpesaWaitingModalProps) {
   const [phoneNumber, setPhoneNumber] = useState('')
   const [stage, setStage] = useState<Stage>('entering-phone')
   const [status, setStatus] = useState<MpesaPaymentStatus['status']>('Pending')
@@ -86,13 +91,13 @@ export function MpesaWaitingModal({ saleId, payment, queuePosition, queueTotal, 
     setErrorMessage(null)
     setSubmitting(true)
     try {
-      await initiateMpesaPayment(saleId, payment.paymentId, phone)
+      await initiate(phone)
       setStage('waiting')
       setStatus('Pending')
       setSecondsLeft(TIMEOUT_SECONDS)
 
       pollTimer.current = setInterval(() => {
-        getPaymentStatus(saleId, payment.paymentId)
+        checkStatus()
           .then((result) => {
             if (result.status !== 'Pending') {
               stopTimers()
@@ -150,7 +155,7 @@ export function MpesaWaitingModal({ saleId, payment, queuePosition, queueTotal, 
             <span className="pos-badge pos-badge--neutral">Payment {queuePosition} of {queueTotal}</span>
           )}
         </div>
-        <p className="mpesa-modal-amount">{formatKes(payment.amount)}</p>
+        <p className="mpesa-modal-amount">{formatKes(amount)}</p>
 
         {stage === 'entering-phone' && (
           <form onSubmit={handleSubmitPhone}>
@@ -219,9 +224,8 @@ export function MpesaWaitingModal({ saleId, payment, queuePosition, queueTotal, 
                 : 'The payment was not completed (declined or cancelled).'}
             </p>
             <p className="mpesa-modal-note">
-              This sale is already recorded. If you don't retry successfully, collect payment manually
-              and reconcile it outside the system for now — there's no automatic "switch payment
-              method" yet.
+              {failureNote ??
+                "This sale is already recorded. If you don't retry successfully, collect payment manually and reconcile it outside the system for now — there's no automatic \"switch payment method\" yet."}
             </p>
             <div className="mpesa-modal-actions mpesa-modal-actions--split">
               <button type="button" className="mpesa-modal-secondary-btn" onClick={handleRetry}>
