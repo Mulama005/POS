@@ -26,3 +26,21 @@ export async function getPaymentStatus(saleId: string, paymentId: string): Promi
   const { data } = await apiClient.get<MpesaPaymentStatus>(`/api/sales/${saleId}/payments/${paymentId}`)
   return data
 }
+
+/** Repair-balance variant: STK Push for an amount against a repair's outstanding balance. */
+export async function initiateRepairMpesaPayment(
+  repairId: string,
+  amount: number,
+  phoneNumber: string,
+): Promise<{ paymentId: string; checkoutRequestId: string }> {
+  const { data } = await apiClient.post<{ paymentId: string; checkoutRequestId: string }>(
+    `/api/repairs/${repairId}/payments/mpesa/initiate`,
+    { amount, phoneNumber },
+  )
+  return data
+}
+
+export async function getRepairPaymentStatus(repairId: string, paymentId: string): Promise<MpesaPaymentStatus> {
+  const { data } = await apiClient.get<MpesaPaymentStatus>(`/api/repairs/${repairId}/payments/mpesa/${paymentId}`)
+  return data
+}

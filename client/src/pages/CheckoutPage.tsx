@@ -1,4 +1,5 @@
-import { QRCodeSVG } from 'qrcode.react'
+import { ReceiptPreview } from '../components/receipt/ReceiptSheet'
+import { buildSaleReceipt } from '../utils/receiptBuilders'
 import { useCallback, useEffect, useState } from 'react'
 import { isAxiosError } from 'axios'
 import { useAuth } from '../hooks/useAuth'
@@ -19,6 +20,7 @@ import { CartPanel } from '../components/CartPanel'
 import { HeldSalesList } from '../components/HeldSalesList'
 import { PaymentModal } from '../components/PaymentModal'
 import { MpesaWaitingModal } from '../components/MpesaWaitingModal'
+import { getPaymentStatus, initiateMpesaPayment } from '../services/mpesaService'
 import { DiscountApprovalModal } from '../components/DiscountApprovalModal'
 import { TillOpenModal } from '../components/TillOpenModal'
 import { TillCloseModal } from '../components/TillCloseModal'
@@ -443,11 +445,35 @@ export function CheckoutPage() {
 
       {receipt && mpesaQueue.length > 0 && (
         <MpesaWaitingModal
-          saleId={receipt.saleId}
-          payment={mpesaQueue[0]}
+          key={mpesaQueue[0].paymentId}
+          amount={mpesaQueue[0].amount}
+          initiate={(phone) => initiateMpesaPayment(receipt.saleId, mpesaQueue[0].paymentId, phone)}
+          checkStatus={() => getPaymentStatus(receipt.saleId, mpesaQueue[0].paymentId)}
           queuePosition={mpesaQueueTotal - mpesaQueue.length + 1}
           queueTotal={mpesaQueueTotal}
-          onResolved={() => setMpesaQueue((q) => q.slice(1))}
+          onResolved={(finalStatus) => {
+            const paymentId = mpesaQueue[0].paymentId
+            // Reflect the real outcome (and M-Pesa receipt ref) on the printed receipt.
+            void getPaymentStatus(receipt.saleId, paymentId)
+              .then((latest) =>
+                setReceipt((r) =>
+                  r && {
+                    ...r,
+                    payments: r.payments.map((p) =>
+                      p.paymentId === paymentId
+                        ? { ...p, status: latest.status, externalReference: latest.externalReference }
+                        : p,
+                    ),
+                  },
+                ),
+              )
+              .catch(() =>
+                setReceipt((r) =>
+                  r && { ...r, payments: r.payments.map((p) => (p.paymentId === paymentId ? { ...p, status: finalStatus } : p)) },
+                ),
+              )
+            setMpesaQueue((q) => q.slice(1))
+          }}
         />
       )}
 
@@ -456,64 +482,12 @@ export function CheckoutPage() {
           <div className="checkout-modal">
             <h2>Sale complete</h2>
 
-            {receipt.pending ? (
-              <p className="checkout-modal__offline-notice">
-                Saved on this register — no connection right now. It'll sync automatically once back online.
-              </p>
-            ) : (
-              <p className="checkout-modal__subtitle">eTIMS submission successful</p>
-            )}
-
-            <p className="checkout-modal__subtitle">
-              Total: {receipt.total.toFixed(2)} KES
-            </p>
-
-            <ul className="receipt-items">
-              {receipt.items.map((item) => (
-                <li key={item.productId}>
-                  {item.quantity} × {item.productName} — {item.lineTotal.toFixed(2)}
-                </li>
-              ))}
-            </ul>
-
-            {!receipt.pending && receipt.etimsSubmitted && (
-              <div className="receipt-etims">
-                <h3>eTIMS receipt</h3>
-
-                <div className="receipt-etims__fields">
-                  {receipt.etimsInvoiceNumber && (
-                    <p><strong>Invoice no.</strong><span>{receipt.etimsInvoiceNumber}</span></p>
-                  )}
-                  {receipt.etimsReceiptNumber !== null && (
-                    <p><strong>Receipt no.</strong><span>{receipt.etimsReceiptNumber}</span></p>
-                  )}
-                  {receipt.etimsSdcId && (
-                    <p><strong>SDC ID</strong><span>{receipt.etimsSdcId}</span></p>
-                  )}
-                  {receipt.etimsMrcNo && (
-                    <p><strong>MRC no.</strong><span>{receipt.etimsMrcNo}</span></p>
-                  )}
-                  {receipt.etimsReceiptPublishedDate && (
-                    <p><strong>Published</strong><span>{new Date(receipt.etimsReceiptPublishedDate).toLocaleString()}</span></p>
-                  )}
-                  {receipt.etimsResultCode && (
-                    <p><strong>eTIMS result</strong><span>{receipt.etimsResultCode}</span></p>
-                  )}
-                </div>
-
-                {receipt.etimsQrCodeData && (
-                  <div className="receipt-etims__qr">
-                    <QRCodeSVG
-                      value={receipt.etimsQrCodeData}
-                      size={168}
-                      level="M"
-                      marginSize={4}
-                    />
-                    <p className="receipt-etims__qr-hint">Scan to verify with KRA eTIMS</p>
-                  </div>
-                )}
-              </div>
-            )}
+            <ReceiptPreview
+              data={buildSaleReceipt(receipt, {
+                cashierName: user?.fullName,
+                registerName: selectedRegister?.name,
+              })}
+            />
 
             <div className="checkout-modal__actions">
               <button type="button" onClick={() => setReceipt(null)}>

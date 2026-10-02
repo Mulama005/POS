@@ -33,6 +33,7 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<RepairJob> RepairJobs => Set<RepairJob>();
+    public DbSet<RepairPayment> RepairPayments => Set<RepairPayment>();
     public DbSet<RepairStatusHistory> RepairStatusHistories => Set<RepairStatusHistory>();
     public DbSet<RepairPartUsed> RepairPartsUsed => Set<RepairPartUsed>();
     public DbSet<CreditTransaction> CreditTransactions => Set<CreditTransaction>();
@@ -232,6 +233,19 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
                 .WithMany()
                 .HasForeignKey(x => x.StockUnitId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ---------- RepairPayment (M-Pesa attempts against a repair balance) ----------
+        modelBuilder.Entity<RepairPayment>(e =>
+        {
+            e.Property(x => x.Amount).HasColumnType("decimal(18,2)");
+            e.Property(x => x.Status);
+            e.Property(x => x.CheckoutRequestId).HasMaxLength(100);
+            e.Property(x => x.MpesaReceiptNumber).HasMaxLength(50);
+            e.Property(x => x.PhoneNumber).HasMaxLength(20);
+            e.HasIndex(x => x.CheckoutRequestId);
+            e.HasIndex(x => x.RepairJobId);
+            e.HasOne(x => x.RepairJob).WithMany().HasForeignKey(x => x.RepairJobId).OnDelete(DeleteBehavior.Restrict);
         });
 
         // ---------- Payment ----------
