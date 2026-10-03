@@ -27,13 +27,13 @@ export function buildProvisionalReceipt(
     total: totals.total,
     status: 'PendingSync',
 
-    items: breakdowns.map(({ line, finalLineAmount, lineTax }) => ({
+    items: breakdowns.map(({ line, rawAmount, lineDiscount, finalLineAmount, lineTax }) => ({
       productId: line.product.id,
       productName: line.product.name,
       unitId: line.unitId,
       quantity: line.quantity,
-      unitPrice: line.product.salePrice,
-      discountAmount: line.discountAmount,
+      unitPrice: rawAmount / line.quantity,
+      discountAmount: lineDiscount,
       taxAmount: lineTax,
       lineTotal: finalLineAmount,
     })),

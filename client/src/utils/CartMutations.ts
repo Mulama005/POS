@@ -41,6 +41,18 @@ export function updateLineDiscount(cart: Cart, lineId: string, discountAmount: n
   }
 }
 
+/** Sets the negotiated unit price for a line; null (or the list price) clears the override. */
+export function updateLinePrice(cart: Cart, lineId: string, price: number | null): Cart {
+  return {
+    ...cart,
+    lines: cart.lines.map((l) => {
+      if (l.lineId !== lineId) return l
+      const clear = price === null || !(price > 0) || price === l.product.salePrice
+      return { ...l, overrideUnitPrice: clear ? null : Math.round(price * 100) / 100 }
+    }),
+  }
+}
+
 export function removeLine(cart: Cart, lineId: string): Cart {
   return { ...cart, lines: cart.lines.filter((l) => l.lineId !== lineId) }
 }

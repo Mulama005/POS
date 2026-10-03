@@ -906,3 +906,6 @@
         font-size: 56px;
     }
 }
+/* Editable per-line price */
+.cart-line__price input { width: 110px; }
+.cart-line__price { text-transform: none; letter-spacing: 0.04em; }

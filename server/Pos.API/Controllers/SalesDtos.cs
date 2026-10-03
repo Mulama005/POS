@@ -13,7 +13,11 @@ public sealed record SaleItemRequest(
     int Quantity,
     /// <summary>Manager-applied markdown on this specific line, in KES. Server-validated —
     /// never trust a client-submitted price directly.</summary>
-    decimal DiscountAmount);
+    decimal DiscountAmount,
+    /// <summary>Negotiated unit price for this line (VAT-inclusive, like SalePrice). Null = list
+    /// price. Below list it is recorded as a discount (and counts toward the approval
+    /// threshold); above list it becomes the line's UnitPrice. Never below the product's cost.</summary>
+    decimal? OverrideUnitPrice = null);
 
 public sealed record PaymentRequest(
     /// <summary>"Cash", "Mpesa", or "Card" — see PaymentMethod. "Credit" (Deni) is rejected

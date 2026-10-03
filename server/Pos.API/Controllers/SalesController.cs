@@ -248,6 +248,10 @@ public sealed class SalesController : ControllerBase
             {
                 return BadRequest($"Discount cannot be negative for product {item.ProductId}.");
             }
+            if (item.OverrideUnitPrice is <= 0)
+            {
+                return BadRequest($"Price must be greater than zero for product {item.ProductId}.");
+            }
 
             // Serialized products (phones, and anything else in a category with
             // RequiresSerialTracking = true) are each an individually identified unit —
@@ -284,18 +288,33 @@ public sealed class SalesController : ControllerBase
         }
 
         // --- Pricing: server is the sole source of truth for price and tax. ---
-        var lines = new List<(SaleItemRequest Request, Product Product, decimal RawAmount, decimal AfterLineDiscount)>();
+        var lines = new List<(SaleItemRequest Request, Product Product, decimal UnitBase, decimal RawAmount, decimal AfterLineDiscount)>();
+        var priceOverrides = new List<string>();
         decimal rawSubtotal = 0m;
         decimal afterLineDiscountsTotal = 0m;
 
         foreach (var item in request.Items)
         {
             var product = products[item.ProductId];
-            var rawAmount = product.SalePrice * item.Quantity;
-            var lineDiscount = Math.Min(item.DiscountAmount, rawAmount); // can't discount below zero
+            // Price override: the cashier may agree a different unit price than the list price.
+            // Higher than list -> that price is the line's UnitPrice. Lower than list -> UnitPrice
+            // stays at list and the difference is a markdown, so it flows through the existing
+            // discount threshold/approval, eTIMS discount fields and reports unchanged.
+            var agreedUnitPrice = item.OverrideUnitPrice is { } ov
+                ? Math.Round(ov, 2, MidpointRounding.AwayFromZero)
+                : product.SalePrice;
+            var unitBase = Math.Max(agreedUnitPrice, product.SalePrice);
+            var markdown = Math.Max(0m, product.SalePrice - agreedUnitPrice) * item.Quantity;
+            if (agreedUnitPrice != product.SalePrice)
+            {
+                priceOverrides.Add($"{product.Sku}: list {product.SalePrice:F2} -> agreed {agreedUnitPrice:F2} x{item.Quantity}");
+            }
+
+            var rawAmount = unitBase * item.Quantity;
+            var lineDiscount = Math.Min(item.DiscountAmount + markdown, rawAmount); // can't discount below zero
             var afterLineDiscount = rawAmount - lineDiscount;
 
-            lines.Add((item, product, rawAmount, afterLineDiscount));
+            lines.Add((item, product, unitBase, rawAmount, afterLineDiscount));
             rawSubtotal += rawAmount;
             afterLineDiscountsTotal += afterLineDiscount;
         }
@@ -329,12 +348,24 @@ public sealed class SalesController : ControllerBase
         var saleItems = new List<SaleItem>();
         var itemResponses = new List<SaleItemResponse>();
 
-        foreach (var (itemRequest, product, rawAmount, afterLineDiscount) in lines)
+        foreach (var (itemRequest, product, unitBase, rawAmount, afterLineDiscount) in lines)
         {
             var shareOfCartDiscount = afterLineDiscountsTotal > 0
                 ? cartDiscount * (afterLineDiscount / afterLineDiscountsTotal)
                 : 0m;
             var finalLineAmount = Math.Round(afterLineDiscount - shareOfCartDiscount, 2, MidpointRounding.AwayFromZero);
+
+            // Hard floor: after every discount and override, a unit may never sell below cost.
+            // The message deliberately doesn't state the cost price (cashiers shouldn't see it).
+            if (product.CostPrice > 0 && finalLineAmount < product.CostPrice * itemRequest.Quantity)
+            {
+                return BadRequest(new
+                {
+                    message = $"'{product.Name}' can't be sold at this price - it is below the minimum allowed. " +
+                              "Raise the price or reduce the discount.",
+                    productId = product.Id,
+                });
+            }
 
             var lineTax = product.TaxClass == TaxClass.Standard
                 ? Math.Round(finalLineAmount - (finalLineAmount / (1 + StandardVatRate)), 2, MidpointRounding.AwayFromZero)
@@ -369,7 +400,7 @@ public sealed class SalesController : ControllerBase
 
                 unitToSell.Status = "Sold";
                 unitToSell.SaleDate = DateTime.UtcNow;
-                unitToSell.SalePrice = product.SalePrice;
+                unitToSell.SalePrice = finalLineAmount; // serialized lines are qty 1
                 consumedStockUnitId = unitToSell.Id;
             }
             else
@@ -382,7 +413,7 @@ public sealed class SalesController : ControllerBase
                 ProductId = product.Id,
                 StockUnitId = consumedStockUnitId,
                 Quantity = itemRequest.Quantity,
-                UnitPrice = product.SalePrice,
+                UnitPrice = unitBase,
                 DiscountAmount = totalLineDiscount,
                 TaxAmount = lineTax,
                 LineTotal = finalLineAmount,
@@ -391,7 +422,7 @@ public sealed class SalesController : ControllerBase
 
             itemResponses.Add(new SaleItemResponse(
                 product.Id, product.Name, consumedStockUnitId, itemRequest.Quantity,
-                product.SalePrice, totalLineDiscount, lineTax, finalLineAmount));
+                unitBase, totalLineDiscount, lineTax, finalLineAmount));
 
             saleTaxTotal += lineTax;
             saleTotal += finalLineAmount;
@@ -461,6 +492,16 @@ public sealed class SalesController : ControllerBase
             details: $"Discount of {totalDiscount/rawSubtotal}% applied to sale {sale.Id} by {discountApprovedByUserId}, amount: {totalDiscount}"
         );
         
+        if (priceOverrides.Count > 0)
+        {
+            await _auditService.LogAsync(
+                userId: cashierId,
+                actionType: "PRICE_OVERRIDE",
+                entityName: "Sale",
+                entityId: sale.Id,
+                details: $"Price override on sale {sale.Id}: {string.Join("; ", priceOverrides)}");
+        }
+
         sale.Items = saleItems;
         foreach (var item in saleItems)
         {

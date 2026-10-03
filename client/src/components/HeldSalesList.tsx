@@ -1,5 +1,6 @@
 import type { Cart } from '../types/sale'
 import { formatKes } from '../utils/currency'
+import { linePricing } from '../utils/CartMath'
 
 interface HeldSalesListProps {
   heldCarts: Cart[]
@@ -8,7 +9,7 @@ interface HeldSalesListProps {
 }
 
 function cartTotalPreview(cart: Cart): number {
-  return cart.lines.reduce((sum, l) => sum + l.product.salePrice * l.quantity - l.discountAmount, 0)
+  return cart.lines.reduce((sum, l) => sum + linePricing(l).unitBase * l.quantity - l.discountAmount - linePricing(l).markdownPerUnit * l.quantity, 0)
 }
 
 export function HeldSalesList({ heldCarts, onResume, onDiscard }: HeldSalesListProps) {
