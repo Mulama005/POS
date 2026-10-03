@@ -13,6 +13,7 @@ import type { Category, Product, ProductFormValues, TaxClass } from '../types/pr
 import type { ApiErrorBody } from '../types/auth'
 import { formatKes } from '../utils/currency'
 import { RoleGate } from '../components/RouteGuards'
+import { useFeatures } from '../hooks/useFeatures'
 import { EtimsClassificationPicker, type EtimsPickerTarget } from '../components/EtimsClassificationPicker'
 import './ProductsPage.css'
 
@@ -78,6 +79,7 @@ export function ProductsPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
+  const { etimsEnabled } = useFeatures()
   const [etimsFilter, setEtimsFilter] = useState<EtimsFilter>('all')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [pickerTargets, setPickerTargets] = useState<EtimsPickerTarget[] | null>(null)
@@ -404,6 +406,7 @@ export function ProductsPage() {
             setSearch(e.target.value)
           }}
         />
+        {etimsEnabled && (
         <div className="products-etims-filter" role="group" aria-label="Filter by eTIMS classification">
           {(['all', 'classified', 'unclassified'] as const).map((f) => (
             <button
@@ -419,6 +422,7 @@ export function ProductsPage() {
             </button>
           ))}
         </div>
+        )}
       </div>
 
       {loading && <p className="products-hint">Loading products…</p>}
@@ -427,7 +431,7 @@ export function ProductsPage() {
       {!loading && !loadError && (
         <>
           <RoleGate roles={['Manager', 'Admin']}>
-            {selectedIds.size > 0 && (
+            {etimsEnabled && selectedIds.size > 0 && (
               <div className="products-selection-bar">
                 <span>{selectedIds.size} product{selectedIds.size === 1 ? '' : 's'} selected</span>
                 <div className="products-selection-bar-actions">
@@ -458,7 +462,7 @@ export function ProductsPage() {
           <table className="products-table">
             <thead>
               <tr>
-                <RoleGate roles={['Manager', 'Admin']}>
+                {etimsEnabled && <RoleGate roles={['Manager', 'Admin']}>
                   <th className="products-col-checkbox">
                     <input
                       type="checkbox"
@@ -467,21 +471,21 @@ export function ProductsPage() {
                       aria-label="Select all products on this page"
                     />
                   </th>
-                </RoleGate>
+                </RoleGate>}
                 <th>SKU</th>
                 <th>Name</th>
                 <th>Category</th>
                 <th>Price</th>
                 <th>Tax</th>
                 <th>Stock</th>
-                <th>eTIMS</th>
+                {etimsEnabled && <th>eTIMS</th>}
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {products.map((p) => (
                 <tr key={p.id} className={p.isActive ? '' : 'products-row--inactive'}>
-                  <RoleGate roles={['Manager', 'Admin']}>
+                  {etimsEnabled && <RoleGate roles={['Manager', 'Admin']}>
                     <td className="products-col-checkbox">
                       <input
                         type="checkbox"
@@ -490,7 +494,7 @@ export function ProductsPage() {
                         aria-label={`Select ${p.name}`}
                       />
                     </td>
-                  </RoleGate>
+                  </RoleGate>}
                   <td>{p.sku}</td>
                   <td>{p.name}</td>
                   <td>{p.categoryName}</td>
@@ -499,6 +503,7 @@ export function ProductsPage() {
                   <td className={`products-col-stock ${p.stockCount <= p.reorderThreshold ? 'products-stock--low' : ''}`}>
                     {p.stockCount}
                   </td>
+                  {etimsEnabled && (
                   <td className="products-col-etims">
                     {getEtimsStatus(p) === 'registered' ? (
                       <span className="pos-badge pos-badge--success" title={`Item code ${p.etimsItemCode}`}>
@@ -512,10 +517,13 @@ export function ProductsPage() {
                       <span className="pos-badge pos-badge--neutral">Unclassified</span>
                     )}
                   </td>
+                  )}
                   <td className="products-row-actions">
                     <button type="button" onClick={() => openEditForm(p)} disabled={rowBusy[p.id]}>
                       Edit
                     </button>
+                    {etimsEnabled && (
+                      <>
                     <RoleGate roles={['Manager', 'Admin']}>
                       <button type="button" onClick={() => openPickerForProduct(p)} disabled={rowBusy[p.id]}>
                         {p.etimsItemClassificationCode ? 'Reclassify' : 'Classify'}
@@ -528,6 +536,8 @@ export function ProductsPage() {
                         </button>
                       )}
                     </RoleGate>
+                      </>
+                    )}
                     <Link to={`/stock/receive?productId=${p.id}`} className="products-receive-link">
                       Receive stock →
                     </Link>
@@ -567,7 +577,7 @@ export function ProductsPage() {
         </>
       )}
 
-      {pickerTargets && (
+      {etimsEnabled && pickerTargets && (
         <EtimsClassificationPicker
           products={pickerTargets}
           onClose={closePicker}

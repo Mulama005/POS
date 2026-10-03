@@ -16,6 +16,14 @@ public sealed class EtimsOptions
     public const string SectionName = "Etims";
 
     /// <summary>
+    /// Master switch. When false (the default) checkout does not require products to be
+    /// registered with eTIMS, no invoice is submitted to the VSCU, receipts carry no KRA
+    /// block or QR, and the eTIMS screens are hidden. Nothing is deleted - set
+    /// "Etims:Enabled": true once the VSCU is approved and running to turn it back on.
+    /// </summary>
+    public bool Enabled { get; init; } = false;
+
+    /// <summary>
     /// Base URL of the locally-running VSCU JAR, e.g. "http://localhost:8088" — the
     /// spec's own worked example (section 2.3) uses port 8088, but the JAR's actual
     /// configured port depends on how it was deployed; check its own config/logs on
