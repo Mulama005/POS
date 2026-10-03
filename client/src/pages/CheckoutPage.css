@@ -230,7 +230,7 @@
 .product-search__result-name {
     font-weight: 500;
     font-size: 15px;
-    color: var(--pos-ink);
+    color: var(--pos-ink-muted);
 }
 .product-search__result-meta {
     font-size: 12px;
