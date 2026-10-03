@@ -15,12 +15,15 @@ public class HealthController : ControllerBase
     private readonly PosDbContext _context;
     private readonly IConfiguration _config;
     private readonly IEtimsService _etimsService;
+    private readonly bool _etimsEnabled;
 
-    public HealthController(PosDbContext context, IConfiguration config, IEtimsService etimsService)
+    public HealthController(PosDbContext context, IConfiguration config, IEtimsService etimsService,
+        Microsoft.Extensions.Options.IOptions<Pos.Infrastructure.Etims.EtimsOptions> etimsOptions)
     {
         _context = context;
         _config = config;
         _etimsService = etimsService;
+        _etimsEnabled = etimsOptions.Value.Enabled;
     }
 
     [HttpGet("health")]
@@ -77,6 +80,19 @@ public class HealthController : ControllerBase
         // fine for an Admin-only diagnostic page hit occasionally, but don't reuse this
         // pattern for anything called per-request — device-init doesn't need to run that
         // often, this is just the cheapest place to expose "is the JAR reachable right now."
+        if (!_etimsEnabled)
+        {
+            services.Add(new
+            {
+                name = "etims",
+                label = "eTIMS Integration",
+                status = "warn",
+                detail = "Disabled",
+                meta = "Set Etims:Enabled to turn on",
+                latency = ""
+            });
+        }
+        else
         try
         {
             var sw = Stopwatch.StartNew();

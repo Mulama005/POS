@@ -46,6 +46,7 @@ public sealed class SalesController : ControllerBase
     private readonly ILogger<SalesController> _logger;
     private readonly IAuditService _auditService;
     private readonly IEtimsService _etimsService;
+    private readonly bool _etimsEnabled;
 
 
     public SalesController(
@@ -57,7 +58,8 @@ public sealed class SalesController : ControllerBase
         IConfiguration config,
         IAuditService auditService,
         ILogger<SalesController> logger,
-        IEtimsService etimsService)
+        IEtimsService etimsService,
+        Microsoft.Extensions.Options.IOptions<Pos.Infrastructure.Etims.EtimsOptions> etimsOptions)
     {
         _db = db;
         _authorizationService = authorizationService;
@@ -68,6 +70,7 @@ public sealed class SalesController : ControllerBase
         _logger = logger;
         _auditService = auditService;
         _etimsService = etimsService;
+        _etimsEnabled = etimsOptions.Value.Enabled;
     }
 
     /// <summary>
@@ -140,7 +143,8 @@ public sealed class SalesController : ControllerBase
 
         if (existingSale is not null)
         {
-            if (existingSale.EtimsResultCode == "000" && existingSale.IsSynced)
+            // With eTIMS off there is nothing left to retry; a replay just returns the saved sale.
+            if (!_etimsEnabled || existingSale.IsSynced)
             {
                 return Ok(MapCompleteSaleResponse(existingSale));
             }
@@ -220,12 +224,14 @@ public sealed class SalesController : ControllerBase
             return BadRequest(new { message = "One or more products are no longer active.", productIds = inactive });
         }
 
-        var etimsUnregistered = request.Items
+        var etimsUnregistered = !_etimsEnabled
+            ? new List<object>()
+            : request.Items
             .Select(i => products[i.ProductId])
             .Where(p => string.IsNullOrWhiteSpace(p.EtimsItemCode) ||
                         p.EtimsRegisteredAt is null ||
                         string.IsNullOrWhiteSpace(p.EtimsItemClassificationCode))
-            .Select(p => new { p.Id, p.Sku, p.Name })
+            .Select(p => (object)new { p.Id, p.Sku, p.Name })
             .Distinct()
             .ToList();
 
@@ -481,7 +487,8 @@ public sealed class SalesController : ControllerBase
             Status = SaleStatus.Completed,
             DiscountApprovedByUserId = discountApprovedByUserId,
             EtimsInvoiceNumber = invoiceNumber.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            IsSynced = false,
+            // With eTIMS off an online sale is complete as soon as it is saved.
+            IsSynced = !_etimsEnabled,
         };
         
         await _auditService.LogAsync(
@@ -546,8 +553,8 @@ public sealed class SalesController : ControllerBase
         }
 
         _logger.LogInformation(
-            "Sale {SaleId} completed locally at register {RegisterId} by cashier {CashierId} — total {Total}; submitting to eTIMS.",
-            sale.Id, register.Id, cashierId, sale.Total);
+            "Sale {SaleId} completed locally at register {RegisterId} by cashier {CashierId} — total {Total}; {EtimsNote}",
+            sale.Id, register.Id, cashierId, sale.Total, _etimsEnabled ? "submitting to eTIMS." : "eTIMS disabled.");
         
         await _auditService.LogAsync(
             userId: cashierId,
@@ -556,6 +563,11 @@ public sealed class SalesController : ControllerBase
             entityId: sale.Id,
             details: $"Sale {sale.Id} total: {sale.Total}"
         );
+
+        if (!_etimsEnabled)
+        {
+            return Ok(MapCompleteSaleResponse(sale));
+        }
 
         var etimsResult = await SubmitEtimsSaleAsync(sale, cancellationToken);
         if (!etimsResult.Success)
@@ -814,7 +826,8 @@ public sealed class SalesController : ControllerBase
             sale.EtimsReceiptSignature,
             sale.EtimsQrCodeData,
             sale.EtimsReceiptPublishedDate,
-            sale.EtimsSdcId, sale.EtimsMrcNo, sale.EtimsResultCode, sale.IsSynced);
+            sale.EtimsSdcId, sale.EtimsMrcNo, sale.EtimsResultCode,
+            sale.IsSynced && sale.EtimsResultCode == "000");
     }
 
     /// <summary>

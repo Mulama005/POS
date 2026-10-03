@@ -21,9 +21,12 @@ public class ReportsController : ControllerBase
     private static readonly TimeSpan NairobiOffset = TimeSpan.FromHours(3);
     private readonly PosDbContext _context;
     private readonly IAuditService _auditService;
+    private readonly bool _etimsEnabled;
 
-    public ReportsController(IAuditService auditService, PosDbContext context)
+    public ReportsController(IAuditService auditService, PosDbContext context,
+        Microsoft.Extensions.Options.IOptions<Pos.Infrastructure.Etims.EtimsOptions> etimsOptions)
     {
+        _etimsEnabled = etimsOptions.Value.Enabled;
         _context = context;
         _auditService = auditService;
     }
@@ -518,8 +521,8 @@ public class ReportsController : ControllerBase
                     PayMode = FormatPayMode(payment?.Method),
                     MpesaRef = payment?.ExternalReference,
                     MpesaPhone = MaskPhone(payment?.MpesaPhoneNumber),
-                    EtimsCuNumber = sale.EtimsInvoiceNumber,
-                    EtimsStatus = sale.IsSynced ? "Success" : "Pending",
+                    EtimsCuNumber = _etimsEnabled ? sale.EtimsInvoiceNumber : null,
+                    EtimsStatus = _etimsEnabled ? (sale.IsSynced ? "Success" : "Pending") : "Not enabled",
                     CashierName = sale.Cashier?.FullName ?? "—"
                 });
             }
