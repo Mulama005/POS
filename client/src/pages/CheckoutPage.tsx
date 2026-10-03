@@ -12,6 +12,7 @@ import {
   removeLine,
   setCartDiscount,
   updateLineDiscount,
+  updateLinePrice,
   updateLineQuantity,
 } from '../utils/CartMutations'
 import { calculateCartTotals } from '../utils/CartMath'
@@ -261,6 +262,7 @@ export function CheckoutPage() {
         unitId: l.unitId,
         quantity: l.quantity,
         discountAmount: l.discountAmount,
+        overrideUnitPrice: l.overrideUnitPrice ?? null,
       })),
       cartDiscountAmount: cart.cartDiscountAmount,
       discountApprovalToken,
@@ -399,6 +401,7 @@ export function CheckoutPage() {
             totals={totals}
             onQuantityChange={handleQuantityChange}
             onLineDiscountChange={handleLineDiscountChange}
+            onLinePriceChange={(lineId, price) => persist(updateLinePrice(cart, lineId, price))}
             onRemoveLine={handleRemoveLine}
             onCartDiscountChange={handleCartDiscountChange}
             disabled={completing}

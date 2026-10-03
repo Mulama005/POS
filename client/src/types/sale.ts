@@ -14,6 +14,8 @@ export interface CartLine {
   quantity: number
   /** Manager-applied markdown on this line, in KES. */
   discountAmount: number
+  /** Negotiated unit price (VAT-inclusive). null/undefined = list price. */
+  overrideUnitPrice?: number | null
 }
 
 export type CartStatus = 'active' | 'held'
@@ -48,6 +50,7 @@ export interface CompleteSaleRequest {
     unitId: string | null
     quantity: number
     discountAmount: number
+    overrideUnitPrice?: number | null
   }[]
   cartDiscountAmount: number
   discountApprovalToken: string | null

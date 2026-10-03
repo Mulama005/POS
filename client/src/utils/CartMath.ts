@@ -2,6 +2,22 @@ import type { Cart } from '../types/sale'
 
 const STANDARD_VAT_RATE = 0.16
 
+/**
+ * Mirrors the server's override rule. At or above list the agreed price is the unit price;
+ * below list the unit price stays at list and the difference is a per-unit markdown.
+ */
+export function linePricing(line: Cart['lines'][number]) {
+  const list = line.product.salePrice
+  const agreed = line.overrideUnitPrice != null && line.overrideUnitPrice > 0 ? round2(line.overrideUnitPrice) : list
+  return {
+    list,
+    agreed,
+    unitBase: Math.max(agreed, list),
+    markdownPerUnit: Math.max(0, list - agreed),
+    overridden: agreed !== list,
+  }
+}
+
 export interface CartTotals {
   rawSubtotal: number
   lineDiscountTotal: number
@@ -13,8 +29,8 @@ export interface CartTotals {
 
 export interface CartLineBreakdown {
   line: Cart['lines'][number]
-  rawAmount: number // salePrice * quantity, before any discount
-  lineDiscount: number // this line's own discountAmount, clamped to rawAmount
+  rawAmount: number // unit base price * quantity, before any discount
+  lineDiscount: number // line discount + price-override markdown, clamped to rawAmount
   finalLineAmount: number // after line discount AND this line's proportional share of the cart discount, rounded
   lineTax: number // VAT portion of finalLineAmount, rounded
 }
@@ -31,8 +47,9 @@ function computeFullBreakdown(cart: Cart): FullBreakdown {
   let afterLineDiscountsTotal = 0
 
   const intermediate = cart.lines.map((line) => {
-    const rawAmount = line.product.salePrice * line.quantity
-    const lineDiscount = Math.min(line.discountAmount, rawAmount)
+    const pricing = linePricing(line)
+    const rawAmount = pricing.unitBase * line.quantity
+    const lineDiscount = Math.min(line.discountAmount + pricing.markdownPerUnit * line.quantity, rawAmount)
     const afterLineDiscount = rawAmount - lineDiscount
     rawSubtotal += rawAmount
     afterLineDiscountsTotal += afterLineDiscount

@@ -1,12 +1,15 @@
 import type { Cart, CartLine } from '../types/sale'
 import type { CartTotals } from '../utils/CartMath'
+import { useState } from 'react'
 import { formatKes } from '../utils/currency'
+import { linePricing } from '../utils/CartMath'
 
 interface CartPanelProps {
   cart: Cart
   totals: CartTotals
   onQuantityChange: (lineId: string, quantity: number) => void
   onLineDiscountChange: (lineId: string, discount: number) => void
+  onLinePriceChange: (lineId: string, price: number | null) => void
   onRemoveLine: (lineId: string) => void
   onCartDiscountChange: (discount: number) => void
   disabled?: boolean
@@ -17,6 +20,7 @@ export function CartPanel({
   totals,
   onQuantityChange,
   onLineDiscountChange,
+  onLinePriceChange,
   onRemoveLine,
   onCartDiscountChange,
   disabled,
@@ -55,6 +59,7 @@ export function CartPanel({
               disabled={disabled}
               onQuantityChange={(qty) => onQuantityChange(line.lineId, qty)}
               onDiscountChange={(discount) => onLineDiscountChange(line.lineId, discount)}
+              onPriceChange={(price) => onLinePriceChange(line.lineId, price)}
               onRemove={() => onRemoveLine(line.lineId)}
             />
           ))}
@@ -104,17 +109,40 @@ interface CartLineRowProps {
   disabled?: boolean
   onQuantityChange: (quantity: number) => void
   onDiscountChange: (discount: number) => void
+  onPriceChange: (price: number | null) => void
   onRemove: () => void
 }
 
-function CartLineRow({ line, disabled, onQuantityChange, onDiscountChange, onRemove }: CartLineRowProps) {
-  const lineRaw = line.product.salePrice * line.quantity
+function CartLineRow({ line, disabled, onQuantityChange, onDiscountChange, onPriceChange, onRemove }: CartLineRowProps) {
+  const pricing = linePricing(line)
+  const lineRaw = pricing.unitBase * line.quantity
+  // Draft text so the cashier can clear and retype; committed on blur / Enter.
+  const [priceDraft, setPriceDraft] = useState<string | null>(null)
+  const commitPrice = () => {
+    if (priceDraft === null) return
+    const value = Number(priceDraft)
+    onPriceChange(Number.isFinite(value) && value > 0 ? value : null)
+    setPriceDraft(null)
+  }
 
   return (
     <li className="cart-line">
       <div className="cart-line__main">
         <span className="cart-line__name">{line.product.name}</span>
-        <span className="cart-line__unit-price">{formatKes(line.product.salePrice)} each</span>
+        <label className="cart-line__discount cart-line__price">
+          Price each{pricing.overridden ? ` (list ${formatKes(pricing.list)})` : ''}
+          <input
+            type="number"
+            min={0.01}
+            step="0.01"
+            inputMode="decimal"
+            value={priceDraft ?? pricing.agreed}
+            disabled={disabled}
+            onChange={(e) => setPriceDraft(e.target.value)}
+            onBlur={commitPrice}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+          />
+        </label>
       </div>
 
       <div className="cart-line__controls">
