@@ -12,6 +12,7 @@ import { CustomersPage } from './pages/CustomersPage'
 import { RepairTrackingPage } from './pages/RepairTrackingPage'
 import { ProductsPage } from './pages/ProductsPage'
 import { ReceiveStock } from './pages/ReceiveStock'
+import { ProductImportPage } from './pages/ProductImportPage'
 import { WarrantyLookupPage } from './pages/WarrantyLookupPage'
 import { AdminDashboard } from './pages/AdminDashboard'
 import { ManagerDashboard } from './pages/ManagerDashboard'
@@ -78,6 +79,7 @@ function App() {
           <Route path="/mfa/setup" element={<MfaSetupPage />} />
           <Route path="/inventory" element={<ProductsPage />} />
           <Route path="/stock/receive" element={<ReceiveStock />} />
+          <Route path="/inventory/import" element={<ProductImportPage />} />
             <Route path="/audit" element={<AuditLogPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/financial-setup" element={<OperatingCostsPage />} />

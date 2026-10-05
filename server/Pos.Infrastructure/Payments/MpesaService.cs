@@ -106,7 +106,7 @@ public sealed class DarajaService : IDarajaService
             TransactionType = _options.TransactionType,
             Amount = (long)Math.Round(amount, MidpointRounding.AwayFromZero), // Daraja expects a whole-shilling integer
             PartyA = normalizedPhone,
-            PartyB = shortCode,
+            PartyB = string.IsNullOrWhiteSpace(_options.TillNumber) ? shortCode : _options.TillNumber.Trim(),
             PhoneNumber = normalizedPhone,
             CallBackURL = $"{_options.CallbackBaseUrl.TrimEnd('/')}/api/payment-callbacks/mpesa",
             AccountReference = Truncate(accountReference, 12), // Daraja limits this field's length
