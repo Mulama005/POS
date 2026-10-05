@@ -1,0 +1,25 @@
+.import-back { font-size: 14px; color: var(--pos-ink); text-decoration: underline; }
+.import-step { margin-bottom: 36px; }
+.import-hint { color: var(--pos-ink-muted, #555); max-width: 70ch; line-height: 1.5; margin: 0 0 16px; }
+.import-hint code { font-family: var(--pos-font-mono); background: rgba(0, 0, 0, 0.06); padding: 1px 5px; }
+.import-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 8px; }
+.import-file { cursor: pointer; display: inline-block; }
+.import-file input { display: none; }
+.import-secondary {
+    font-family: var(--pos-font-body); font-size: 14px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 10px 18px; background: transparent; color: var(--pos-ink); border: 1.5px solid var(--pos-ink); cursor: pointer;
+}
+.import-filename { font-family: var(--pos-font-mono); font-size: 13px; }
+.import-error { color: var(--pos-danger, #a33); border-left: 3px solid var(--pos-danger, #a33); padding: 8px 12px; margin: 12px 0; }
+.import-summary { max-width: 560px; margin-bottom: 20px; }
+.import-bad { color: var(--pos-danger, #a33); }
+.import-toggle { display: flex; gap: 8px; align-items: center; font-size: 14px; margin-bottom: 12px; }
+.import-table-wrap { overflow-x: auto; border: 1px solid var(--pos-rule); margin-bottom: 20px; max-height: 60vh; overflow-y: auto; }
+.import-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.import-table th, .import-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid rgba(0, 0, 0, 0.1); vertical-align: top; white-space: nowrap; }
+.import-table th { position: sticky; top: 0; background: var(--pos-bg, #faf9f6); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
+.import-table td.import-notes { white-space: normal; min-width: 260px; }
+.import-row--error { background: rgba(163, 51, 51, 0.06); }
+.import-row--skip { opacity: 0.6; }
+.import-done h2 { font-family: var(--pos-font-display); font-weight: 400; }
+.import-done { max-width: 560px; }

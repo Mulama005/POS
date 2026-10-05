@@ -514,3 +514,4 @@
         gap: 12px;
     }
 }
+a.products-add-btn { text-decoration: none; display: inline-block; }

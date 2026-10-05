@@ -292,9 +292,12 @@ export function ProductsPage() {
     <div className="products-screen">
       <div className="products-header">
         <h1 className="products-title">Products</h1>
-        <button type="button" className="products-add-btn" onClick={formOpen ? closeForm : openCreateForm}>
-          {formOpen ? 'Cancel' : '+ Add product'}
-        </button>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <Link to="/inventory/import" className="products-add-btn">Import CSV</Link>
+          <button type="button" className="products-add-btn" onClick={formOpen ? closeForm : openCreateForm}>
+            {formOpen ? 'Cancel' : '+ Add product'}
+          </button>
+        </div>
       </div>
 
       {formOpen && (
