@@ -91,10 +91,6 @@ export function CartPanel({
             <span>-{formatKes(totals.discountTotal)}</span>
           </div>
         )}
-        <div className="cart-panel__totals-row">
-          <span>Tax (VAT, included)</span>
-          <span>{formatKes(totals.taxTotal)}</span>
-        </div>
         <div className="cart-panel__totals-row cart-panel__totals-row--total">
           <span>Total</span>
           <span>{formatKes(totals.total)}</span>
