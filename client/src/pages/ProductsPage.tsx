@@ -402,7 +402,7 @@ export function ProductsPage() {
       <div className="products-search-row">
         <input
           type="text"
-          placeholder="Search by SKU, name, or barcode"
+          placeholder="Search by SKU, name, or category"
           value={search}
           onChange={(e) => {
             setPage(1)
