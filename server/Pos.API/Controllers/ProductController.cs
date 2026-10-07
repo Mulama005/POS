@@ -57,6 +57,7 @@ public class ProductsController : ControllerBase
             query = query.Where(p =>
                 p.Name.Contains(search) ||
                 p.Sku.Contains(search) ||
+                (p.Category != null && p.Category.Name.Contains(search)) ||
                 (p.Barcode != null && p.Barcode.Contains(search)));
         }
 
