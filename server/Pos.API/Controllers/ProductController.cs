@@ -54,11 +54,12 @@ public class ProductsController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(search))
         {
+            var searchPattern = $"%{search.Trim()}%";
             query = query.Where(p =>
-                p.Name.Contains(search) ||
-                p.Sku.Contains(search) ||
-                (p.Category != null && p.Category.Name.Contains(search)) ||
-                (p.Barcode != null && p.Barcode.Contains(search)));
+                EF.Functions.ILike(p.Name, searchPattern) ||
+                EF.Functions.ILike(p.Sku, searchPattern) ||
+                (p.Category != null && EF.Functions.ILike(p.Category.Name, searchPattern)) ||
+                (p.Barcode != null && EF.Functions.ILike(p.Barcode, searchPattern)));
         }
 
         if (category.HasValue)

@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState, type FormEvent } from 'react'
+import { useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { isAxiosError } from 'axios'
 import {
@@ -72,6 +73,7 @@ function toFormValues(p: Product): ProductFormValues {
 
 export function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
+  const productLoadSequence = useRef(0)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
@@ -107,21 +109,24 @@ export function ProductsPage() {
   }
 
   const loadProducts = async () => {
+    const requestSequence = ++productLoadSequence.current
     setLoading(true)
     setLoadError(null)
     try {
       const res = await listProducts({
         page,
         pageSize: PAGE_SIZE,
-        search: search || undefined,
+        search: search.trim() || undefined,
         etimsClassified: etimsFilter === 'all' ? undefined : etimsFilter === 'classified',
       })
+      if (requestSequence !== productLoadSequence.current) return
       setProducts(res.items)
       setTotal(res.total)
     } catch (err) {
+      if (requestSequence !== productLoadSequence.current) return
       setLoadError(getErrorMessage(err, 'Could not load products.'))
     } finally {
-      setLoading(false)
+      if (requestSequence === productLoadSequence.current) setLoading(false)
     }
   }
 
