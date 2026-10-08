@@ -10,9 +10,11 @@ import {
 } from '../services/ProductsService'
 import { listCategories } from '../services/categoriesService'
 import { registerProductWithEtims } from '../services/EtimsService'
+import { apiClient } from '../services/apiClient'
 import type { Category, Product, ProductFormValues, TaxClass } from '../types/product'
 import type { ApiErrorBody } from '../types/auth'
 import { formatKes } from '../utils/currency'
+import { downloadBlob } from '../utils/downloadFile'
 import { RoleGate } from '../components/RouteGuards'
 import { useFeatures } from '../hooks/useFeatures'
 import { EtimsClassificationPicker, type EtimsPickerTarget } from '../components/EtimsClassificationPicker'
@@ -92,6 +94,8 @@ export function ProductsPage() {
   const [formImage, setFormImage] = useState<File | null>(null)
   const [formSubmitting, setFormSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [exportingInventory, setExportingInventory] = useState(false)
+  const [inventoryExportError, setInventoryExportError] = useState<string | null>(null)
 
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({})
   const [rowError, setRowError] = useState<Record<string, string>>({})
@@ -180,6 +184,25 @@ export function ProductsPage() {
       setFormError(getErrorMessage(err, editingId ? 'Could not update product.' : 'Could not create product.'))
     } finally {
       setFormSubmitting(false)
+    }
+  }
+
+  const downloadInventoryPdf = async () => {
+    setExportingInventory(true)
+    setInventoryExportError(null)
+    try {
+      const { data } = await apiClient.get<Blob>('/api/reports/export/inventory', {
+        params: { format: 'pdf' },
+        responseType: 'blob',
+      })
+      if (await data.slice(0, 5).text() !== '%PDF-') {
+        throw new Error('The inventory export endpoint did not return a PDF.')
+      }
+      downloadBlob(data, `EddTechPos-inventory-${new Date().toISOString().slice(0, 10)}.pdf`)
+    } catch (err) {
+      setInventoryExportError(getErrorMessage(err, 'Could not download the inventory PDF.'))
+    } finally {
+      setExportingInventory(false)
     }
   }
 
@@ -297,10 +320,18 @@ export function ProductsPage() {
     <div className="products-screen">
       <div className="products-header">
         <h1 className="products-title">Products</h1>
-        <button type="button" className="products-add-btn" onClick={formOpen ? closeForm : openCreateForm}>
-          {formOpen ? 'Cancel' : '+ Add product'}
-        </button>
+        <div className="products-header-actions">
+          <RoleGate roles={['Manager', 'Admin']}>
+            <button type="button" className="products-import-btn" onClick={() => void downloadInventoryPdf()} disabled={exportingInventory}>
+              {exportingInventory ? 'Preparing PDF…' : 'Download inventory PDF'}
+            </button>
+          </RoleGate>
+          <button type="button" className="products-add-btn" onClick={formOpen ? closeForm : openCreateForm}>
+            {formOpen ? 'Cancel' : '+ Add product'}
+          </button>
+        </div>
       </div>
+      {inventoryExportError && <p className="products-error" role="alert">{inventoryExportError}</p>}
 
       {formOpen && (
         <form className="products-form" onSubmit={(e) => void handleFormSubmit(e)}>

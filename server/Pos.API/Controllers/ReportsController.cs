@@ -551,15 +551,62 @@ public class ReportsController : ControllerBase
                 p.Sku,
                 p.Barcode,
                 CategoryName = p.Category.Name,
-                Stock = p.StockUnits.Count(u => u.Status == "InStock"),
+                Stock = p.BulkQuantityOnHand + p.StockUnits.Count(u => u.Status == "InStock"),
                 p.CostPrice,
                 p.SalePrice,
+                TaxClass = p.TaxClass.ToString(),
                 p.ReorderThreshold,
                 p.WarrantyMonths,
-                TotalValue = p.StockUnits.Count(u => u.Status == "InStock") * p.CostPrice
+                TotalValue = (p.BulkQuantityOnHand + p.StockUnits.Count(u => u.Status == "InStock")) * p.CostPrice
             })
             .OrderBy(p => p.Name)
             .ToListAsync();
+
+        if (format.Equals("pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            var document = Document.Create(container => container.Page(page =>
+            {
+                page.Size(PageSizes.A4.Landscape());
+                page.Margin(1.2f, Unit.Centimetre);
+                page.DefaultTextStyle(style => style.FontFamily("Helvetica").FontSize(8).FontColor(Colors.Grey.Darken4));
+                page.Header().Column(header =>
+                {
+                    header.Item().Text("EddTechPos · INVENTORY").FontSize(9).SemiBold().FontColor(Colors.BlueGrey.Darken3).LetterSpacing(1.2f);
+                    header.Item().PaddingTop(4).Text("Current inventory").FontSize(22).Bold().FontColor(Colors.Grey.Darken4);
+                    header.Item().PaddingTop(3).Text($"{data.Count:N0} active products · Generated {DateTime.UtcNow.AddHours(3):dd MMM yyyy, HH:mm} EAT").FontColor(Colors.Grey.Darken1);
+                    header.Item().PaddingTop(8).Text($"Units on hand: {data.Sum(p => p.Stock):N0}    Inventory value at cost: KES {data.Sum(p => p.TotalValue):N2}").SemiBold();
+                    header.Item().PaddingTop(8).LineHorizontal(1).LineColor(Colors.Grey.Lighten1);
+                });
+                page.Content().PaddingTop(10).Table(table =>
+                {
+                    table.ColumnsDefinition(columns =>
+                    {
+                        columns.RelativeColumn(1.1f); columns.RelativeColumn(1.7f); columns.RelativeColumn(1.1f);
+                        columns.RelativeColumn(1.4f); columns.RelativeColumn(0.65f); columns.RelativeColumn(0.9f);
+                        columns.RelativeColumn(0.9f); columns.RelativeColumn(0.85f); columns.RelativeColumn(0.85f);
+                    });
+                    table.Header(header =>
+                    {
+                        foreach (var label in new[] { "SKU", "PRODUCT", "CATEGORY", "BARCODE", "QTY", "COST (KES)", "SALE (KES)", "STOCK VALUE", "REORDER AT" })
+                            header.Cell().Background(Colors.Grey.Lighten3).PaddingVertical(6).PaddingHorizontal(4).Text(label).FontSize(6.5f).SemiBold().FontColor(Colors.Grey.Darken2);
+                    });
+                    foreach (var product in data)
+                    {
+                        var values = new[]
+                        {
+                            product.Sku, product.Name, product.CategoryName, product.Barcode ?? "—",
+                            product.Stock.ToString("N0"), product.CostPrice.ToString("N2"), product.SalePrice.ToString("N2"),
+                            product.TotalValue.ToString("N2"), product.ReorderThreshold.ToString("N0")
+                        };
+                        foreach (var value in values)
+                            table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5).PaddingHorizontal(4).Text(value).FontSize(7);
+                    }
+                });
+                page.Footer().AlignCenter().Text(text => { text.Span("EddTechPos | Inventory | Page "); text.CurrentPageNumber(); text.Span(" of "); text.TotalPages(); });
+            }));
+
+            return File(document.GeneratePdf(), "application/pdf", $"EddTechPos_Inventory_{DateTime.UtcNow:yyyyMMdd_HHmm}.pdf");
+        }
 
         return ExportData(data, format, $"Inventory_Report_{DateTime.Now:yyyyMMdd}");
     }
