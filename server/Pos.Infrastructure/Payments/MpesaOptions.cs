@@ -7,10 +7,19 @@ public sealed class DarajaOptions
     public string ConsumerKey { get; init; } = string.Empty;
     public string ConsumerSecret { get; init; } = string.Empty;
 
-    /// <summary>The Till or Paybill number sales are collected against.</summary>
+    /// <summary>
+    /// Paybill: the Paybill number. Till (Buy Goods): the head-office STORE number - this is
+    /// what Daraja's Go Live is registered against and what the STK password is built from.
+    /// </summary>
     public string BusinessShortCode { get; init; } = string.Empty;
 
     public string Passkey { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Till (Buy Goods) only: the actual Till number customers pay, sent as PartyB. Leave empty
+    /// for a Paybill, where PartyB is the same as BusinessShortCode.
+    /// </summary>
+    public string TillNumber { get; init; } = string.Empty;
 
     /// <summary>
     /// Must be a publicly reachable HTTPS URL — Safaricom posts the payment result here

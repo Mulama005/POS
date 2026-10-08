@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from "react";
-import { useAuth } from "../hooks/useAuth";
+import { apiClient } from "../services/apiClient";
 import { downloadBlob } from "../utils/downloadFile";
 import "./AuditLogPage.css";
 
@@ -14,6 +14,11 @@ interface AuditEntry {
     ipAddress: string;
 }
 
+interface AuditLogResponse {
+    items: AuditEntry[];
+    total: number;
+}
+
 const nairobiDateTime = new Intl.DateTimeFormat("en-KE", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -21,9 +26,9 @@ const nairobiDateTime = new Intl.DateTimeFormat("en-KE", {
 });
 
 export default function AuditLogPage() {
-    const { accessToken } = useAuth();
     const [entries, setEntries] = useState<AuditEntry[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState("");
     const [exporting, setExporting] = useState(false);
     const [exportError, setExportError] = useState("");
     const [exportNotice, setExportNotice] = useState("");
@@ -40,28 +45,23 @@ export default function AuditLogPage() {
 
     const fetchAuditLog = async () => {
         setLoading(true);
+        setLoadError("");
         try {
-            const params = new URLSearchParams({
-                page: page.toString(),
-                pageSize: pageSize.toString(),
-                ...(filters.userName && { userName: filters.userName }),
-                ...(filters.userId && { userId: filters.userId }),
-                ...(filters.actionType && { actionType: filters.actionType }),
-                ...(filters.fromDate && { fromDate: filters.fromDate }),
-                ...(filters.toDate && { toDate: filters.toDate }),
+            const { data } = await apiClient.get<AuditLogResponse>("/api/audit", {
+                params: {
+                    page,
+                    pageSize,
+                    userName: filters.userName || undefined,
+                    userId: filters.userId || undefined,
+                    actionType: filters.actionType || undefined,
+                    fromDate: filters.fromDate || undefined,
+                    toDate: filters.toDate || undefined,
+                },
             });
-
-            const res = await fetch(`/api/audit?${params}`, {
-                headers: { Authorization: `Bearer ${accessToken}` },
-                credentials: "include",
-            });
-
-            if (!res.ok) throw new Error("Failed to fetch audit log");
-            const data = await res.json();
             setEntries(data.items);
             setTotal(data.total);
-        } catch (err) {
-            console.error(err);
+        } catch {
+            setLoadError("Could not load audit activity. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -79,17 +79,21 @@ export default function AuditLogPage() {
         setExportError("");
         setExportNotice("Gathering your audit trail and preparing the PDF…");
         try {
-            const params = new URLSearchParams();
-            if (filters.userName) params.set("userName", filters.userName);
-            if (filters.userId) params.set("userId", filters.userId);
-            if (filters.actionType) params.set("actionType", filters.actionType);
-            if (filters.fromDate) params.set("fromDate", filters.fromDate);
-            if (filters.toDate) params.set("toDate", filters.toDate);
-            const response = await fetch(`/api/audit/export/pdf?${params}`, {
-                headers: { Authorization: `Bearer ${accessToken}` }, credentials: "include",
+            const { data } = await apiClient.get<Blob>("/api/audit/export/pdf", {
+                params: {
+                    userName: filters.userName || undefined,
+                    userId: filters.userId || undefined,
+                    actionType: filters.actionType || undefined,
+                    fromDate: filters.fromDate || undefined,
+                    toDate: filters.toDate || undefined,
+                },
+                responseType: "blob",
             });
-            if (!response.ok) throw new Error("Failed to export audit log");
-            downloadBlob(await response.blob(), `EddTechPOS-audit-log-${new Date().toISOString().slice(0, 10)}.pdf`);
+            const pdfSignature = await data.slice(0, 5).text();
+            if (pdfSignature !== "%PDF-") {
+                throw new Error("The audit export endpoint did not return a PDF.");
+            }
+            downloadBlob(data, `EddTechPOS-audit-log-${new Date().toISOString().slice(0, 10)}.pdf`);
             setExportNotice("Your audit PDF is downloading now.");
             window.setTimeout(() => setExportNotice(""), 4500);
         } catch (err) {
@@ -118,6 +122,7 @@ export default function AuditLogPage() {
                     </button>
                 </div>
             </header>
+            {loadError && <p className="audit-export-error" role="alert">{loadError}</p>}
             {exportError && <p className="audit-export-error" role="alert">{exportError}</p>}
 
             {/* Filters */}

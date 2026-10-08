@@ -326,6 +326,7 @@ export function ProductsPage() {
               {exportingInventory ? 'Preparing PDF…' : 'Download inventory PDF'}
             </button>
           </RoleGate>
+          <Link to="/inventory/import" className="products-add-btn">Import CSV</Link>
           <button type="button" className="products-add-btn" onClick={formOpen ? closeForm : openCreateForm}>
             {formOpen ? 'Cancel' : '+ Add product'}
           </button>

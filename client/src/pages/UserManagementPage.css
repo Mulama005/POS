@@ -137,6 +137,56 @@
     padding: 0;
 }
 
+.user-mgmt-invite-link-note a {
+    display: inline-block;
+    margin: 8px 0;
+    color: var(--pos-ink);
+    font-weight: 600;
+}
+
+.user-mgmt-invite-result {
+    margin: -16px 0 32px;
+    padding: 18px 20px;
+    border: 1px solid var(--pos-border);
+    border-left: 4px solid var(--pos-ink);
+    background: color-mix(in srgb, var(--pos-ink) 4%, transparent);
+}
+
+.user-mgmt-invite-result__message {
+    margin: 0;
+    color: var(--pos-ink);
+    font-weight: 600;
+}
+
+.user-mgmt-invite-result__link {
+    display: grid;
+    justify-items: start;
+    gap: 8px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--pos-ink-muted);
+}
+
+.user-mgmt-invite-result__link strong {
+    color: var(--pos-ink);
+    font-size: 15px;
+}
+
+.user-mgmt-invite-result__link code {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    color: var(--pos-ink);
+}
+
+.user-mgmt-invite-result__link a {
+    color: var(--pos-ink);
+    font-weight: 600;
+}
+
+.user-mgmt-copy-invite-link {
+    margin-top: 4px;
+}
+
 /* --- Table -----------------------------------------------------------
    Hairline rows, uppercase letter-spaced headers closed by a 2px ink
    rule. No outer card, no row fills. */
