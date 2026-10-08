@@ -201,13 +201,13 @@ public sealed class EtimsController : ControllerBase
             User.FindFirst(ClaimTypes.Email)?.Value
             ?? User.FindFirst(ClaimTypes.Name)?.Value
             ?? User.Identity?.Name
-            ?? "AyiyaPOS";
+            ?? "EddTechPos";
 
         userName = userName.Trim();
 
         if (userName.Length == 0)
         {
-            userName = "AyiyaPOS";
+            userName = "EddTechPos";
         }
 
         // KRA regrId/modrId are limited to 20 characters.
@@ -216,7 +216,7 @@ public sealed class EtimsController : ControllerBase
             User.FindFirst(ClaimTypes.Email)?.Value
             ?? User.FindFirst(ClaimTypes.Name)?.Value
             ?? User.Identity?.Name
-            ?? "AyiyaPOS";
+            ?? "EddTechPos";
 
         operatorId = operatorId.Trim();
 
@@ -227,7 +227,7 @@ public sealed class EtimsController : ControllerBase
 
         if (operatorId.Length == 0)
         {
-            operatorId = "AyiyaPOS";
+            operatorId = "EddTechPos";
         }
 
         // ------------------------------------------------------------

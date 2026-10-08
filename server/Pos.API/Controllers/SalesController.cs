@@ -630,18 +630,18 @@ public sealed class SalesController : ControllerBase
             User.FindFirst(ClaimTypes.Email)?.Value
             ?? User.FindFirst(ClaimTypes.Name)?.Value
             ?? User.Identity?.Name
-            ?? "AyiyaPOS";
+            ?? "EddTechPos";
         operatorId = operatorId.Trim();
         if (operatorId.Length > 20) operatorId = operatorId[..20];
-        if (operatorId.Length == 0) operatorId = "AyiyaPOS";
+        if (operatorId.Length == 0) operatorId = "EddTechPos";
 
         var operatorName =
             User.FindFirst(ClaimTypes.Name)?.Value
             ?? User.FindFirst(ClaimTypes.Email)?.Value
-            ?? "AyiyaPOS";
+            ?? "EddTechPos";
         operatorName = operatorName.Trim();
         if (operatorName.Length > 60) operatorName = operatorName[..60];
-        if (operatorName.Length == 0) operatorName = "AyiyaPOS";
+        if (operatorName.Length == 0) operatorName = "EddTechPos";
 
         var taxblA = 0m;
         var taxblB = 0m;
