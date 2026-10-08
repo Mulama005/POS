@@ -11,6 +11,10 @@
     "DefaultConnection": ""
   },
 
+  "Frontend": {
+    "BaseUrl": "http://localhost:5173"
+  },
+
   "Supabase": {
     "Url": "https://YOUR-SUPABASE-PROJECT.supabase.co",
     "ServiceRoleKey": "YOUR_SUPABASE_SERVICE_ROLE_KEY",
