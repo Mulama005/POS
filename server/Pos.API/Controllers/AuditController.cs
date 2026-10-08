@@ -107,7 +107,7 @@ public class AuditController : ControllerBase
             page.DefaultTextStyle(style => style.FontFamily("Helvetica").FontSize(8).FontColor(Colors.Grey.Darken4));
             page.Header().Column(header =>
             {
-                header.Item().Text("AYIYAPOS · SYSTEM MONITORING").FontSize(9).SemiBold().FontColor(Colors.BlueGrey.Darken3).LetterSpacing(1.2f);
+                header.Item().Text("EddTechPos · SYSTEM MONITORING").FontSize(9).SemiBold().FontColor(Colors.BlueGrey.Darken3).LetterSpacing(1.2f);
                 header.Item().PaddingTop(4).Text("Audit log").FontSize(22).Bold().FontColor(Colors.Grey.Darken4);
                 header.Item().PaddingTop(3).Text($"{entries.Count:N0} matching records · Generated {DateTime.UtcNow.AddHours(3):dd MMM yyyy, HH:mm} EAT").FontColor(Colors.Grey.Darken1);
                 header.Item().PaddingTop(10).LineHorizontal(1).LineColor(Colors.Grey.Lighten1);
@@ -132,8 +132,8 @@ public class AuditController : ControllerBase
                         table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(6).PaddingHorizontal(5).Text(value).FontSize(7);
                 }
             });
-            page.Footer().AlignCenter().Text(text => { text.Span("AyiyaPOS | Audit log | Page "); text.CurrentPageNumber(); text.Span(" of "); text.TotalPages(); });
+            page.Footer().AlignCenter().Text(text => { text.Span("EddTechPos | Audit log | Page "); text.CurrentPageNumber(); text.Span(" of "); text.TotalPages(); });
         }));
-        return File(document.GeneratePdf(), "application/pdf", $"AyiyaPOS_Audit_Log_{DateTime.UtcNow:yyyyMMdd_HHmm}.pdf");
+        return File(document.GeneratePdf(), "application/pdf", $"EddTechPos_Audit_Log_{DateTime.UtcNow:yyyyMMdd_HHmm}.pdf");
     }
 }

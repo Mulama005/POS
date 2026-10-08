@@ -31,7 +31,9 @@ export function UserManagementPage() {
   const [inviteRole, setInviteRole] = useState<UserRole>('Cashier')
   const [inviteSubmitting, setInviteSubmitting] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
+  const [inviteNotice, setInviteNotice] = useState<string | null>(null)
   const [inviteLink, setInviteLink] = useState<string | null>(null)
+  const [inviteLinkCopied, setInviteLinkCopied] = useState(false)
 
   const loadUsers = async () => {
     setLoading(true)
@@ -79,19 +81,34 @@ export function UserManagementPage() {
   const handleInviteSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setInviteError(null)
+    setInviteNotice(null)
+    setInviteLink(null)
+    setInviteLinkCopied(false)
     setInviteSubmitting(true)
     try {
       const res = await inviteUser({ fullName: inviteFullName, email: inviteEmail || undefined, phoneNumber: invitePhone || undefined, role: inviteRole })
       setInviteLink(res.inviteLink ?? null)
+      setInviteNotice(res.message)
       setInviteFullName('')
       setInviteEmail('')
       setInvitePhone('')
       setInviteRole('Cashier')
+      setInviteOpen(false)
       await loadUsers()
     } catch (err) {
       setInviteError(getErrorMessage(err, 'Could not send invite.'))
     } finally {
       setInviteSubmitting(false)
+    }
+  }
+
+  const copyInviteLink = async () => {
+    if (!inviteLink) return
+    try {
+      await navigator.clipboard.writeText(inviteLink)
+      setInviteLinkCopied(true)
+    } catch {
+      setInviteError('Could not copy the link. Select and copy it manually.')
     }
   }
 
@@ -103,6 +120,24 @@ export function UserManagementPage() {
           {inviteOpen ? 'Cancel' : 'Add staff member'}
         </button>
       </div>
+
+      {(inviteNotice || inviteError) && (
+        <section className="user-mgmt-invite-result" aria-live="polite">
+          {inviteError && <p className="user-mgmt-error" role="alert">{inviteError}</p>}
+          {inviteNotice && <p className="user-mgmt-invite-result__message" role="status">{inviteNotice}</p>}
+          {inviteLink && (
+            <div className="user-mgmt-invite-result__link">
+              <strong>Password setup link</strong>
+              <span>Copy and send this link to the staff member:</span>
+              <a href={inviteLink} target="_blank" rel="noreferrer">Open password setup</a>
+              <code>{inviteLink}</code>
+              <button type="button" className="user-mgmt-copy-invite-link" onClick={() => void copyInviteLink()}>
+                {inviteLinkCopied ? 'Copied' : 'Copy link'}
+              </button>
+            </div>
+          )}
+        </section>
+      )}
 
       {inviteOpen && (
         <form className="user-mgmt-invite-form" onSubmit={(e) => void handleInviteSubmit(e)}>
@@ -130,14 +165,6 @@ export function UserManagementPage() {
               {inviteSubmitting ? 'Saving…' : 'Save staff member'}
             </button>
           </div>
-          {inviteError && <p className="user-mgmt-error" role="alert">{inviteError}</p>}
-          {inviteLink && (
-            <p className="user-mgmt-invite-link-note">
-              Share this sign-in link with the staff member directly:
-              <br />
-              <code>{inviteLink}</code>
-            </p>
-          )}
         </form>
       )}
 

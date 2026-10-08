@@ -89,6 +89,10 @@ export default function AuditLogPage() {
                 },
                 responseType: "blob",
             });
+            const pdfSignature = await data.slice(0, 5).text();
+            if (pdfSignature !== "%PDF-") {
+                throw new Error("The audit export endpoint did not return a PDF.");
+            }
             downloadBlob(data, `EddTechPOS-audit-log-${new Date().toISOString().slice(0, 10)}.pdf`);
             setExportNotice("Your audit PDF is downloading now.");
             window.setTimeout(() => setExportNotice(""), 4500);
