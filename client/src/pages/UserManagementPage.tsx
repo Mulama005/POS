@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { isAxiosError } from 'axios'
-import { changeUserRole, deactivateUser, inviteUser, listUsers, reactivateUser } from '../services/usersService'
+import { assignUserRegister, changeUserRole, deactivateUser, inviteUser, listUsers, reactivateUser } from '../services/usersService'
+import { listRegisters, type RegisterSummary } from '../services/registersService'
 import type { ManagedUser } from '../types/user'
 import type { UserRole, ApiErrorBody } from '../types/auth'
 import './UserManagementPage.css'
@@ -19,8 +20,10 @@ function getErrorMessage(err: unknown, fallback: string): string {
 
 export function UserManagementPage() {
   const [users, setUsers] = useState<ManagedUser[]>([])
+  const [registers, setRegisters] = useState<RegisterSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [registersError, setRegistersError] = useState<string | null>(null)
   const [rowError, setRowError] = useState<Record<string, string>>({})
   const [rowBusy, setRowBusy] = useState<Record<string, boolean>>({})
 
@@ -49,6 +52,9 @@ export function UserManagementPage() {
 
   useEffect(() => {
     void loadUsers()
+    listRegisters().then(setRegisters).catch(() => {
+      setRegistersError('Could not load registers. Refresh the page and try again.')
+    })
   }, [])
 
   const withRowState = async (userId: string, action: () => Promise<void>) => {
@@ -67,6 +73,12 @@ export function UserManagementPage() {
   const handleRoleChange = (user: ManagedUser, newRole: UserRole) => {
     if (newRole === user.role) return
     void withRowState(user.id, () => changeUserRole(user.id, newRole))
+  }
+
+  const handleRegisterChange = (user: ManagedUser, registerId: string) => {
+    const nextRegisterId = registerId || null
+    if (nextRegisterId === user.assignedRegisterId) return
+    void withRowState(user.id, () => assignUserRegister(user.id, nextRegisterId))
   }
 
   const handleDeactivate = (user: ManagedUser) => {
@@ -139,6 +151,8 @@ export function UserManagementPage() {
         </section>
       )}
 
+      {registersError && <p className="user-mgmt-error" role="alert">{registersError}</p>}
+
       {inviteOpen && (
         <form className="user-mgmt-invite-form" onSubmit={(e) => void handleInviteSubmit(e)}>
           <div className="user-mgmt-invite-fields">
@@ -179,6 +193,7 @@ export function UserManagementPage() {
               <th>Email</th>
               <th>Phone</th>
               <th>Role</th>
+              <th>Register</th>
               <th>Status</th>
               <th>2FA</th>
               <th></th>
@@ -200,6 +215,24 @@ export function UserManagementPage() {
                       <option key={r} value={r}>{r}</option>
                     ))}
                   </select>
+                </td>
+                <td>
+                  {u.role === 'Cashier' ? (
+                    <select
+                      aria-label={`Register for ${u.fullName}`}
+                      value={u.assignedRegisterId ?? ''}
+                      disabled={rowBusy[u.id] || Boolean(registersError)}
+                      onChange={(e) => handleRegisterChange(u, e.target.value)}
+                    >
+                      <option value="">Unassigned</option>
+                      {u.assignedRegisterId && !registers.some((register) => register.id === u.assignedRegisterId) && (
+                        <option value={u.assignedRegisterId}>{u.assignedRegisterName ?? 'Inactive register'}</option>
+                      )}
+                      {registers.map((register) => (
+                        <option key={register.id} value={register.id}>{register.name}</option>
+                      ))}
+                    </select>
+                  ) : '—'}
                 </td>
                 <td>{u.isActive ? 'Active' : 'Deactivated'}</td>
                 <td>{u.mfaEnabled ? 'On' : 'Off'}</td>

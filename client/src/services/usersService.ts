@@ -16,6 +16,10 @@ export async function changeUserRole(userId: string, role: UserRole): Promise<vo
   await apiClient.put(`/api/users/${userId}/role`, { role })
 }
 
+export async function assignUserRegister(userId: string, registerId: string | null): Promise<void> {
+  await apiClient.put(`/api/users/${userId}/register`, { registerId })
+}
+
 export async function deactivateUser(userId: string): Promise<void> {
   await apiClient.post(`/api/users/${userId}/deactivate`)
 }
