@@ -6,6 +6,8 @@ export interface ManagedUser {
   email: string | null
   phoneNumber?: string | null
   role: UserRole
+  assignedRegisterId: string | null
+  assignedRegisterName: string | null
   isActive: boolean
   mfaEnabled: boolean
 }

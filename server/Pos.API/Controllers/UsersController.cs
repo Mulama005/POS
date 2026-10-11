@@ -59,6 +59,8 @@ public sealed class UsersController : ControllerBase
                 Email = u.Email.EndsWith("@local.invalid") ? null : u.Email,
                 u.PhoneNumber,
                 Role = u.Role.ToString(),
+                u.AssignedRegisterId,
+                AssignedRegisterName = u.AssignedRegister == null ? null : u.AssignedRegister.Name,
                 u.IsActive,
                 u.MfaEnabled,
             })
@@ -207,6 +209,12 @@ public sealed class UsersController : ControllerBase
         await _userManager.RemoveFromRolesAsync(appUser, currentRoles);
         await _userManager.AddToRoleAsync(appUser, newRole.ToString());
 
+        if (domainUser.Role == RegisterUserRole.Cashier && newRole != RegisterUserRole.Cashier)
+        {
+            domainUser.AssignedRegisterId = null;
+            domainUser.SessionsRevokedAt = DateTimeOffset.UtcNow;
+        }
+
         domainUser.Role = newRole;
         await _db.SaveChangesAsync(cancellationToken);
         
@@ -223,6 +231,50 @@ public sealed class UsersController : ControllerBase
         );
 
         return Ok(new { message = $"Role updated to {newRole}." });
+    }
+
+    /// <summary>Assign or unassign a register for a cashier.</summary>
+    [HttpPut("{id:guid}/register")]
+    public async Task<IActionResult> AssignRegister(Guid id, [FromBody] AssignRegisterRequest request, CancellationToken cancellationToken)
+    {
+        var domainUser = await _db.DomainUsers.FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+        if (domainUser is null)
+        {
+            return NotFound();
+        }
+
+        if (domainUser.Role != RegisterUserRole.Cashier)
+        {
+            return BadRequest("Registers can only be assigned to cashiers.");
+        }
+
+        if (request.RegisterId.HasValue)
+        {
+            var registerExists = await _db.Registers.AnyAsync(
+                r => r.Id == request.RegisterId.Value && r.IsActive, cancellationToken);
+            if (!registerExists)
+            {
+                return BadRequest("Select an active register.");
+            }
+        }
+
+        var previousRegisterId = domainUser.AssignedRegisterId;
+        domainUser.AssignedRegisterId = request.RegisterId;
+        // Register identity is included in the cashier's access token. Revoke their
+        // current session so the new assignment takes effect at their next login.
+        domainUser.SessionsRevokedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(cancellationToken);
+
+        var adminId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (adminId is null) return Unauthorized();
+        await _auditService.LogAsync(
+            userId: Guid.Parse(adminId),
+            actionType: "USER_REGISTER_ASSIGNED",
+            entityName: "User",
+            entityId: domainUser.Id,
+            details: $"Changed cashier register from {previousRegisterId?.ToString() ?? "none"} to {request.RegisterId?.ToString() ?? "none"}");
+
+        return Ok(new { message = request.RegisterId.HasValue ? "Register assigned. The cashier must sign in again." : "Register assignment cleared. The cashier must sign in again." });
     }
 
     /// <summary>
