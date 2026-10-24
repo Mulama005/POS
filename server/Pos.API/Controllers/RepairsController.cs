@@ -386,6 +386,7 @@ public sealed class RepairsController : ControllerBase
             .Select(r => new {
                 r.Id, r.TicketNumber, r.DeviceDescription, r.ReportedFault, Status = r.Status.ToString(), r.CreatedAt,
                 r.QuotedCost, r.FinalCost, r.AmountPaid,
+                r.DiagnosisNotes,
                 Balance = r.FinalCost != null ? r.FinalCost - r.AmountPaid : (decimal?)null,
             })
             .ToListAsync(cancellationToken);
@@ -405,7 +406,7 @@ public sealed class RepairsController : ControllerBase
                 r.Id, r.TicketNumber, r.DeviceDescription, r.ReportedFault,
                 Status = r.Status.ToString(), r.AssignedTechnicianId, r.CreatedAt,
                 AssignedTechnicianName = _db.DomainUsers.Where(u => u.Id == r.AssignedTechnicianId).Select(u => u.FullName).FirstOrDefault(),
-                r.QuotedCost, r.FinalCost, r.AmountPaid,
+                r.QuotedCost, r.FinalCost, r.AmountPaid, r.DiagnosisNotes,
                 Balance = r.FinalCost != null ? r.FinalCost - r.AmountPaid : (decimal?)null,
             })
             .ToListAsync(cancellationToken);

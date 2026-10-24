@@ -41,6 +41,7 @@ export function RepairsPage() {
   const [busy, setBusy] = useState(false)
   const [form, setForm] = useState({ customerId: '', deviceDescription: '', reportedFault: '', quotedCost: '' })
   const [notes, setNotes] = useState<Record<string, string>>({})
+  const [visibleDiagnosisNotes, setVisibleDiagnosisNotes] = useState<Record<string, boolean>>({})
   const [techIds, setTechIds] = useState<Record<string, string>>({})
   const [costInputs, setCostInputs] = useState<Record<string, string>>({})
   const [paymentAmounts, setPaymentAmounts] = useState<Record<string, string>>({})
@@ -90,7 +91,12 @@ export function RepairsPage() {
   const setStatus = async (repair: Repair, status: RepairStatus) => {
     setBusy(true)
     try {
-      await updateRepairStatus(repair.id, status, notes[repair.id] ?? '')
+      await updateRepairStatus(repair.id, status, notes[repair.id] ?? repair.diagnosisNotes ?? '')
+      setNotes((current) => {
+        const next = { ...current }
+        delete next[repair.id]
+        return next
+      })
       await load()
     } catch (e) {
       setError(errorText(e))
@@ -224,9 +230,11 @@ export function RepairsPage() {
                       <select value={repair.status} disabled={busy} onChange={(e) => void setStatus(repair, e.target.value as RepairStatus)}>
                         {STATUSES.map((status) => <option key={status}>{status}</option>)}
                       </select>
-                      <input
-                        placeholder="Diagnosis notes (optional)"
-                        value={notes[repair.id] ?? ''}
+                      <textarea
+                        className="repair-notes-input"
+                        aria-label={`Diagnosis notes for ${repair.ticketNumber}`}
+                        placeholder="Add diagnosis notes…"
+                        value={notes[repair.id] ?? repair.diagnosisNotes ?? ''}
                         onChange={(e) => setNotes({ ...notes, [repair.id]: e.target.value })}
                       />
                       {canManage && (
@@ -235,6 +243,26 @@ export function RepairsPage() {
                         </button>
                       )}
                     </div>
+
+                    <button
+                      type="button"
+                      className="service-button service-button--quiet repair-notes-toggle"
+                      aria-expanded={Boolean(visibleDiagnosisNotes[repair.id])}
+                      onClick={() => setVisibleDiagnosisNotes((current) => ({ ...current, [repair.id]: !current[repair.id] }))}
+                    >
+                      {visibleDiagnosisNotes[repair.id] ? 'Hide diagnosis notes' : 'Diagnosis notes'}
+                    </button>
+                    {visibleDiagnosisNotes[repair.id] && (
+                      <section className="repair-notes" aria-label={`Saved diagnosis notes for ${repair.ticketNumber}`}>
+                        <div className="repair-notes__heading">
+                          <span>Saved diagnosis notes</span>
+                          <span>{repair.diagnosisNotes ? 'Saved' : 'No note yet'}</span>
+                        </div>
+                        <p className={!repair.diagnosisNotes ? 'repair-notes__empty' : ''}>
+                          {repair.diagnosisNotes || 'No diagnosis notes have been saved for this repair.'}
+                        </p>
+                      </section>
+                    )}
 
                     {canManage && (
                       <div className="service-inline">
