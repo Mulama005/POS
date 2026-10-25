@@ -297,6 +297,30 @@
 .monthly-line-chart .chart-axis-label { fill: var(--pos-ink-muted); font-family: var(--pos-font-mono); font-size: 11px; }
 .monthly-line-chart .chart-axis-label--y { text-anchor: end; }
 .monthly-line-chart .chart-axis-label--x { text-anchor: middle; }
+.repair-report-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 28px; }
+.repair-tech-chart { padding: 22px 24px 14px; border: 1px solid var(--pos-border); background: var(--pos-shell-bg); }
+.repair-tech-chart__legend { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; color: var(--pos-ink-muted); font: 11px var(--pos-font-mono); letter-spacing: .04em; text-transform: uppercase; }
+.repair-tech-chart__legend span { display: inline-flex; align-items: center; gap: 8px; }
+.repair-tech-chart__legend i { width: 11px; height: 11px; display: inline-block; border-radius: 50%; }
+.repair-tech-chart__rate-dot, .repair-tech-chart__rate-point { background: #176b55; fill: #176b55; }
+.repair-tech-chart__money-dot, .repair-tech-chart__money-point { background: #b07622; fill: #b07622; }
+.repair-tech-chart__legend small { margin-left: auto; font: inherit; text-transform: none; letter-spacing: 0; }
+.repair-tech-chart svg { display: block; width: 100%; min-width: 680px; height: auto; }
+.repair-tech-chart .chart-gridline { stroke: var(--pos-border); stroke-width: 1; }
+.repair-tech-chart .chart-axis { stroke: var(--pos-ink-muted); stroke-width: 1.5; }
+.repair-tech-chart .chart-axis-label { fill: var(--pos-ink-muted); font-family: var(--pos-font-mono); font-size: 11px; }
+.repair-tech-chart .chart-axis-label--y { text-anchor: end; }
+.repair-tech-chart__rate-line, .repair-tech-chart__money-line { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.repair-tech-chart__rate-line { stroke: #176b55; }
+.repair-tech-chart__money-line { stroke: #b07622; }
+.repair-tech-chart__rate-point { stroke: var(--pos-shell-bg); stroke-width: 2; }
+.repair-tech-chart__money-point { stroke: var(--pos-shell-bg); stroke-width: 2; }
+.report-table-scroll { overflow-x: auto; margin-top: 26px; }
+.report-table-scroll table { width: 100%; border-collapse: collapse; }
+.report-table-scroll th, .report-table-scroll td { padding: 13px 12px 13px 0; border-bottom: 1px solid var(--pos-border); text-align: left; font-size: 13px; white-space: nowrap; }
+.report-table-scroll th { color: var(--pos-ink-muted); font-size: 10px; letter-spacing: .13em; text-transform: uppercase; }
+.report-table-scroll td:not(:first-child) { font-family: var(--pos-font-mono); font-size: 12px; }
+.repair-report-note { color: var(--pos-ink-muted); font-size: 12px; line-height: 1.5; margin-top: 14px; }
 .report-tables { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px; }
 .report-breakdown h3 { margin-bottom: 20px; }
 .report-breakdown table { width: 100%; border-collapse: collapse; }

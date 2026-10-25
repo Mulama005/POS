@@ -99,7 +99,14 @@ public class ReportsController : ControllerBase
                            && payment.Sale.Status == SaleStatus.Completed
                            && payment.Sale.SaleDate >= previousStartUtc
                            && payment.Sale.SaleDate < currentEndUtc)
-            .Select(payment => new { payment.Sale.SaleDate, payment.Method, payment.Amount })
+            .Select(payment => new { payment.Sale.SaleDate, payment.Method, payment.BankName, payment.Amount })
+            .ToListAsync();
+
+        var ledgerPayments = await _context.CreditTransactions.AsNoTracking()
+            .Where(transaction => transaction.Type == CreditTransactionType.Payment
+                               && transaction.Timestamp >= previousStart.ToUniversalTime()
+                               && transaction.Timestamp < currentEnd.ToUniversalTime())
+            .Select(transaction => new { transaction.Timestamp, transaction.PaymentMethod, transaction.BankName, transaction.Amount })
             .ToListAsync();
 
         var creditTransactions = await _context.CreditTransactions.AsNoTracking()
@@ -116,13 +123,18 @@ public class ReportsController : ControllerBase
         var salesPerformance = BuildSalesPerformance(
             sales, saleItems, currentStartUtc, currentEndUtc, previousStartUtc, previousEndUtc);
 
-        var paymentBreakdown = payments
-            .GroupBy(p => p.Method)
+        var paymentEntries = payments
+            .Select(p => (Date: p.SaleDate, Method: p.Method.ToString(), p.Amount, p.BankName))
+            .Concat(ledgerPayments.Select(p => (Date: p.Timestamp.UtcDateTime, Method: p.PaymentMethod ?? "Payment", p.Amount, p.BankName)))
+            .ToList();
+
+        var paymentBreakdown = paymentEntries
+            .GroupBy(p => new { p.Method, p.BankName })
             .Select(g => new
             {
-                Method = g.Key.ToString(),
-                CurrentTotal = g.Where(p => IsInRange(p.SaleDate, currentStartUtc, currentEndUtc)).Sum(p => p.Amount),
-                PreviousTotal = g.Where(p => IsInRange(p.SaleDate, previousStartUtc, previousEndUtc)).Sum(p => p.Amount)
+                Method = g.Key.BankName is null ? g.Key.Method : $"{g.Key.Method} · {g.Key.BankName}",
+                CurrentTotal = g.Where(p => IsInRange(p.Date, currentStartUtc, currentEndUtc)).Sum(p => p.Amount),
+                PreviousTotal = g.Where(p => IsInRange(p.Date, previousStartUtc, previousEndUtc)).Sum(p => p.Amount)
             })
             .Select(x =>
             {
@@ -463,6 +475,137 @@ public class ReportsController : ControllerBase
     //  EXPORT ENDPOINTS
     // ═══════════════════════════════════════════════════════════════════════
 
+    [HttpGet("repair-summary")]
+    public async Task<IActionResult> RepairSummary([FromQuery] DateOnly? fromDate = null, [FromQuery] DateOnly? toDate = null, CancellationToken ct = default)
+    {
+        var report = await BuildRepairSummaryAsync(fromDate, toDate, ct);
+        if (report is null) return BadRequest("The start date must be on or before the end date.");
+        return Ok(report);
+    }
+
+    [HttpGet("export/repairs")]
+    public async Task<IActionResult> ExportRepairReport([FromQuery] string format = "csv", [FromQuery] DateOnly? fromDate = null, [FromQuery] DateOnly? toDate = null, CancellationToken ct = default)
+    {
+        var report = await BuildRepairSummaryAsync(fromDate, toDate, ct);
+        if (report is null) return BadRequest("The start date must be on or before the end date.");
+
+        await LogExportAsync("Repair performance", report.From.UtcDateTime, report.ToExclusive.UtcDateTime.AddDays(-1), format);
+        var fileBase = $"repair-performance-{report.FromDay:yyyyMMdd}-{report.ToDay:yyyyMMdd}";
+        if (format.Equals("csv", StringComparison.OrdinalIgnoreCase))
+        {
+            var csvRows = report.Technicians.Select(x => new RepairReportExportRow(
+                x.TechnicianName, x.CompletedRepairs, x.ClockedHours, x.WorkRate, x.MoneyCollected)).ToList();
+            if (report.UnassignedRepairs > 0 || report.UnassignedMoneyCollected > 0)
+                csvRows.Add(new RepairReportExportRow("Unassigned", report.UnassignedRepairs, 0, null, report.UnassignedMoneyCollected));
+            csvRows.Add(new RepairReportExportRow("TOTAL", report.TotalCompletedRepairs, report.TotalClockedHours, null, report.TotalMoneyCollected));
+            using var writer = new StringWriter(CultureInfo.InvariantCulture);
+            using (var csv = new CsvHelper.CsvWriter(writer, CultureInfo.InvariantCulture)) csv.WriteRecords(csvRows);
+            return File(System.Text.Encoding.UTF8.GetBytes(writer.ToString()), "text/csv", $"{fileBase}.csv");
+        }
+
+        if (!format.Equals("pdf", StringComparison.OrdinalIgnoreCase))
+            return BadRequest("Unsupported format. Use 'csv' or 'pdf'.");
+
+        var document = Document.Create(container => container.Page(page =>
+        {
+            page.Size(PageSizes.A4.Landscape());
+            page.Margin(1.5f, Unit.Centimetre);
+            page.DefaultTextStyle(style => style.FontFamily("Helvetica").FontSize(9));
+            page.Header().Column(column =>
+            {
+                column.Item().Text("REPAIR PERFORMANCE SUMMARY").FontSize(18).Bold();
+                column.Item().PaddingTop(4).Text($"{report.FromDay:dd MMM yyyy} — {report.ToDay:dd MMM yyyy} · EAT (UTC+3)").FontColor(Colors.Grey.Darken1);
+            });
+            page.Content().Column(column =>
+            {
+                column.Item().PaddingVertical(14).Row(row =>
+                {
+                    row.RelativeItem().Text($"Completed repairs  {report.TotalCompletedRepairs}").SemiBold();
+                    row.RelativeItem().Text($"Payments collected  KES {report.TotalMoneyCollected:N2}").SemiBold();
+                    row.RelativeItem().Text($"Clocked hours  {report.TotalClockedHours:N2}").SemiBold();
+                });
+                column.Item().Text("Technician work rate is completed repairs divided by recorded clocked hours. Money collected is payment recorded against repairs currently assigned to each technician.").FontSize(8).FontColor(Colors.Grey.Darken1);
+                column.Item().PaddingTop(14).Table(table =>
+                {
+                    table.ColumnsDefinition(columns =>
+                    {
+                        columns.RelativeColumn(2); columns.RelativeColumn(1); columns.RelativeColumn(1); columns.RelativeColumn(1.2f); columns.RelativeColumn(1.4f);
+                    });
+                    table.Header(header =>
+                    {
+                        foreach (var title in new[] { "Technician", "Completed repairs", "Clocked hours", "Repairs / hour", "Money collected (KES)" })
+                            header.Cell().Background(Colors.Grey.Lighten3).Padding(7).Text(title).SemiBold();
+                    });
+                    foreach (var item in report.Technicians)
+                    {
+                        var cells = new[] { item.TechnicianName, item.CompletedRepairs.ToString(), item.ClockedHours.ToString("N2"), item.WorkRate?.ToString("N2") ?? "—", item.MoneyCollected.ToString("N2") };
+                        foreach (var value in cells) table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).Padding(7).Text(value);
+                    }
+                    if (report.UnassignedRepairs > 0 || report.UnassignedMoneyCollected > 0)
+                    {
+                        var cells = new[] { "Unassigned", report.UnassignedRepairs.ToString(), "—", "—", report.UnassignedMoneyCollected.ToString("N2") };
+                        foreach (var value in cells) table.Cell().BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).Padding(7).Text(value);
+                    }
+                    var totals = new[] { "TOTAL", report.TotalCompletedRepairs.ToString(), report.TotalClockedHours.ToString("N2"), "—", report.TotalMoneyCollected.ToString("N2") };
+                    foreach (var value in totals) table.Cell().Background(Colors.Grey.Lighten4).Padding(7).Text(value).SemiBold();
+                    if (report.Technicians.Count == 0) table.Cell().ColumnSpan(5).Padding(10).Text("No technicians found.");
+                });
+            });
+            page.Footer().AlignRight().Text(text => { text.Span("Page "); text.CurrentPageNumber(); text.Span(" of "); text.TotalPages(); });
+        }));
+        return File(document.GeneratePdf(), "application/pdf", $"{fileBase}.pdf");
+    }
+
+    private async Task<RepairSummaryData?> BuildRepairSummaryAsync(DateOnly? fromDate, DateOnly? toDate, CancellationToken ct)
+    {
+        var today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.ToOffset(NairobiOffset).DateTime);
+        var fromDay = fromDate ?? new DateOnly(today.Year, today.Month, 1);
+        var toDay = toDate ?? today;
+        if (fromDay > toDay) return null;
+        var rangeStart = new DateTimeOffset(fromDay.ToDateTime(TimeOnly.MinValue), NairobiOffset).ToUniversalTime();
+        var rangeEnd = new DateTimeOffset(toDay.AddDays(1).ToDateTime(TimeOnly.MinValue), NairobiOffset).ToUniversalTime();
+
+        var technicians = await _context.DomainUsers.AsNoTracking()
+            .Where(x => x.Role == RegisterUserRole.Technician)
+            .OrderBy(x => x.FullName)
+            .Select(x => new { x.Id, x.FullName })
+            .ToListAsync(ct);
+        var completedRows = await _context.RepairJobs.AsNoTracking()
+            .Where(x => x.Status == RepairStatus.Collected && x.CollectedAt >= rangeStart && x.CollectedAt < rangeEnd)
+            .Select(x => new { x.AssignedTechnicianId })
+            .ToListAsync(ct);
+        var moneyRows = await (
+            from payment in _context.CreditTransactions.AsNoTracking()
+            join job in _context.RepairJobs.AsNoTracking() on payment.RepairJobId equals job.Id
+            where payment.Type == CreditTransactionType.Payment && payment.Timestamp >= rangeStart && payment.Timestamp < rangeEnd
+            select new { job.AssignedTechnicianId, payment.Amount }
+        ).ToListAsync(ct);
+        var timeEntries = await _context.TechnicianTimeEntries.AsNoTracking()
+            .Where(x => x.ClockInAt < rangeEnd && (x.ClockOutAt == null || x.ClockOutAt > rangeStart))
+            .Select(x => new { x.TechnicianId, x.ClockInAt, x.ClockOutAt })
+            .ToListAsync(ct);
+        var now = DateTimeOffset.UtcNow;
+        var reportTechnicians = technicians.Select(technician =>
+        {
+            var repairsDone = completedRows.Count(x => x.AssignedTechnicianId == technician.Id);
+            var received = moneyRows.Where(x => x.AssignedTechnicianId == technician.Id).Sum(x => x.Amount);
+            var hours = timeEntries.Where(x => x.TechnicianId == technician.Id).Sum(x =>
+            {
+                var start = x.ClockInAt < rangeStart ? rangeStart : x.ClockInAt;
+                var end = (x.ClockOutAt ?? now) > rangeEnd ? rangeEnd : (x.ClockOutAt ?? now);
+                return Math.Max(0, (end - start).TotalHours);
+            });
+            return new RepairTechnicianSummary(technician.Id, technician.FullName, repairsDone, Math.Round((decimal)hours, 2), hours <= 0 ? null : Math.Round(repairsDone / (decimal)hours, 2), received);
+        }).ToList();
+
+        var unassignedRepairs = completedRows.Count(x => x.AssignedTechnicianId == null);
+        var unassignedMoney = moneyRows.Where(x => x.AssignedTechnicianId == null).Sum(x => x.Amount);
+        return new RepairSummaryData(fromDay, toDay, rangeStart, rangeEnd, reportTechnicians,
+            reportTechnicians.Sum(x => x.CompletedRepairs) + unassignedRepairs,
+            reportTechnicians.Sum(x => x.MoneyCollected) + unassignedMoney,
+            reportTechnicians.Sum(x => x.ClockedHours), unassignedRepairs, unassignedMoney);
+    }
+
     [HttpGet("export/sales")]
     public async Task<IActionResult> ExportSalesReport(
         [FromQuery] string format = "csv",
@@ -500,13 +643,16 @@ public class ReportsController : ControllerBase
 
         var paymentBySale = payments
             .GroupBy(p => p.SaleId)
-            .ToDictionary(g => g.Key, g => g.OrderBy(p => p.ProcessedAt).First());
+            .ToDictionary(g => g.Key, g => g.OrderBy(p => p.ProcessedAt).ToList());
 
         // 3. Flatten to one row per line item
         var rows = new List<SalesReportRow>();
         foreach (var sale in sales)
         {
-            paymentBySale.TryGetValue(sale.Id, out var payment);
+            paymentBySale.TryGetValue(sale.Id, out var salePayments);
+            salePayments ??= [];
+            var payMode = string.Join(" + ", salePayments.Select(p =>
+                $"{FormatPayMode(p.Method)}{(string.IsNullOrWhiteSpace(p.BankName) ? "" : $" · {p.BankName}")}"));
 
             foreach (var item in sale.Items)
             {
@@ -518,9 +664,10 @@ public class ReportsController : ControllerBase
                     Subtotal = item.LineTotal - item.TaxAmount,
                     Tax = item.TaxAmount,
                     Total = item.LineTotal,
-                    PayMode = FormatPayMode(payment?.Method),
-                    MpesaRef = payment?.ExternalReference,
-                    MpesaPhone = MaskPhone(payment?.MpesaPhoneNumber),
+                    PayMode = payMode.Length == 0 ? "—" : payMode,
+                    BankName = string.Join(", ", salePayments.Where(p => !string.IsNullOrWhiteSpace(p.BankName)).Select(p => p.BankName).Distinct()),
+                    MpesaRef = string.Join(", ", salePayments.Where(p => !string.IsNullOrWhiteSpace(p.ExternalReference)).Select(p => p.ExternalReference)),
+                    MpesaPhone = MaskPhone(salePayments.FirstOrDefault(p => p.Method == PaymentMethod.Mpesa)?.MpesaPhoneNumber),
                     EtimsCuNumber = _etimsEnabled ? sale.EtimsInvoiceNumber : null,
                     EtimsStatus = _etimsEnabled ? (sale.IsSynced ? "Success" : "Pending") : "Not enabled",
                     CashierName = sale.Cashier?.FullName ?? "—"
@@ -1309,6 +1456,7 @@ public class ReportsController : ControllerBase
         new SalesColumn("VAT (16%)",           56,   false, TextAlign.Right),
         new SalesColumn("Total (KES)",         62,   false, TextAlign.Right),
         new SalesColumn("Pay Mode",            54,   false, TextAlign.Left),
+        new SalesColumn("Bank",                58,   false, TextAlign.Left),
         new SalesColumn("M-Pesa Ref",          62,   false, TextAlign.Left),
         new SalesColumn("M-Pesa Phone",        64,   false, TextAlign.Left),
         new SalesColumn("eTIMS CU",            76,   false, TextAlign.Left),
@@ -1415,6 +1563,7 @@ public class ReportsController : ControllerBase
                     (row.Tax.ToString("N2"),                        TextAlign.Right),
                     (row.Total.ToString("N2"),                      TextAlign.Right),
                     (row.PayMode       ?? "—",                      TextAlign.Left),
+                    (row.BankName      ?? "—",                      TextAlign.Left),
                     (row.MpesaRef      ?? "—",                      TextAlign.Left),
                     (row.MpesaPhone    ?? "—",                      TextAlign.Left),
                     (row.EtimsCuNumber ?? "—",                      TextAlign.Left),
@@ -1504,7 +1653,7 @@ public class ReportsController : ControllerBase
 
         sb.AppendLine(
             "Sale Date/Time,Product Description,Qty,Subtotal,VAT (16%),Total (KES)," +
-            "Pay Mode,M-Pesa Ref,M-Pesa Phone,KRA eTIMS CU,eTIMS Status,Cashier");
+            "Pay Mode,Bank,M-Pesa or Transfer Ref,M-Pesa Phone,KRA eTIMS CU,eTIMS Status,Cashier");
 
         foreach (var row in rows)
         {
@@ -1516,6 +1665,7 @@ public class ReportsController : ControllerBase
                 row.Tax.ToString("F2", CultureInfo.InvariantCulture),
                 row.Total.ToString("F2", CultureInfo.InvariantCulture),
                 Escape(row.PayMode ?? ""),
+                Escape(row.BankName ?? ""),
                 Escape(row.MpesaRef ?? ""),
                 Escape(row.MpesaPhone ?? ""),
                 Escape(row.EtimsCuNumber ?? ""),
@@ -1545,7 +1695,8 @@ public class ReportsController : ControllerBase
         return method switch
         {
             PaymentMethod.Cash => "Cash",
-            PaymentMethod.Mpesa => "Mpesa",
+            PaymentMethod.Mpesa => "M-Pesa",
+            PaymentMethod.BankTransfer => "Bank transfer",
             PaymentMethod.Card => "Card",
             null => "—",
             _ => method.ToString() ?? "—"
@@ -1672,6 +1823,7 @@ public class SalesReportRow
     public decimal Tax { get; set; }
     public decimal Total { get; set; }
     public string? PayMode { get; set; }
+    public string? BankName { get; set; }
     public string? MpesaRef { get; set; }
     public string? MpesaPhone { get; set; }
     public string? EtimsCuNumber { get; set; }
@@ -1806,3 +1958,9 @@ public record ProductBreakdownDto(
     decimal PreviousTotal,
     decimal AbsoluteDelta,
     decimal? Percent);
+
+public sealed record RepairTechnicianSummary(Guid TechnicianId, string TechnicianName, int CompletedRepairs, decimal ClockedHours, decimal? WorkRate, decimal MoneyCollected);
+public sealed record RepairSummaryData(DateOnly FromDay, DateOnly ToDay, DateTimeOffset From, DateTimeOffset ToExclusive,
+    IReadOnlyList<RepairTechnicianSummary> Technicians, int TotalCompletedRepairs, decimal TotalMoneyCollected,
+    decimal TotalClockedHours, int UnassignedRepairs, decimal UnassignedMoneyCollected);
+public sealed record RepairReportExportRow(string Technician, int CompletedRepairs, decimal ClockedHours, decimal? RepairsPerHour, decimal MoneyCollectedKes);

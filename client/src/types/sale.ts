@@ -1,6 +1,6 @@
 import type { ProductSummary } from './product'
 
-export type PaymentMethod = 'Cash' | 'Mpesa' | 'Card'
+export type PaymentMethod = 'Cash' | 'Mpesa' | 'BankTransfer' | 'Card'
 
 /** One line in an in-progress cart, kept client-side (Dexie) until checkout completes.
  * Price/tax shown here are for display only — the server recomputes everything
@@ -38,7 +38,11 @@ export interface Cart {
 export interface PaymentInput {
   method: PaymentMethod
   amount: number
-  mpesaPhoneNumber?: string | null
+  bankName?: string | null
+  reference?: string | null
+  isManualMpesa?: boolean
+  manualMpesaVerified?: boolean
+  bankTransferVerified?: boolean
 }
 
 export interface CompleteSaleRequest {
@@ -74,6 +78,7 @@ export interface PaymentResult {
   amount: number
   status: string
   externalReference: string | null
+  bankName: string | null
 }
 
 export interface CompleteSaleResult {

@@ -548,6 +548,31 @@
     align-items: end;
 }
 
+.repair-payment-details {
+    margin-top: 12px;
+    gap: 12px;
+}
+
+.repair-payment-hint {
+    color: var(--pos-ink-muted);
+    font-size: 12px;
+}
+
+.repair-payment-confirmation {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 42px;
+    color: var(--pos-ink-muted);
+    font-size: 12px;
+}
+
+.repair-payment-confirmation input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--pos-ink);
+}
+
 /* --- Repair tracking shell ------------------------------------------- */
 .track-shell {
     max-width: 640px;

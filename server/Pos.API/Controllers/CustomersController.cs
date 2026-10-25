@@ -95,6 +95,8 @@ public sealed class CustomersController : ControllerBase
                 Type = t.Type.ToString(),
                 t.Amount,
                 t.PaymentMethod,
+                t.BankName,
+                t.ExternalReference,
                 t.Notes,
                 t.BalanceAfter,
                 t.Timestamp,

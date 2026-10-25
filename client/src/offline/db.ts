@@ -58,7 +58,7 @@ export interface SaleLineItem {
 
 export interface SaleActionPayload {
   lineItems: SaleLineItem[];
-  paymentMethod: "Cash" | "MPesa" | "Card" | "Credit";
+  paymentMethod: "Cash" | "MPesa" | "BankTransfer" | "Card" | "Credit";
   customerId?: string; // present for credit sales (Deni ledger)
   totalAmount: number;
 }

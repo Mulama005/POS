@@ -86,3 +86,23 @@ export interface ProductFormValues {
   reorderThreshold: string
   warrantyMonths: string
 }
+
+/** Matches ProductImportDto in the CSV preview/commit API. CategoryName must
+ * exactly match an existing product category. */
+export interface ProductImportRow {
+  sku: string
+  barcode: string | null
+  name: string
+  categoryName: string
+  costPrice: number
+  salePrice: number
+  taxClass: string | null
+  reorderThreshold: number
+  warrantyMonths: number
+}
+
+export interface ProductImportPreview {
+  row: ProductImportRow
+  isDuplicate: boolean
+  action: 'Create' | 'Skip'
+}

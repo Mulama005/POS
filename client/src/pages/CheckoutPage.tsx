@@ -366,7 +366,7 @@ export function CheckoutPage() {
 
       {selectedRegister && !selectedRegister.isTillOpen && (
         <div className="checkout-till-warning">
-          <span>This register's till is closed — a sale can't be completed until it's opened.</span>
+          <span>This register's till is closed a sale can't be completed until it's opened.</span>
           <button type="button" className="checkout-till-action" onClick={() => setTillOpenModalOpen(true)}>
             Open till
           </button>
@@ -569,10 +569,9 @@ export function CheckoutPage() {
                 </span>
               </div>
 
-              {(tillReconciliation.mpesaSalesTotal > 0 || tillReconciliation.cardSalesTotal > 0) && (
+              {(tillReconciliation.mpesaSalesTotal > 0 || tillReconciliation.cardSalesTotal > 0 || tillReconciliation.bankTransferSalesTotal > 0 || tillReconciliation.absaCashTotal > 0 || tillReconciliation.cooperativeCashTotal > 0) && (
                 <p className="till-reconciliation__note">
-                  Also collected {formatKes(tillReconciliation.mpesaSalesTotal)} via M-Pesa and{' '}
-                  {formatKes(tillReconciliation.cardSalesTotal)} via card this shift (not part of the cash count).
+                  Outside the drawer cash count: M-Pesa {formatKes(tillReconciliation.mpesaSalesTotal)}, card {formatKes(tillReconciliation.cardSalesTotal)}, bank transfers {formatKes(tillReconciliation.bankTransferSalesTotal)}, Absa cash deposits {formatKes(tillReconciliation.absaCashTotal)}, Co-operative cash deposits {formatKes(tillReconciliation.cooperativeCashTotal)}.
                 </p>
               )}
             </div>

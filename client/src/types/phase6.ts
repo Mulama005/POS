@@ -45,6 +45,8 @@ export interface LedgerEntry {
   type: 'CreditSale' | 'Payment'
   amount: number
   paymentMethod: string | null
+  bankName?: string | null
+  externalReference?: string | null
   notes: string | null
   balanceAfter: number
   timestamp: string

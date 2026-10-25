@@ -21,4 +21,7 @@ export interface TillReconciliation {
   variance: number
   mpesaSalesTotal: number
   cardSalesTotal: number
+  bankTransferSalesTotal: number
+  absaCashTotal: number
+  cooperativeCashTotal: number
 }

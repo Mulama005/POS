@@ -298,8 +298,14 @@ namespace Pos.Infrastructure.Migrations
                     b.Property<decimal>("BalanceAfter")
                         .HasColumnType("numeric");
 
+                    b.Property<string>("BankName")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("CustomerId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("ExternalReference")
+                        .HasColumnType("text");
 
                     b.Property<string>("Notes")
                         .HasColumnType("text");
@@ -313,6 +319,9 @@ namespace Pos.Infrastructure.Migrations
                     b.Property<Guid?>("RelatedSaleId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("RepairJobId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTimeOffset>("Timestamp")
                         .HasColumnType("timestamp with time zone");
 
@@ -320,6 +329,8 @@ namespace Pos.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("RepairJobId");
 
                     b.ToTable("CreditTransactions");
                 });
@@ -639,11 +650,17 @@ namespace Pos.Infrastructure.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<string>("BankName")
+                        .HasColumnType("text");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("ExternalReference")
                         .HasColumnType("text");
+
+                    b.Property<bool>("IsManualMpesa")
+                        .HasColumnType("boolean");
 
                     b.Property<int>("Method")
                         .HasColumnType("integer");
@@ -1286,6 +1303,42 @@ namespace Pos.Infrastructure.Migrations
                     b.ToTable("StockUnits");
                 });
 
+            modelBuilder.Entity("Pos.Domain.Entities.TechnicianTimeEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ClockInAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ClockInRecordedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ClockOutAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ClockOutRecordedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TechnicianId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClockInAt");
+
+                    b.HasIndex("ClockInRecordedByUserId");
+
+                    b.HasIndex("ClockOutRecordedByUserId");
+
+                    b.HasIndex("TechnicianId")
+                        .IsUnique()
+                        .HasFilter("\"ClockOutAt\" IS NULL");
+
+                    b.ToTable("TechnicianTimeEntries");
+                });
+
             modelBuilder.Entity("Pos.Domain.Entities.TillSession", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1600,6 +1653,14 @@ namespace Pos.Infrastructure.Migrations
                     b.Navigation("Sale");
                 });
 
+            modelBuilder.Entity("Pos.Domain.Entities.CreditTransaction", b =>
+                {
+                    b.HasOne("Pos.Domain.Entities.RepairJob", null)
+                        .WithMany()
+                        .HasForeignKey("RepairJobId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("Pos.Domain.Entities.EtimsCode", b =>
                 {
                     b.HasOne("Pos.Domain.Entities.EtimsCodeClass", "EtimsCodeClass")
@@ -1817,6 +1878,26 @@ namespace Pos.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Pos.Domain.Entities.TechnicianTimeEntry", b =>
+                {
+                    b.HasOne("Pos.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("ClockInRecordedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Pos.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("ClockOutRecordedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Pos.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("TechnicianId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Pos.Domain.Entities.TillSession", b =>

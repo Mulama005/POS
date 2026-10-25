@@ -24,7 +24,12 @@ public sealed record PaymentRequest(
     /// for now; that needs Step 32's credit-ledger module to track what's owed.</summary>
     string Method,
     decimal Amount,
-    string? MpesaPhoneNumber);
+    string? MpesaPhoneNumber,
+    string? BankName = null,
+    string? Reference = null,
+    bool IsManualMpesa = false,
+    bool ManualMpesaVerified = false,
+    bool BankTransferVerified = false);
 
 public sealed record CompleteSaleRequest(
     Guid ClientTransactionId,
@@ -54,7 +59,8 @@ public sealed record PaymentResponse(
     string Method,
     decimal Amount,
     string Status,
-    string? ExternalReference);
+    string? ExternalReference,
+    string? BankName = null);
 
 public sealed record CompleteSaleResponse(
     Guid SaleId,

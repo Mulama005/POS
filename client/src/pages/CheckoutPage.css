@@ -757,6 +757,40 @@
     padding-bottom: 16px;
     border-bottom: 1px solid var(--pos-border);
 }
+.payment-line-group > select,
+.payment-line-group > input:not([type='number']) {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 42px;
+    padding: 10px 12px;
+    border: 1px solid var(--pos-border);
+    border-radius: 6px;
+    color: var(--pos-ink);
+    background: var(--pos-bg);
+    font: inherit;
+    font-size: 14px;
+}
+.payment-line-hint {
+    color: var(--pos-ink-muted);
+    font-size: 12px;
+}
+.payment-line-confirmation {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--pos-ink);
+    font-size: 13px;
+}
+.payment-line-confirmation input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--pos-ink);
+}
+.payment-line-group > select:focus,
+.payment-line-group > input:focus {
+    outline: 2px solid color-mix(in srgb, var(--pos-ink) 16%, transparent);
+    outline-offset: 1px;
+}
 .payment-line-group:last-child {
     border-bottom: none;
 }
@@ -773,10 +807,6 @@
     font-family: var(--pos-font-mono);
     min-width: 0;
     text-align: right;
-}
-.payment-line-phone {
-    width: 100%;
-    box-sizing: border-box;
 }
 .payment-line button {
     flex: 0 0 auto;

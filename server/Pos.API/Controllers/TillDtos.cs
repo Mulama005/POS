@@ -27,4 +27,7 @@ public sealed record TillReconciliationResponse(
     /// <summary>Non-cash totals shown for context only — they don't affect the physical
     /// cash count, but a Manager reconciling the drawer usually wants the full picture.</summary>
     decimal MpesaSalesTotal,
-    decimal CardSalesTotal);
+    decimal CardSalesTotal,
+    decimal BankTransferSalesTotal,
+    decimal AbsaCashTotal,
+    decimal CooperativeCashTotal);
