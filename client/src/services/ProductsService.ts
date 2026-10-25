@@ -1,5 +1,5 @@
 import { apiClient } from './apiClient'
-import type { Product, ProductFormValues, ProductListResponse, ProductSummary } from '../types/product'
+import type { Product, ProductFormValues, ProductImportPreview, ProductImportRow, ProductListResponse, ProductSummary } from '../types/product'
 
 export async function searchProducts(query: string): Promise<ProductSummary[]> {
   if (!query.trim()) {
@@ -97,4 +97,16 @@ export async function updateProduct(id: string, values: ProductFormValues, image
  * removing the row (sale history keeps pointing at a real product). */
 export async function deleteProduct(id: string): Promise<void> {
   await apiClient.delete(`/api/products/${id}`)
+}
+
+export async function previewProductCsv(file: File): Promise<ProductImportPreview[]> {
+  const form = new FormData()
+  form.append('file', file)
+  const { data } = await apiClient.post<{ preview: ProductImportPreview[] }>('/api/products/import-csv/preview', form)
+  return data.preview
+}
+
+export async function commitProductCsv(rows: ProductImportRow[]): Promise<{ created: number }> {
+  const { data } = await apiClient.post<{ created: number }>('/api/products/import-csv/commit', rows)
+  return data
 }

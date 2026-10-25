@@ -149,6 +149,8 @@ public sealed class PaymentCallbacksController : ControllerBase
                 Type = CreditTransactionType.Payment,
                 Amount = attempt.Amount,
                 PaymentMethod = "M-Pesa",
+                ExternalReference = receipt ?? callback.CheckoutRequestId,
+                RepairJobId = job.Id,
                 Notes = $"Repair {job.TicketNumber} payment - M-Pesa {receipt ?? callback.CheckoutRequestId}",
                 RecordedByUserId = attempt.InitiatedByUserId,
                 BalanceAfter = customer.CurrentCreditBalance,

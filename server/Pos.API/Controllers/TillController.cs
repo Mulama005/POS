@@ -171,9 +171,12 @@ public sealed class TillController : ControllerBase
             .Where(p => p.Sale.TillSessionId == session.Id && p.Sale.Status == SaleStatus.Completed)
             .ToListAsync(cancellationToken);
 
-        var cashTotal = paymentsBySale.Where(p => p.Method == PaymentMethod.Cash && p.Status == PaymentStatus.Success).Sum(p => p.Amount);
+        var cashTotal = paymentsBySale.Where(p => p.Method == PaymentMethod.Cash && p.BankName is null && p.Status == PaymentStatus.Success).Sum(p => p.Amount);
+        var absaCashTotal = paymentsBySale.Where(p => p.Method == PaymentMethod.Cash && p.BankName == "Absa Bank" && p.Status == PaymentStatus.Success).Sum(p => p.Amount);
+        var cooperativeCashTotal = paymentsBySale.Where(p => p.Method == PaymentMethod.Cash && p.BankName == "Co-operative Bank" && p.Status == PaymentStatus.Success).Sum(p => p.Amount);
         var mpesaTotal = paymentsBySale.Where(p => p.Method == PaymentMethod.Mpesa && p.Status == PaymentStatus.Success).Sum(p => p.Amount);
         var cardTotal = paymentsBySale.Where(p => p.Method == PaymentMethod.Card && p.Status == PaymentStatus.Success).Sum(p => p.Amount);
+        var bankTransferTotal = paymentsBySale.Where(p => p.Method == PaymentMethod.BankTransfer && p.Status == PaymentStatus.Success).Sum(p => p.Amount);
 
         var expectedCash = session.OpeningFloat + cashTotal;
         var variance = request.CountedCashAtClose - expectedCash;
@@ -198,7 +201,7 @@ public sealed class TillController : ControllerBase
         return Ok(new TillReconciliationResponse(
             session.Id, session.RegisterId, session.OpenedAt, session.ClosedAt.Value,
             session.OpeningFloat, cashTotal, expectedCash, request.CountedCashAtClose, variance,
-            mpesaTotal, cardTotal));
+            mpesaTotal, cardTotal, bankTransferTotal, absaCashTotal, cooperativeCashTotal));
     }
 
     private async Task<bool> IsAlreadyOpenAsync(Guid registerId, CancellationToken cancellationToken)

@@ -42,8 +42,9 @@ export function buildProvisionalReceipt(
       paymentId: crypto.randomUUID(),
       method: p.method,
       amount: p.amount,
-      status: p.method === 'Cash' ? 'Success' : 'Pending',
-      externalReference: null,
+      status: p.method === 'Cash' || p.method === 'BankTransfer' || (p.method === 'Mpesa' && p.isManualMpesa && p.manualMpesaVerified) ? 'Success' : 'Pending',
+      externalReference: p.reference ?? null,
+      bankName: p.bankName ?? null,
     })),
 
     // No eTIMS data exists yet for an offline/provisional sale.

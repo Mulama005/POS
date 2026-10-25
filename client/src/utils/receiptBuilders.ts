@@ -7,7 +7,7 @@ const kes = (n: number) =>
 const dateTime = (iso: string) =>
   new Date(iso).toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' })
 
-const METHOD_LABEL: Record<string, string> = { Cash: 'Cash', Mpesa: 'M-Pesa', Card: 'Card', Credit: 'On credit' }
+const METHOD_LABEL: Record<string, string> = { Cash: 'Cash', Mpesa: 'M-Pesa', BankTransfer: 'Bank transfer', Card: 'Card', Credit: 'On credit' }
 
 export function buildSaleReceipt(
   sale: CompleteSaleResult & { pending?: boolean },
@@ -29,15 +29,16 @@ export function buildSaleReceipt(
     {
       heading: 'Payment',
       rows: sale.payments.map((p) => {
-        const label = METHOD_LABEL[p.method] ?? p.method
+        const methodLabel = METHOD_LABEL[p.method] ?? p.method
+        const label = `${methodLabel}${p.bankName ? ` · ${p.bankName}` : ''}`
         const state = p.status === 'Success' ? '' : ` (${p.status === 'TimedOut' ? 'timed out' : p.status.toLowerCase()})`
         return { label: `${label}${state}`, value: kes(p.amount) }
       }),
     },
   ]
   const mpesaRefs = sale.payments
-    .filter((p) => p.method === 'Mpesa' && p.status === 'Success' && p.externalReference)
-    .map((p) => ({ label: 'M-Pesa ref', value: p.externalReference as string, muted: true }))
+    .filter((p) => (p.method === 'Mpesa' || p.method === 'BankTransfer') && p.externalReference)
+    .map((p) => ({ label: p.method === 'Mpesa' ? 'M-Pesa receipt code' : 'Bank transfer ref', value: p.externalReference as string, muted: true }))
   sections[0].rows.push(...mpesaRefs)
 
   if (!sale.pending && sale.etimsSubmitted) {
@@ -83,7 +84,7 @@ export interface RepairReceiptDto {
   finalCost: number | null
   amountPaid: number
   balance: number | null
-  payments: { timestamp: string; method: string | null; amount: number; reference: string | null }[]
+  payments: { timestamp: string; method: string | null; amount: number; reference: string | null; bankName: string | null }[]
 }
 
 export function buildRepairReceipt(r: RepairReceiptDto): ReceiptData {
@@ -116,7 +117,7 @@ export function buildRepairReceipt(r: RepairReceiptDto): ReceiptData {
       heading: 'Payments received',
       rows: r.payments.flatMap((p) => {
         const rows: ReceiptRow[] = [
-          { label: `${dateTime(p.timestamp)} ${p.method ?? ''}`.trim(), value: kes(p.amount) },
+          { label: `${dateTime(p.timestamp)} ${p.method ?? ''}${p.bankName ? ` · ${p.bankName}` : ''}`.trim(), value: kes(p.amount) },
         ]
         if (p.reference) rows.push({ label: `  Ref: ${p.reference}`, value: '', muted: true })
         return rows

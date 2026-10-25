@@ -76,7 +76,7 @@ export function AcceptInvitePage() {
         </div>
 
         {done ? (
-          <p className="login-mfa-copy">Account activated — taking you to sign in…</p>
+          <p className="login-mfa-copy">Account activated  taking you to sign in…</p>
         ) : (
           <form className="login-form" onSubmit={(e) => void handleSubmit(e)} noValidate>
             <div className="login-field">

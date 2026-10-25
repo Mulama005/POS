@@ -31,7 +31,8 @@ public enum PaymentMethod
     Cash,
     Mpesa,
     Card,
-    Credit // Deni
+    Credit, // Deni
+    BankTransfer
 }
 
 public enum PaymentStatus

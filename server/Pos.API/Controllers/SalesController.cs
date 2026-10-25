@@ -34,7 +34,11 @@ public sealed class SalesController : ControllerBase
     private const decimal StandardVatRate = 0.16m;
     private static readonly HashSet<string> AcceptedPaymentMethods = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Cash", "Mpesa", "Card",
+        "Cash", "Mpesa", "BankTransfer", "Card",
+    };
+    private static readonly HashSet<string> AcceptedBanks = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Absa Bank", "Co-operative Bank",
     };
 
     private readonly PosDbContext _db;
@@ -454,6 +458,31 @@ public sealed class SalesController : ControllerBase
             {
                 return BadRequest("Payment amount must be positive.");
             }
+            var isBankTransfer = payment.Method.Equals("BankTransfer", StringComparison.OrdinalIgnoreCase);
+            var isCash = payment.Method.Equals("Cash", StringComparison.OrdinalIgnoreCase);
+            var isManualMpesa = payment.Method.Equals("Mpesa", StringComparison.OrdinalIgnoreCase) && payment.IsManualMpesa;
+            if ((isBankTransfer || isManualMpesa || payment.BankName is not null) &&
+                (payment.BankName is null || !AcceptedBanks.Contains(payment.BankName)))
+            {
+                return BadRequest("Choose Absa Bank or Co-operative Bank for this payment.");
+            }
+            if (payment.BankName is not null && !isCash && !isBankTransfer && !isManualMpesa)
+                return BadRequest("A bank can only be selected for cash, bank transfer, or manually recorded M-Pesa payments.");
+            if (isBankTransfer && string.IsNullOrWhiteSpace(payment.Reference))
+            {
+                return BadRequest("Enter the bank transfer reference.");
+            }
+            if (isBankTransfer && !payment.BankTransferVerified)
+                return BadRequest("Confirm the bank transfer arrived before completing the sale.");
+            if (payment.IsManualMpesa &&
+                (!payment.Method.Equals("Mpesa", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(payment.Reference) || !payment.ManualMpesaVerified))
+            {
+                return BadRequest("Manual M-Pesa payments require a receipt code and cashier confirmation.");
+            }
+            if (payment.ManualMpesaVerified && !payment.IsManualMpesa)
+                return BadRequest("Cashier confirmation is only valid for manually entered M-Pesa payments.");
+            if (payment.BankTransferVerified && !isBankTransfer)
+                return BadRequest("Bank transfer confirmation is only valid for bank transfer payments.");
         }
 
         var paidTotal = request.Payments.Sum(p => p.Amount);
@@ -520,10 +549,12 @@ public sealed class SalesController : ControllerBase
         {
             var method = Enum.Parse<PaymentMethod>(paymentRequest.Method, ignoreCase: true);
 
-            // Cash is settled the instant it's counted at the register. Mpesa/Card start
-            // Pending — Steps 27/28 wire up the real Daraja/Pesapal callbacks that flip
-            // these to Success/Failed asynchronously.
-            var status = method == PaymentMethod.Cash ? PaymentStatus.Success : PaymentStatus.Pending;
+            // Cash, bank transfers, and manually checked M-Pesa receipts are recorded
+            // after the cashier confirms receipt. STK M-Pesa remains asynchronous.
+            var isManualMpesa = method == PaymentMethod.Mpesa && paymentRequest.IsManualMpesa;
+            var status = method is PaymentMethod.Cash or PaymentMethod.BankTransfer || isManualMpesa
+                ? PaymentStatus.Success
+                : PaymentStatus.Pending;
 
             var payment = new Payment
             {
@@ -532,10 +563,13 @@ public sealed class SalesController : ControllerBase
                 Amount = paymentRequest.Amount,
                 Status = status,
                 MpesaPhoneNumber = paymentRequest.MpesaPhoneNumber,
+                BankName = paymentRequest.BankName?.Trim(),
+                ExternalReference = paymentRequest.Reference?.Trim(),
+                IsManualMpesa = isManualMpesa,
                 ProcessedAt = status == PaymentStatus.Success ? DateTime.UtcNow : null,
             };
             sale.Payments.Add(payment);
-            paymentResponses.Add(new PaymentResponse(payment.Id, method.ToString(), payment.Amount, payment.Status.ToString(), payment.ExternalReference));
+            paymentResponses.Add(new PaymentResponse(payment.Id, method.ToString(), payment.Amount, payment.Status.ToString(), payment.ExternalReference, payment.BankName));
         }
 
         _db.Sales.Add(sale);
@@ -727,6 +761,7 @@ public sealed class SalesController : ControllerBase
                 PaymentMethod.Cash => "01",
                 PaymentMethod.Card => "05",
                 PaymentMethod.Mpesa => "06",
+                PaymentMethod.BankTransfer => "04",
                 PaymentMethod.Credit => "02",
                 _ => "07"
             })
@@ -816,7 +851,7 @@ public sealed class SalesController : ControllerBase
             i.LineTotal)).ToList();
 
         var payments = sale.Payments.Select(p => new PaymentResponse(
-            p.Id, p.Method.ToString(), p.Amount, p.Status.ToString(), p.ExternalReference)).ToList();
+            p.Id, p.Method.ToString(), p.Amount, p.Status.ToString(), p.ExternalReference, p.BankName)).ToList();
 
         return new CompleteSaleResponse(
             sale.Id, sale.SaleDate, sale.Subtotal, sale.DiscountTotal, sale.TaxTotal, sale.Total,

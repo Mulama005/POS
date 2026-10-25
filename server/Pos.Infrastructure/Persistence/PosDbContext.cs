@@ -34,6 +34,7 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<RepairJob> RepairJobs => Set<RepairJob>();
     public DbSet<RepairPayment> RepairPayments => Set<RepairPayment>();
+    public DbSet<TechnicianTimeEntry> TechnicianTimeEntries => Set<TechnicianTimeEntry>();
     public DbSet<RepairStatusHistory> RepairStatusHistories => Set<RepairStatusHistory>();
     public DbSet<RepairPartUsed> RepairPartsUsed => Set<RepairPartUsed>();
     public DbSet<CreditTransaction> CreditTransactions => Set<CreditTransaction>();
@@ -117,6 +118,25 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         modelBuilder.Entity<Register>(e =>
         {
             e.Property(x => x.Name).IsRequired().HasMaxLength(100);
+        });
+
+        // ---------- Technician timekeeping ----------
+        modelBuilder.Entity<TechnicianTimeEntry>(e =>
+        {
+            e.HasIndex(x => x.TechnicianId)
+                .IsUnique()
+                .HasFilter("\"ClockOutAt\" IS NULL");
+            e.HasIndex(x => x.ClockInAt);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.TechnicianId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.ClockInRecordedByUserId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<User>().WithMany().HasForeignKey(x => x.ClockOutRecordedByUserId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ---------- Repair payment reporting link ----------
+        modelBuilder.Entity<CreditTransaction>(e =>
+        {
+            e.HasIndex(x => x.RepairJobId);
+            e.HasOne<RepairJob>().WithMany().HasForeignKey(x => x.RepairJobId).OnDelete(DeleteBehavior.Restrict);
         });
 
         // ---------- TillSession ----------

@@ -14,6 +14,12 @@ public class Payment : BaseEntity
 
     public string? ExternalReference { get; set; }
 
+    /// <summary>Bank account that received a cash deposit or bank transfer.</summary>
+    public string? BankName { get; set; }
+
+    /// <summary>True when an M-Pesa payment was entered manually from the customer's receipt.</summary>
+    public bool IsManualMpesa { get; set; }
+
     /// <summary>Phone number the STK Push was sent to, when Method = Mpesa.</summary>
     public string? MpesaPhoneNumber { get; set; }
 

@@ -124,7 +124,15 @@ export function ProductSearchBar({ onAdd, disabled }: ProductSearchBarProps) {
               <button type="button" onClick={() => handleAdd(product)}>
                 <span className="product-search__result-name">{product.name}</span>
                 <span className="product-search__result-meta">
-                  {product.sku} · KES {product.salePrice.toFixed(2)} · {product.stockQuantity} in stock
+                  <span className="product-search__result-sku">{product.sku}</span>
+                  <span className="product-search__result-price">KES {product.salePrice.toFixed(2)}</span>
+                  <span className={`product-search__result-stock ${
+                    product.stockQuantity === 0 ? 'product-search__result-stock--out'
+                    : product.stockQuantity <= 5 ? 'product-search__result-stock--low'
+                    : 'product-search__result-stock--ok'
+                  }`}>
+                    {product.stockQuantity} in stock
+                  </span>
                 </span>
               </button>
             </li>

@@ -17,8 +17,11 @@ public class CreditTransaction
     public decimal Amount { get; set; } // always positive; Type determines the sign's meaning
 
     public string? PaymentMethod { get; set; } // "Cash", "M-Pesa", etc. — only set for Type=Payment
+    public string? BankName { get; set; }
+    public string? ExternalReference { get; set; }
     public string? Notes { get; set; }
     public Guid? RelatedSaleId { get; set; } // links back to the retail sale, once Phase 5's Sale entity exists
+    public Guid? RepairJobId { get; set; }
 
     public Guid RecordedByUserId { get; set; }
     public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.UtcNow;

@@ -161,6 +161,7 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
           label: "Monitoring",
           items: [
               { id: "audit", label: "Audit Log", icon: "list", path: "/audit" },
+              { id: "timekeeping", label: "Timekeeping", icon: "list", path: "/timekeeping" },
           ],
       }
   ],
@@ -198,6 +199,7 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
           label: "Monitoring",
           items: [
               { id: "audit", label: "Audit Log", icon: "list", path: "/audit" },
+              { id: "timekeeping", label: "Timekeeping", icon: "list", path: "/timekeeping" },
           ],
       }
   ],

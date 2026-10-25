@@ -25,7 +25,7 @@ public sealed record SetFinalCostRequest(decimal FinalCost);
 /// <summary>Records money actually collected against an already-finalized repair cost.
 /// Mirrors CustomersController's RecordPaymentRequest shape deliberately — same
 /// concept, same shape, different entry point.</summary>
-public sealed record RecordRepairPaymentRequest(decimal Amount, string PaymentMethod, string? Notes);
+public sealed record RecordRepairPaymentRequest(decimal Amount, string PaymentMethod, string? Notes, string? BankName = null, string? Reference = null, bool ManualMpesaVerified = false, bool BankTransferVerified = false);
 
 public sealed record ConsumePartRequest(Guid ProductId, Guid? UnitId, int Quantity);
 

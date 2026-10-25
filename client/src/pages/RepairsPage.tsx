@@ -21,7 +21,8 @@ import type { Customer, Repair, RepairStatus, TechnicianSummary } from '../types
 import './repairs.css'
 
 const STATUSES: RepairStatus[] = ['Received', 'Diagnosing', 'AwaitingParts', 'InRepair', 'Ready', 'Collected']
-const PAYMENT_METHODS = ['Cash', 'M-Pesa', 'Card']
+const PAYMENT_METHODS = ['Cash', 'M-Pesa', 'Bank transfer', 'Card']
+const BANKS = ['Absa Bank', 'Co-operative Bank']
 
 const errorText = (error: unknown) =>
   isAxiosError(error)
@@ -46,6 +47,10 @@ export function RepairsPage() {
   const [costInputs, setCostInputs] = useState<Record<string, string>>({})
   const [paymentAmounts, setPaymentAmounts] = useState<Record<string, string>>({})
   const [paymentMethods, setPaymentMethods] = useState<Record<string, string>>({})
+  const [repairMpesaModes, setRepairMpesaModes] = useState<Record<string, 'manual' | 'stk'>>({})
+  const [paymentBanks, setPaymentBanks] = useState<Record<string, string>>({})
+  const [paymentReferences, setPaymentReferences] = useState<Record<string, string>>({})
+  const [manualMpesaVerified, setManualMpesaVerified] = useState<Record<string, boolean>>({})
   const [mpesaTarget, setMpesaTarget] = useState<{ repair: Repair; amount: number } | null>(null)
   const [receiptView, setReceiptView] = useState<ReceiptData | null>(null)
   const mpesaPaymentId = useRef<string | null>(null)
@@ -155,15 +160,48 @@ export function RepairsPage() {
       return
     }
     setRowError((prev) => ({ ...prev, [repair.id]: '' }))
-    if ((paymentMethods[repair.id] ?? PAYMENT_METHODS[0]) === 'M-Pesa') {
+    const method = paymentMethods[repair.id] ?? PAYMENT_METHODS[0]
+    const manualMpesa = method === 'M-Pesa' && repairMpesaModes[repair.id] === 'manual'
+    if (method === 'M-Pesa' && !manualMpesa) {
       // Real STK Push: the balance only changes once Safaricom confirms (server-side).
       setMpesaTarget({ repair, amount: Math.round(amount) })
       return
     }
+    if (method === 'Bank transfer' && (!paymentBanks[repair.id] || !paymentReferences[repair.id]?.trim())) {
+      setRowError((prev) => ({ ...prev, [repair.id]: 'Choose a bank and enter the transfer reference.' }))
+      return
+    }
+    if (method === 'Bank transfer' && !manualMpesaVerified[repair.id]) {
+      setRowError((prev) => ({ ...prev, [repair.id]: 'Confirm the transfer arrived before recording it.' }))
+      return
+    }
+    if (manualMpesa && !paymentReferences[repair.id]?.trim()) {
+      setRowError((prev) => ({ ...prev, [repair.id]: 'Enter the M-Pesa receipt code after confirming the payment.' }))
+      return
+    }
+      if (manualMpesa && !paymentBanks[repair.id]) {
+        setRowError((prev) => ({ ...prev, [repair.id]: 'Choose the bank used for the M-Pesa payment.' }))
+        return
+      }
     setBusy(true)
     try {
-      await recordRepairPayment(repair.id, amount, paymentMethods[repair.id] ?? PAYMENT_METHODS[0])
+      if (manualMpesa && !manualMpesaVerified[repair.id]) {
+        setRowError((prev) => ({ ...prev, [repair.id]: 'Confirm the payment was received before recording it.' }))
+        return
+      }
+      await recordRepairPayment(
+        repair.id,
+        amount,
+        method,
+        undefined,
+          method === 'Cash' || method === 'Bank transfer' || manualMpesa ? paymentBanks[repair.id] || null : null,
+        paymentReferences[repair.id] || null,
+        manualMpesaVerified[repair.id] ?? false,
+        manualMpesaVerified[repair.id] ?? false,
+      )
       setPaymentAmounts((prev) => ({ ...prev, [repair.id]: '' }))
+      setPaymentReferences((prev) => ({ ...prev, [repair.id]: '' }))
+      setManualMpesaVerified((prev) => ({ ...prev, [repair.id]: false }))
       await load()
     } catch (e) {
       setRowError((prev) => ({ ...prev, [repair.id]: errorText(e) }))
@@ -325,7 +363,12 @@ export function RepairsPage() {
                               <select
                                 aria-label="Payment method"
                                 value={paymentMethods[repair.id] ?? PAYMENT_METHODS[0]}
-                                onChange={(e) => setPaymentMethods({ ...paymentMethods, [repair.id]: e.target.value })}
+                                onChange={(e) => {
+                                  setPaymentMethods({ ...paymentMethods, [repair.id]: e.target.value })
+                                  setPaymentReferences({ ...paymentReferences, [repair.id]: '' })
+                                  setPaymentBanks({ ...paymentBanks, [repair.id]: '' })
+                                  setManualMpesaVerified({ ...manualMpesaVerified, [repair.id]: false })
+                                }}
                               >
                                 {PAYMENT_METHODS.map((method) => <option key={method}>{method}</option>)}
                               </select>
@@ -339,6 +382,52 @@ export function RepairsPage() {
                               <button className="service-button service-button--quiet" disabled={busy} onClick={() => void takePayment(repair)}>
                                 Record payment
                               </button>
+                            </div>
+                          )}
+                          {!isPaidInFull && (paymentMethods[repair.id] ?? PAYMENT_METHODS[0]) === 'Cash' && (
+                            <div className="service-inline repair-payment-details">
+                              <select aria-label="Cash destination" value={paymentBanks[repair.id] ?? ''} onChange={(e) => setPaymentBanks({ ...paymentBanks, [repair.id]: e.target.value })}>
+                                <option value="">Cash drawer</option>
+                                {BANKS.map((bank) => <option key={bank}>{bank}</option>)}
+                              </select>
+                              <span />
+                              <span className="repair-payment-hint">Choose a bank if cash was deposited directly.</span>
+                            </div>
+                          )}
+                          {!isPaidInFull && (paymentMethods[repair.id] ?? PAYMENT_METHODS[0]) === 'Bank transfer' && (
+                            <div className="service-inline repair-payment-details">
+                              <select aria-label="Receiving bank" required value={paymentBanks[repair.id] ?? ''} onChange={(e) => { setPaymentBanks({ ...paymentBanks, [repair.id]: e.target.value }); setManualMpesaVerified({ ...manualMpesaVerified, [repair.id]: false }) }}>
+                                <option value="">Choose bank</option>
+                                {BANKS.map((bank) => <option key={bank}>{bank}</option>)}
+                              </select>
+                              <input placeholder="Bank transfer reference" value={paymentReferences[repair.id] ?? ''} onChange={(e) => { setPaymentReferences({ ...paymentReferences, [repair.id]: e.target.value }); setManualMpesaVerified({ ...manualMpesaVerified, [repair.id]: false }) }} />
+                              <label className="repair-payment-confirmation">
+                                <input type="checkbox" checked={Boolean(manualMpesaVerified[repair.id])} onChange={(e) => setManualMpesaVerified({ ...manualMpesaVerified, [repair.id]: e.target.checked })} />
+                                Transfer confirmed
+                              </label>
+                            </div>
+                          )}
+                          {!isPaidInFull && (paymentMethods[repair.id] ?? PAYMENT_METHODS[0]) === 'M-Pesa' && (
+                            <div className="service-inline repair-payment-details">
+                              <select aria-label="M-Pesa payment type" value={repairMpesaModes[repair.id] ?? 'stk'} onChange={(e) => setRepairMpesaModes({ ...repairMpesaModes, [repair.id]: e.target.value as 'manual' | 'stk' })}>
+                                <option value="stk">Send STK Push</option>
+                                <option value="manual">Customer already paid</option>
+                              </select>
+                              {repairMpesaModes[repair.id] === 'manual' ? (
+                                  <>
+                                    <select aria-label="Bank used for M-Pesa payment" required value={paymentBanks[repair.id] ?? ''} onChange={(e) => { setPaymentBanks({ ...paymentBanks, [repair.id]: e.target.value }); setManualMpesaVerified({ ...manualMpesaVerified, [repair.id]: false }) }}>
+                                      <option value="">Choose bank used</option>
+                                      {BANKS.map((bank) => <option key={bank}>{bank}</option>)}
+                                    </select>
+                                    <input placeholder="M-Pesa receipt code" value={paymentReferences[repair.id] ?? ''} onChange={(e) => { setPaymentReferences({ ...paymentReferences, [repair.id]: e.target.value }); setManualMpesaVerified({ ...manualMpesaVerified, [repair.id]: false }) }} />
+                                  </>
+                              ) : <span />}
+                              {repairMpesaModes[repair.id] === 'manual' ? (
+                                <label className="repair-payment-confirmation">
+                                  <input type="checkbox" checked={Boolean(manualMpesaVerified[repair.id])} onChange={(e) => setManualMpesaVerified({ ...manualMpesaVerified, [repair.id]: e.target.checked })} />
+                                  Confirmed received
+                                </label>
+                              ) : <span />}
                             </div>
                           )}
                         </>

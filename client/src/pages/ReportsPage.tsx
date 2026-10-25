@@ -41,6 +41,8 @@ interface MonthlySummary {
     peakHours: PeakPeriod[];
     peakDays: PeakPeriod[];
 }
+interface RepairTechnicianSummary { technicianId: string; technicianName: string; completedRepairs: number; clockedHours: number; workRate: number | null; moneyCollected: number; }
+interface RepairSummaryData { fromDay: string; toDay: string; technicians: RepairTechnicianSummary[]; totalCompletedRepairs: number; totalMoneyCollected: number; totalClockedHours: number; unassignedRepairs: number; unassignedMoneyCollected: number; }
 
 const money = (value: number) => `KES ${value.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const signedMoney = (value: number) => `${value >= 0 ? "+" : "−"}${money(Math.abs(value))}`;
@@ -156,6 +158,109 @@ function MonthlySalesLineChart({ rows }: { rows: TrendMonth[] }) {
             </svg>
         </div>
     </div>;
+}
+
+function TechnicianComparisonChart({ rows }: { rows: RepairTechnicianSummary[] }) {
+    const width = Math.max(720, rows.length * 125);
+    const height = 330;
+    const plot = { left: 76, right: 80, top: 28, bottom: 74 };
+    const plotWidth = width - plot.left - plot.right;
+    const plotHeight = height - plot.top - plot.bottom;
+    const maxRate = Math.max(...rows.map(row => row.workRate ?? 0), 1);
+    const maxMoney = Math.max(...rows.map(row => row.moneyCollected), 1);
+    const points = rows.map((row, index) => ({
+        x: plot.left + (rows.length <= 1 ? plotWidth / 2 : index * plotWidth / (rows.length - 1)),
+        rateY: plot.top + (1 - (row.workRate ?? 0) / maxRate) * plotHeight,
+        moneyY: plot.top + (1 - row.moneyCollected / maxMoney) * plotHeight,
+        row,
+    }));
+    const rateLine = points.map(point => `${point.x},${point.rateY}`).join(" ");
+    const moneyLine = points.map(point => `${point.x},${point.moneyY}`).join(" ");
+    return <div className="repair-tech-chart">
+        <div className="repair-tech-chart__legend"><span><i className="repair-tech-chart__rate-dot" />Repairs completed per clocked hour</span><span><i className="repair-tech-chart__money-dot" />Repair payments collected (KES)</span><small>Left scale: repairs/hour · Right scale: KES</small></div>
+        <div className="monthly-line-chart__scroll">
+            {rows.length === 0 ? <p className="report-empty">No technicians are available for this period.</p> : <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Technician repairs per hour and repair payments collected">
+                {[0, 0.25, 0.5, 0.75, 1].map(tick => {
+                    const y = plot.top + (1 - tick) * plotHeight;
+                    return <g key={tick}>
+                        <line className="chart-gridline" x1={plot.left} x2={width - plot.right} y1={y} y2={y} />
+                        <text className="chart-axis-label chart-axis-label--y" x={plot.left - 10} y={y + 4}>{(maxRate * tick).toFixed(1)}</text>
+                        <text className="chart-axis-label" textAnchor="start" x={width - plot.right + 10} y={y + 4}>{Math.round(maxMoney * tick).toLocaleString("en-KE")}</text>
+                    </g>;
+                })}
+                <line className="chart-axis" x1={plot.left} x2={plot.left} y1={plot.top} y2={height - plot.bottom} />
+                <line className="chart-axis" x1={plot.left} x2={width - plot.right} y1={height - plot.bottom} y2={height - plot.bottom} />
+                <polyline className="repair-tech-chart__rate-line" points={rateLine} />
+                <polyline className="repair-tech-chart__money-line" points={moneyLine} />
+                {points.map(point => <g key={point.row.technicianId}>
+                    <circle className="repair-tech-chart__rate-point" cx={point.x} cy={point.rateY} r="5"><title>{`${point.row.technicianName}: ${point.row.workRate?.toFixed(2) ?? "—"} repairs/hour`}</title></circle>
+                    <circle className="repair-tech-chart__money-point" cx={point.x} cy={point.moneyY} r="5"><title>{`${point.row.technicianName}: ${money(point.row.moneyCollected)} collected`}</title></circle>
+                    <text className="chart-axis-label chart-axis-label--x" x={point.x} y={height - 32}>{point.row.technicianName}</text>
+                </g>)}
+            </svg>}
+        </div>
+    </div>;
+}
+
+function RepairReportsSection({ reportMonth, onNotice }: { reportMonth: string; onNotice: (message: string, dismissAfterMs?: number) => void }) {
+    const { accessToken } = useAuth();
+    const [data, setData] = useState<RepairSummaryData | null>(null);
+    const [error, setError] = useState("");
+    const [loading, setLoading] = useState(true);
+    const [year, month] = reportMonth.split("-");
+    const lastDay = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate().toString().padStart(2, "0");
+    const fromDate = `${year}-${month}-01`;
+    const toDate = `${year}-${month}-${lastDay}`;
+
+    useEffect(() => {
+        let active = true;
+        setLoading(true);
+        setError("");
+        apiClient.get<RepairSummaryData>("/api/reports/repair-summary", { params: { fromDate, toDate } })
+            .then(({ data: result }) => { if (active) setData(result); })
+            .catch(() => { if (active) setError("We could not load the repair report. Please try again."); })
+            .finally(() => { if (active) setLoading(false); });
+        return () => { active = false; };
+    }, [accessToken, fromDate, toDate]);
+
+    const exportReport = async (format: "pdf" | "csv") => {
+        onNotice(format === "pdf" ? "Preparing the repair PDF…" : "Preparing the repair CSV…");
+        try {
+            const { data: file } = await apiClient.get<Blob>("/api/reports/export/repairs", { params: { format, fromDate, toDate }, responseType: "blob" });
+            downloadBlob(file, `repair-performance-${reportMonth}.${format}`);
+            onNotice(`Your repair ${format.toUpperCase()} is downloading.`, 4500);
+        } catch {
+            setError(`We could not create the repair ${format.toUpperCase()}. Please try again.`);
+            onNotice(`The repair ${format.toUpperCase()} could not be created.`, 6000);
+        }
+    };
+
+    const exportCsv = () => {
+        if (!data) return;
+        downloadCsvFile(`repair-performance-${reportMonth}.csv`, [
+            ["Technician", "Completed repairs", "Clocked hours", "Repairs per hour", "Repair payments collected (KES)"],
+            ...data.technicians.map(row => [row.technicianName, row.completedRepairs, row.clockedHours, row.workRate, row.moneyCollected]),
+            ["Unassigned repairs", data.unassignedRepairs, "", "", data.unassignedMoneyCollected],
+            ["TOTAL", data.totalCompletedRepairs, data.totalClockedHours, "", data.totalMoneyCollected],
+        ]);
+        onNotice("Your repair CSV is downloading.", 4500);
+    };
+
+    return <section className="report-section repair-reports">
+        <div className="section-header"><div><h2>Repair performance</h2><p>Completed repair work and payments recorded during {reportMonth}. Work rate is completed repairs per recorded clocked hour.</p></div><div className="export-buttons"><button onClick={() => void exportReport("pdf")}>PDF summary</button><button onClick={exportCsv}>CSV</button></div></div>
+        {error && <p className="report-error">{error}</p>}
+        {loading && !data ? <p className="report-empty">Loading repair performance…</p> : data && <>
+            <div className="report-kpis repair-report-kpis">
+                <article className="report-kpi"><span>Completed repairs</span><strong>{data.totalCompletedRepairs}</strong><small>Collected during the selected month</small></article>
+                <article className="report-kpi"><span>Payments collected</span><strong>{money(data.totalMoneyCollected)}</strong><small>Linked to repair tickets during the selected month</small></article>
+                <article className="report-kpi"><span>Technician hours</span><strong>{data.totalClockedHours.toFixed(2)}</strong><small>Hours recorded in Timekeeping</small></article>
+            </div>
+            <TechnicianComparisonChart rows={data.technicians} />
+            {data.unassignedRepairs > 0 || data.unassignedMoneyCollected > 0 ? <p className="repair-report-note">Unassigned work: {data.unassignedRepairs} completed repair(s) · {money(data.unassignedMoneyCollected)} collected.</p> : null}
+            <div className="report-table-scroll"><table><thead><tr><th>Technician</th><th>Completed repairs</th><th>Clocked hours</th><th>Repairs / hour</th><th>Payments collected</th></tr></thead><tbody>{data.technicians.map(row => <tr key={row.technicianId}><td>{row.technicianName}</td><td>{row.completedRepairs}</td><td>{row.clockedHours.toFixed(2)}</td><td>{row.workRate?.toFixed(2) ?? "—"}</td><td>{money(row.moneyCollected)}</td></tr>)}</tbody></table></div>
+            <p className="repair-report-note">Collected repair payments are attributed to the technician currently assigned to each repair. Unassigned jobs are included in the report totals.</p>
+        </>}
+    </section>;
 }
 
 export default function ReportsPage() {
@@ -319,6 +424,8 @@ export default function ReportsPage() {
                 <ComparisonChart label="Markdown rate" current={summary.salesPerformance.discountPercentage.current} previous={summary.salesPerformance.discountPercentage.previous} format={percent} />
             </div>
         </section>
+
+        <RepairReportsSection reportMonth={reportMonth} onNotice={showExportNotice} />
 
         <section className="report-section financial-summary">
             <div className="section-header"><div><h2>Financial summary</h2><p>A decision-ready monthly view of profit, stock capital and forward targets.</p></div><div className="export-buttons"><a href="/financial-setup">Operating costs</a><button onClick={() => void downloadFinancialExport("pdf")}>PDF</button><button onClick={() => void downloadFinancialExport("csv")}>CSV</button></div></div>

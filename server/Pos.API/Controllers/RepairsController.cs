@@ -277,6 +277,23 @@ public sealed class RepairsController : ControllerBase
     public async Task<IActionResult> RecordPayment(Guid id, [FromBody] RecordRepairPaymentRequest request, CancellationToken cancellationToken)
     {
         if (request.Amount <= 0) return BadRequest("Amount must be positive.");
+        var isCash = request.PaymentMethod.Equals("Cash", StringComparison.OrdinalIgnoreCase);
+        var isBankTransfer = request.PaymentMethod.Equals("Bank transfer", StringComparison.OrdinalIgnoreCase);
+        var isMpesa = request.PaymentMethod.Equals("M-Pesa", StringComparison.OrdinalIgnoreCase) || request.PaymentMethod.Equals("Mpesa", StringComparison.OrdinalIgnoreCase);
+        if (!isCash && !isBankTransfer && !isMpesa && !request.PaymentMethod.Equals("Card", StringComparison.OrdinalIgnoreCase))
+            return BadRequest("Choose Cash, M-Pesa, Bank transfer, or Card.");
+        if (request.BankName is not null && ((!isCash && !isBankTransfer && !isMpesa) || request.BankName is not ("Absa Bank" or "Co-operative Bank")))
+            return BadRequest("Choose Absa Bank or Co-operative Bank for this payment.");
+        if (isBankTransfer && request.BankName is null)
+            return BadRequest("Choose Absa Bank or Co-operative Bank for this transfer.");
+        if (isMpesa && request.BankName is null)
+            return BadRequest("Choose Absa Bank or Co-operative Bank for the M-Pesa payment.");
+        if (isBankTransfer && string.IsNullOrWhiteSpace(request.Reference))
+            return BadRequest("Enter the bank transfer reference.");
+        if (isBankTransfer && !request.BankTransferVerified)
+            return BadRequest("Confirm the bank transfer arrived before recording it.");
+        if (isMpesa && (string.IsNullOrWhiteSpace(request.Reference) || !request.ManualMpesaVerified))
+            return BadRequest("Enter the M-Pesa receipt code and confirm the payment was received.");
 
         var job = await _db.RepairJobs.FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
         if (job is null) return NotFound();
@@ -303,6 +320,9 @@ public sealed class RepairsController : ControllerBase
             Type = CreditTransactionType.Payment,
             Amount = request.Amount,
             PaymentMethod = request.PaymentMethod,
+            BankName = request.BankName?.Trim(),
+            ExternalReference = request.Reference?.Trim(),
+            RepairJobId = job.Id,
             Notes = request.Notes is null
                 ? $"Repair {job.TicketNumber} payment"
                 : $"Repair {job.TicketNumber} payment — {request.Notes}",
@@ -341,17 +361,17 @@ public sealed class RepairsController : ControllerBase
                         && t.Type == CreditTransactionType.Payment
                         && t.Notes != null && t.Notes.StartsWith(prefix))
             .OrderBy(t => t.Timestamp)
-            .Select(t => new { t.Timestamp, t.PaymentMethod, t.Amount, t.Notes })
+            .Select(t => new { t.Timestamp, t.PaymentMethod, t.Amount, t.Notes, t.ExternalReference, t.BankName })
             .ToListAsync(cancellationToken);
 
         var payments = rows.Select(t =>
         {
             // The M-Pesa callback writes "... - M-Pesa <RECEIPT>"; surface just the code.
-            string? reference = null;
+            string? reference = t.ExternalReference;
             var marker = "M-Pesa ";
             var at = t.Notes!.LastIndexOf(marker, StringComparison.Ordinal);
-            if (at >= 0) reference = t.Notes[(at + marker.Length)..].Trim();
-            return new { timestamp = t.Timestamp, method = t.PaymentMethod, amount = t.Amount, reference };
+            if (reference is null && at >= 0) reference = t.Notes[(at + marker.Length)..].Trim();
+            return new { timestamp = t.Timestamp, method = t.PaymentMethod, amount = t.Amount, reference, bankName = t.BankName };
         }).ToList();
 
         return Ok(new

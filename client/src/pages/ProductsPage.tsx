@@ -4,14 +4,16 @@ import { Link } from 'react-router-dom'
 import { isAxiosError } from 'axios'
 import {
   createProduct,
+  commitProductCsv,
   deleteProduct,
   listProducts,
+  previewProductCsv,
   updateProduct,
 } from '../services/ProductsService'
 import { listCategories } from '../services/categoriesService'
 import { registerProductWithEtims } from '../services/EtimsService'
 import { apiClient } from '../services/apiClient'
-import type { Category, Product, ProductFormValues, TaxClass } from '../types/product'
+import type { Category, Product, ProductFormValues, ProductImportPreview, ProductImportRow, TaxClass } from '../types/product'
 import type { ApiErrorBody } from '../types/auth'
 import { formatKes } from '../utils/currency'
 import { downloadBlob } from '../utils/downloadFile'
@@ -94,6 +96,13 @@ export function ProductsPage() {
   const [formImage, setFormImage] = useState<File | null>(null)
   const [formSubmitting, setFormSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+
+  const [importOpen, setImportOpen] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importPreview, setImportPreview] = useState<ProductImportPreview[] | null>(null)
+  const [importBusy, setImportBusy] = useState(false)
+  const [importError, setImportError] = useState<string | null>(null)
+  const [importNotice, setImportNotice] = useState<string | null>(null)
   const [exportingInventory, setExportingInventory] = useState(false)
   const [inventoryExportError, setInventoryExportError] = useState<string | null>(null)
 
@@ -166,6 +175,73 @@ export function ProductsPage() {
   const closeForm = () => {
     setFormOpen(false)
     setEditingId(null)
+  }
+
+  const closeImport = () => {
+    setImportOpen(false)
+    setImportFile(null)
+    setImportPreview(null)
+    setImportError(null)
+    setImportNotice(null)
+  }
+
+  const downloadImportTemplate = () => {
+    const headers = 'Sku,Barcode,Name,CategoryName,CostPrice,SalePrice,TaxClass,ReorderThreshold,WarrantyMonths'
+    const example = 'ACC-001,1234567890123,USB-C Charger,Accessories,500,1200,Standard,5,12'
+    const url = URL.createObjectURL(new Blob([`${headers}\n${example}\n`], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'product-import-template.csv'
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleCsvPreview = async () => {
+    if (!importFile) {
+      setImportError('Choose a CSV file first.')
+      return
+    }
+    setImportBusy(true)
+    setImportError(null)
+    setImportNotice(null)
+    try {
+      setImportPreview(await previewProductCsv(importFile))
+    } catch (err) {
+      setImportError(getErrorMessage(err, 'We could not read that CSV file. Check its headings and values, then try again.'))
+    } finally {
+      setImportBusy(false)
+    }
+  }
+
+  const knownCategories = new Set(categories.map((category) => category.name.trim().toLocaleLowerCase()))
+  const seenImportSkus = new Set<string>()
+  const reviewedImportRows = (importPreview ?? []).map((item) => {
+    const sku = item.row.sku.trim().toLocaleLowerCase()
+    const duplicateInFile = seenImportSkus.has(sku)
+    seenImportSkus.add(sku)
+    const categoryMissing = !knownCategories.has(item.row.categoryName.trim().toLocaleLowerCase())
+    const reason = item.isDuplicate ? 'Already exists' : duplicateInFile ? 'Repeated in CSV' : categoryMissing ? 'Category not found' : null
+    return { ...item, reason }
+  })
+  const importableRows: ProductImportRow[] = reviewedImportRows.filter((item) => item.reason === null).map((item) => item.row)
+
+  const handleCsvCommit = async () => {
+    if (importableRows.length === 0) return
+    setImportBusy(true)
+    setImportError(null)
+    try {
+      const { created } = await commitProductCsv(importableRows)
+      setImportNotice(`${created} product${created === 1 ? '' : 's'} created successfully.`)
+      setImportPreview(null)
+      setImportFile(null)
+      setPage(1)
+      setSearch('')
+      await loadProducts()
+    } catch (err) {
+      setImportError(getErrorMessage(err, 'We could not create these products. No changes were made.'))
+    } finally {
+      setImportBusy(false)
+    }
   }
 
   const handleFormSubmit = async (e: FormEvent) => {
@@ -325,6 +401,9 @@ export function ProductsPage() {
             <button type="button" className="products-import-btn" onClick={() => void downloadInventoryPdf()} disabled={exportingInventory}>
               {exportingInventory ? 'Preparing PDF…' : 'Download inventory PDF'}
             </button>
+            <button type="button" className="products-import-btn" onClick={importOpen ? closeImport : () => setImportOpen(true)}>
+              {importOpen ? 'Close import' : 'Import CSV'}
+            </button>
           </RoleGate>
           <Link to="/inventory/import" className="products-add-btn">Import CSV</Link>
           <button type="button" className="products-add-btn" onClick={formOpen ? closeForm : openCreateForm}>
@@ -332,7 +411,28 @@ export function ProductsPage() {
           </button>
         </div>
       </div>
+
       {inventoryExportError && <p className="products-error" role="alert">{inventoryExportError}</p>}
+
+      {importOpen && (
+        <section className="products-import" aria-labelledby="products-import-title">
+          <div className="products-import-heading">
+            <div><p>Bulk onboarding</p><h2 id="products-import-title">Import products from CSV</h2><span>Review the import before creating products. Existing and repeated SKUs are skipped.</span></div>
+            <button type="button" onClick={downloadImportTemplate}>Download template</button>
+          </div>
+          {!importPreview && !importNotice && <div className="products-import-upload">
+            <label>CSV file<input type="file" accept=".csv,text/csv" onChange={(event) => { setImportFile(event.target.files?.[0] ?? null); setImportError(null) }} /></label>
+            <button type="button" onClick={() => void handleCsvPreview()} disabled={importBusy || !importFile}>{importBusy ? 'Reading…' : 'Preview import'}</button>
+          </div>}
+          {importError && <p className="products-error" role="alert">{importError}</p>}
+          {importNotice && <div className="products-import-success"><strong>{importNotice}</strong><button type="button" onClick={() => { setImportNotice(null); setImportFile(null) }}>Import another file</button></div>}
+          {importPreview && <>
+            <div className="products-import-summary"><strong>{importPreview.length} CSV row{importPreview.length === 1 ? '' : 's'} reviewed</strong><span>{importableRows.length} ready to create · {importPreview.length - importableRows.length} skipped</span></div>
+            <div className="products-import-table-wrap"><table className="products-import-table"><thead><tr><th>SKU</th><th>Product</th><th>Category</th><th>Cost</th><th>Price</th><th>Status</th></tr></thead><tbody>{reviewedImportRows.map((item, index) => <tr key={`${item.row.sku}-${index}`}><td>{item.row.sku}</td><td>{item.row.name}</td><td>{item.row.categoryName}</td><td>{formatKes(item.row.costPrice)}</td><td>{formatKes(item.row.salePrice)}</td><td><span className={item.reason ? 'products-import-status products-import-status--skip' : 'products-import-status'}>{item.reason ?? 'Ready to create'}</span></td></tr>)}</tbody></table></div>
+            <div className="products-import-actions"><button type="button" onClick={() => { setImportPreview(null); setImportError(null) }}>Choose another file</button><button type="button" className="products-add-btn" onClick={() => void handleCsvCommit()} disabled={importBusy || importableRows.length === 0}>{importBusy ? 'Creating…' : `Create ${importableRows.length} product${importableRows.length === 1 ? '' : 's'}`}</button></div>
+          </>}
+        </section>
+      )}
 
       {formOpen && (
         <form className="products-form" onSubmit={(e) => void handleFormSubmit(e)}>

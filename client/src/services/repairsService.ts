@@ -22,8 +22,8 @@ export const assignRepair = (id: string, technicianId: string) =>
   apiClient.put(`/api/repairs/${id}/assign`, { technicianId })
 export const setRepairFinalCost = (id: string, finalCost: number) =>
   apiClient.put(`/api/repairs/${id}/cost`, { finalCost })
-export const recordRepairPayment = (id: string, amount: number, paymentMethod: string, notes?: string) =>
-  apiClient.post(`/api/repairs/${id}/payment`, { amount, paymentMethod, notes: notes || null })
+export const recordRepairPayment = (id: string, amount: number, paymentMethod: string, notes?: string, bankName?: string | null, reference?: string | null, manualMpesaVerified?: boolean, bankTransferVerified?: boolean) =>
+  apiClient.post(`/api/repairs/${id}/payment`, { amount, paymentMethod, notes: notes || null, bankName: bankName || null, reference: reference || null, manualMpesaVerified: manualMpesaVerified ?? false, bankTransferVerified: bankTransferVerified ?? false })
 export const listTechnicians = async () => (await apiClient.get<TechnicianSummary[]>('/api/staff/technicians')).data
 export const trackRepair = async (ticketNumber: string, phoneLast4: string) =>
   (await apiClient.get<PublicRepairStatus>(`/api/repairs/track/${encodeURIComponent(ticketNumber)}`, { params: { phoneLast4 } })).data
