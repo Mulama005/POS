@@ -79,12 +79,17 @@ function App() {
           <Route path="/dashboard/manager" element={<ManagerDashboard />} />
           <Route path="/mfa/setup" element={<MfaSetupPage />} />
           <Route path="/inventory" element={<ProductsPage />} />
-          <Route path="/stock/receive" element={<ReceiveStock />} />
           <Route path="/inventory/import" element={<ProductImportPage />} />
             <Route path="/audit" element={<AuditLogPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/timekeeping" element={<TimekeepingPage />} />
             <Route path="/financial-setup" element={<OperatingCostsPage />} />
+        </Route>
+      </Route>
+
+      <Route element={<RequireRole roles={['Cashier', 'Manager', 'Admin']} />}>
+        <Route element={<DashboardLayout />}>
+          <Route path="/stock/receive" element={<ReceiveStock />} />
         </Route>
       </Route>
 

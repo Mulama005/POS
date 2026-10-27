@@ -1,8 +1,8 @@
 namespace Pos.Domain.Entities;
 
 /// <summary>
-/// A technician shift recorded by a manager or administrator. Each entry keeps
-/// both the technician and staff member who recorded each clock event.
+/// A staff shift recorded by a manager or administrator. Each entry keeps
+/// both the staff member and the user who recorded each clock event.
 /// </summary>
 public sealed class TechnicianTimeEntry
 {

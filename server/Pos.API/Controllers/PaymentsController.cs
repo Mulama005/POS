@@ -120,19 +120,18 @@ public sealed class PaymentCallbacksController : ControllerBase
             .ExecuteUpdateAsync(u => u
                 .SetProperty(p => p.Status, newStatus)
                 .SetProperty(p => p.MpesaReceiptNumber, receipt)
+                .SetProperty(p => p.PaymentMethod, "M-Pesa")
+                .SetProperty(p => p.ExternalReference, receipt)
                 .SetProperty(p => p.ProcessedAt, now), ct);
         if (claimed == 0) return true; // another request already resolved it
 
         if (succeeded)
         {
             var job = await _db.RepairJobs.FirstOrDefaultAsync(r => r.Id == attempt.RepairJobId, ct);
-            var customer = job is null ? null : await _db.Customers.FirstOrDefaultAsync(c => c.Id == job.CustomerId, ct);
-            if (job is null || customer is null)
+            if (job is null)
             {
-                // Money has been taken but we can't attribute it - leave the row Success
-                // with its receipt so it is findable, and shout.
                 _logger.LogError(
-                    "M-Pesa repair payment {PaymentId} (receipt {Receipt}) succeeded but repair/customer is missing.",
+                    "M-Pesa repair payment {PaymentId} (receipt {Receipt}) succeeded but its repair is missing.",
                     attempt.Id, receipt);
                 await tx.CommitAsync(ct);
                 return true;
@@ -140,21 +139,28 @@ public sealed class PaymentCallbacksController : ControllerBase
 
             job.AmountPaid += attempt.Amount;
             job.UpdatedAt = now;
-            customer.CurrentCreditBalance -= attempt.Amount;
 
-            _db.CreditTransactions.Add(new CreditTransaction
+            var customer = job.CustomerId is Guid customerId
+                ? await _db.Customers.FirstOrDefaultAsync(c => c.Id == customerId, ct)
+                : null;
+            if (customer is not null)
             {
-                Id = Guid.NewGuid(),
-                CustomerId = customer.Id,
-                Type = CreditTransactionType.Payment,
-                Amount = attempt.Amount,
-                PaymentMethod = "M-Pesa",
-                ExternalReference = receipt ?? callback.CheckoutRequestId,
-                RepairJobId = job.Id,
-                Notes = $"Repair {job.TicketNumber} payment - M-Pesa {receipt ?? callback.CheckoutRequestId}",
-                RecordedByUserId = attempt.InitiatedByUserId,
-                BalanceAfter = customer.CurrentCreditBalance,
-            });
+                customer.CurrentCreditBalance -= attempt.Amount;
+                _db.CreditTransactions.Add(new CreditTransaction
+                {
+                    Id = Guid.NewGuid(),
+                    CustomerId = customer.Id,
+                    Type = CreditTransactionType.Payment,
+                    Amount = attempt.Amount,
+                    PaymentMethod = "M-Pesa",
+                    ExternalReference = receipt ?? callback.CheckoutRequestId,
+                    RepairJobId = job.Id,
+                    Notes = $"Repair {job.TicketNumber} payment - M-Pesa {receipt ?? callback.CheckoutRequestId}",
+                    RecordedByUserId = attempt.InitiatedByUserId,
+                    Timestamp = now,
+                    BalanceAfter = customer.CurrentCreditBalance,
+                });
+            }
             await _db.SaveChangesAsync(ct);
         }
 

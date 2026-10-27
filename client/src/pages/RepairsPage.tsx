@@ -40,7 +40,7 @@ export function RepairsPage() {
   const [technicians, setTechnicians] = useState<TechnicianSummary[]>([])
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [form, setForm] = useState({ customerId: '', deviceDescription: '', reportedFault: '', quotedCost: '' })
+  const [form, setForm] = useState({ customerId: '', deviceDescription: '', quotedCost: '', assignedTechnicianId: '' })
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [visibleDiagnosisNotes, setVisibleDiagnosisNotes] = useState<Record<string, boolean>>({})
   const [techIds, setTechIds] = useState<Record<string, string>>({})
@@ -64,7 +64,7 @@ export function RepairsPage() {
       const [repairData, customerData, technicianData] = await Promise.all([
         canManage ? listRepairs() : myRepairQueue(),
         listCustomers(),
-        canManage ? listTechnicians() : Promise.resolve([]),
+        listTechnicians(),
       ])
       setRepairs(repairData)
       setCustomers(customerData)
@@ -83,8 +83,13 @@ export function RepairsPage() {
     setBusy(true)
     setError(null)
     try {
-      await createRepair({ ...form, quotedCost: form.quotedCost ? Number(form.quotedCost) : null })
-      setForm({ customerId: '', deviceDescription: '', reportedFault: '', quotedCost: '' })
+      await createRepair({
+        customerId: form.customerId || null,
+        deviceDescription: form.deviceDescription,
+        quotedCost: Number(form.quotedCost),
+        assignedTechnicianId: form.assignedTechnicianId,
+      })
+      setForm({ customerId: '', deviceDescription: '', quotedCost: '', assignedTechnicianId: '' })
       await load()
     } catch (e) {
       setError(errorText(e))
@@ -216,7 +221,7 @@ export function RepairsPage() {
         <div>
           <p className="service-eyebrow">Service desk</p>
           <h1 className="service-title">{canManage ? 'Repair management' : 'My repair queue'}</h1>
-          <p className="service-subtitle">Create, assign, and keep customers informed about every repair.</p>
+          <p className="service-subtitle">Record the product, amount, and technician responsible for each repair.</p>
         </div>
         <button className="service-button service-button--quiet" onClick={() => void load()}>Refresh</button>
       </header>
@@ -225,24 +230,27 @@ export function RepairsPage() {
 
       <div className="service-grid">
         <section className="service-card">
-          <h2>New repair intake</h2>
+          <h2>New repair job</h2>
           <form className="service-form" onSubmit={(e) => void submit(e)}>
-            <label>Customer
-              <select required value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })}>
-                <option value="">Select customer</option>
+            <label>Customer (optional)
+              <select value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })}>
+                <option value="">No customer linked</option>
                 {customers.map((c) => <option value={c.id} key={c.id}>{c.fullName} · {c.phone ?? 'no phone'}</option>)}
               </select>
             </label>
-            <label>Device
-              <input required value={form.deviceDescription} onChange={(e) => setForm({ ...form, deviceDescription: e.target.value })} placeholder="e.g. Samsung Galaxy A14" />
+            <label>Product type
+              <input required value={form.deviceDescription} onChange={(e) => setForm({ ...form, deviceDescription: e.target.value })} placeholder="e.g. Phone, laptop, or tablet" />
             </label>
-            <label>Reported fault
-              <textarea required value={form.reportedFault} onChange={(e) => setForm({ ...form, reportedFault: e.target.value })} placeholder="Describe the problem" />
+            <label>Technician responsible
+              <select required value={form.assignedTechnicianId} onChange={(e) => setForm({ ...form, assignedTechnicianId: e.target.value })}>
+                <option value="">Select technician</option>
+                {technicians.map((technician) => <option value={technician.id} key={technician.id}>{technician.fullName}</option>)}
+              </select>
             </label>
-            <label>Quoted cost (KES)
-              <input type="number" min="0" value={form.quotedCost} onChange={(e) => setForm({ ...form, quotedCost: e.target.value })} />
+            <label>Amount (KES)
+              <input required type="number" min="0.01" step="0.01" value={form.quotedCost} onChange={(e) => setForm({ ...form, quotedCost: e.target.value })} placeholder="0.00" />
             </label>
-            <button className="service-button" disabled={busy}>Create repair</button>
+            <button className="service-button" disabled={busy || technicians.length === 0}>{technicians.length === 0 ? 'No technicians available' : 'Create repair job'}</button>
           </form>
         </section>
 
@@ -261,7 +269,7 @@ export function RepairsPage() {
                       <h3>{repair.ticketNumber} · {repair.deviceDescription}</h3>
                       <span className="status-pill">{repair.status}</span>
                     </div>
-                    <p>{repair.reportedFault}</p>
+                    {repair.reportedFault && repair.reportedFault !== 'Not recorded at intake' && <p>{repair.reportedFault}</p>}
                     {repair.assignedTechnicianName && <p className="service-subtitle">Assigned to {repair.assignedTechnicianName}</p>}
 
                     <div className="repair-item__actions">

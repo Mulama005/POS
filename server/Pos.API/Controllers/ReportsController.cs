@@ -88,7 +88,7 @@ public class ReportsController : ControllerBase
                 item.ProductId,
                 item.Product.Sku,
                 item.Product.Name,
-                item.Product.CostPrice,
+                item.CostPriceAtSale ?? item.Product.CostPrice,
                 item.Product.CategoryId,
                 item.Product.Category.Name))
             .ToListAsync();
@@ -352,6 +352,29 @@ public class ReportsController : ControllerBase
         });
     }
 
+    [HttpGet("sourced-purchases")]
+    public async Task<IActionResult> SourcedPurchases([FromQuery] int? year = null, [FromQuery] int? month = null, CancellationToken ct = default)
+    {
+        var now = DateTimeOffset.UtcNow.ToOffset(NairobiOffset);
+        var selectedYear = year ?? now.Year;
+        var selectedMonth = month ?? now.Month;
+        if (selectedYear < 2000 || selectedYear > now.Year || selectedMonth is < 1 or > 12 ||
+            (selectedYear == now.Year && selectedMonth > now.Month))
+            return BadRequest("Provide a valid year and month.");
+
+        var from = new DateTimeOffset(selectedYear, selectedMonth, 1, 0, 0, 0, NairobiOffset).UtcDateTime;
+        var to = new DateTimeOffset(selectedYear, selectedMonth, 1, 0, 0, 0, NairobiOffset).AddMonths(1).UtcDateTime;
+        var purchases = await _context.SupplierSourcedPurchases.AsNoTracking()
+            .Where(x => x.PurchasedAt >= from && x.PurchasedAt < to)
+            .OrderByDescending(x => x.PurchasedAt)
+            .Select(x => new SourcedPurchaseReportRow(
+                x.Id, x.PurchasedAt, x.SupplierName, x.Product.Sku, x.Product.Name,
+                x.Quantity, x.UnitCost, x.TotalCost, x.Reference, x.RecordedByUser.FullName))
+            .ToListAsync(ct);
+
+        return Ok(new { year = selectedYear, month = selectedMonth, totalPurchases = purchases.Count, totalCost = purchases.Sum(x => x.TotalCost), purchases });
+    }
+
     [HttpGet("inventory")]
     public async Task<IActionResult> InventoryReport()
     {
@@ -575,9 +598,11 @@ public class ReportsController : ControllerBase
             .Select(x => new { x.AssignedTechnicianId })
             .ToListAsync(ct);
         var moneyRows = await (
-            from payment in _context.CreditTransactions.AsNoTracking()
+            from payment in _context.RepairPayments.AsNoTracking()
             join job in _context.RepairJobs.AsNoTracking() on payment.RepairJobId equals job.Id
-            where payment.Type == CreditTransactionType.Payment && payment.Timestamp >= rangeStart && payment.Timestamp < rangeEnd
+            where payment.Status == PaymentStatus.Success &&
+                (payment.ProcessedAt ?? payment.CreatedAt) >= rangeStart &&
+                (payment.ProcessedAt ?? payment.CreatedAt) < rangeEnd
             select new { job.AssignedTechnicianId, payment.Amount }
         ).ToListAsync(ct);
         var timeEntries = await _context.TechnicianTimeEntries.AsNoTracking()
@@ -826,7 +851,7 @@ public class ReportsController : ControllerBase
             .Where(item => item.Sale.Status == SaleStatus.Completed
                         && item.Sale.SaleDate >= from
                         && item.Sale.SaleDate < toExclusive)
-            .Select(item => new { item.LineTotal, item.TaxAmount, item.Quantity, item.Product.CostPrice })
+            .Select(item => new { item.LineTotal, item.TaxAmount, item.Quantity, CostPrice = item.CostPriceAtSale ?? item.Product.CostPrice })
             .ToListAsync();
         var netRevenue = soldItems.Sum(item => item.LineTotal - item.TaxAmount);
         var cogs = soldItems.Sum(item => item.Quantity * item.CostPrice);
@@ -942,14 +967,15 @@ public class ReportsController : ControllerBase
             .Select(p => new { p.Id, p.Sku, p.Name, p.CostPrice }).ToListAsync();
         var soldItems = await _context.SaleItems.AsNoTracking()
             .Where(i => i.Sale.Status == SaleStatus.Completed && i.Sale.SaleDate >= monthStart.UtcDateTime && i.Sale.SaleDate < periodEnd.UtcDateTime)
-            .Select(i => new { i.ProductId, i.Quantity, i.LineTotal, i.TaxAmount, i.Product.CostPrice }).ToListAsync();
+            .Select(i => new { i.ProductId, i.Quantity, i.LineTotal, i.TaxAmount, CostPrice = i.CostPriceAtSale ?? i.Product.CostPrice }).ToListAsync();
         var groupedItems = soldItems.GroupBy(i => i.ProductId).ToDictionary(g => g.Key, g => g.ToList());
         var rows = products.Select(product =>
         {
             groupedItems.TryGetValue(product.Id, out var items);
             var units = items?.Sum(i => i.Quantity) ?? 0;
             var revenue = items?.Sum(i => i.LineTotal - i.TaxAmount) ?? 0m;
-            return new SkuPerformancePdfRow(product.Sku, product.Name, units, revenue, revenue - units * product.CostPrice);
+            var cogs = items?.Sum(i => i.Quantity * i.CostPrice) ?? 0m;
+            return new SkuPerformancePdfRow(product.Sku, product.Name, units, revenue, revenue - cogs);
         });
         var orderedRows = string.Equals(kind, "top", StringComparison.OrdinalIgnoreCase)
             ? rows.OrderByDescending(r => r.Revenue).ThenBy(r => r.Name).Take(10).ToList()
@@ -1878,6 +1904,7 @@ public record MonthlyInsightsPdfDto(
     decimal PreviousSales,
     IReadOnlyList<MonthlyTrendPdfPoint> Trend);
 public record SkuPerformancePdfRow(string Sku, string Name, decimal UnitsSold, decimal Revenue, decimal GrossProfit);
+public sealed record SourcedPurchaseReportRow(Guid PurchaseId, DateTime PurchasedAt, string SupplierName, string Sku, string ProductName, int Quantity, decimal UnitCost, decimal TotalCost, string? Reference, string RecordedBy);
 
 public record MonthlySale(DateTime SaleDate, decimal Subtotal, decimal DiscountTotal, decimal TaxTotal, decimal Total);
 

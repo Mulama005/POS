@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Pos.Application.Common.Interfaces;
 using Pos.Domain.Entities;
-using Pos.Domain.Enums;
 using Pos.Infrastructure.Persistence;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -17,6 +16,7 @@ namespace Pos.Api.Controllers;
 public sealed class TimekeepingController : ControllerBase
 {
     private static readonly TimeSpan NairobiOffset = TimeSpan.FromHours(3);
+    private static readonly string[] ExcludedStaffNames = ["bonventure mulama", "moryn wachira", "moureen wachira"];
     private readonly PosDbContext _db;
     private readonly IAuditService _audit;
 
@@ -36,12 +36,16 @@ public sealed class TimekeepingController : ControllerBase
 
         var entries = await _db.TechnicianTimeEntries.AsNoTracking()
             .Where(x => x.ClockInAt < toExclusive && (x.ClockOutAt == null || x.ClockOutAt > from))
+            .Where(x => _db.DomainUsers.Any(u =>
+                u.Id == x.TechnicianId &&
+                !ExcludedStaffNames.Contains(u.FullName.Trim().ToLower()) &&
+                !EF.Functions.ILike(u.FullName.Trim(), "George%")))
             .OrderByDescending(x => x.ClockInAt)
             .Select(x => new
             {
                 x.Id,
-                x.TechnicianId,
-                TechnicianName = _db.DomainUsers.Where(u => u.Id == x.TechnicianId).Select(u => u.FullName).FirstOrDefault() ?? "Unknown technician",
+                StaffId = x.TechnicianId,
+                StaffName = _db.DomainUsers.Where(u => u.Id == x.TechnicianId).Select(u => u.FullName).FirstOrDefault() ?? "Unknown staff member",
                 x.ClockInAt,
                 x.ClockInRecordedByUserId,
                 ClockInRecordedBy = _db.DomainUsers.Where(u => u.Id == x.ClockInRecordedByUserId).Select(u => u.FullName).FirstOrDefault() ?? "Unknown user",
@@ -55,8 +59,8 @@ public sealed class TimekeepingController : ControllerBase
         var rows = entries.Select(x => new
         {
             x.Id,
-            x.TechnicianId,
-            x.TechnicianName,
+            x.StaffId,
+            x.StaffName,
             x.ClockInAt,
             x.ClockInRecordedByUserId,
             x.ClockInRecordedBy,
@@ -66,8 +70,10 @@ public sealed class TimekeepingController : ControllerBase
             IsOpen = x.ClockOutAt is null,
             HoursWorked = Math.Round(Math.Max(0, (((x.ClockOutAt ?? now) > toExclusive ? toExclusive : (x.ClockOutAt ?? now)) - (x.ClockInAt < from ? from : x.ClockInAt)).TotalHours), 2),
         }).ToList();
-        var technicians = await _db.DomainUsers.AsNoTracking()
-            .Where(u => u.IsActive && u.Role == RegisterUserRole.Technician)
+        var staff = await _db.DomainUsers.AsNoTracking()
+            .Where(u => u.IsActive &&
+                !ExcludedStaffNames.Contains(u.FullName.Trim().ToLower()) &&
+                !EF.Functions.ILike(u.FullName.Trim(), "George%"))
             .OrderBy(u => u.FullName)
             .Select(u => new { u.Id, u.FullName })
             .ToListAsync(ct);
@@ -76,7 +82,7 @@ public sealed class TimekeepingController : ControllerBase
         {
             fromDate = fromDay.ToString("yyyy-MM-dd"),
             toDate = toDay.ToString("yyyy-MM-dd"),
-            technicians,
+            staff,
             entries = rows,
             totalHours = Math.Round(rows.Sum(x => x.HoursWorked), 2),
             openShifts = rows.Count(x => x.IsOpen),
@@ -86,13 +92,16 @@ public sealed class TimekeepingController : ControllerBase
     [HttpPost("clock-in")]
     public async Task<IActionResult> ClockIn([FromBody] ClockInRequest request, CancellationToken ct)
     {
-        var technician = await _db.DomainUsers.FirstOrDefaultAsync(
-            u => u.Id == request.TechnicianId && u.IsActive && u.Role == RegisterUserRole.Technician, ct);
-        if (technician is null) return BadRequest("Choose an active technician.");
+        var staff = await _db.DomainUsers.FirstOrDefaultAsync(
+            u => u.Id == request.StaffId &&
+                u.IsActive &&
+                !ExcludedStaffNames.Contains(u.FullName.Trim().ToLower()) &&
+                !EF.Functions.ILike(u.FullName.Trim(), "George%"), ct);
+        if (staff is null) return BadRequest("Choose an active staff member.");
 
         var entry = new TechnicianTimeEntry
         {
-            TechnicianId = technician.Id,
+            TechnicianId = staff.Id,
             ClockInAt = DateTimeOffset.UtcNow,
             ClockInRecordedByUserId = CurrentUserId,
         };
@@ -104,18 +113,29 @@ public sealed class TimekeepingController : ControllerBase
         catch (DbUpdateException)
         {
             _db.ChangeTracker.Clear();
-            return Conflict("This technician already has an open shift. Clock them out before starting another.");
+            return Conflict("This staff member already has an open shift. Clock them out before starting another.");
         }
 
-        await _audit.LogAsync(CurrentUserId, "TECHNICIAN_CLOCKED_IN", "TechnicianTimeEntry", entry.Id,
-            $"Clocked in {technician.FullName} at {entry.ClockInAt.ToOffset(NairobiOffset):yyyy-MM-dd HH:mm} EAT.", HttpContext.Connection.RemoteIpAddress?.ToString());
+        await _audit.LogAsync(CurrentUserId, "STAFF_CLOCKED_IN", "TechnicianTimeEntry", entry.Id,
+            $"Clocked in {staff.FullName} at {entry.ClockInAt.ToOffset(NairobiOffset):yyyy-MM-dd HH:mm} EAT.", HttpContext.Connection.RemoteIpAddress?.ToString());
 
-        return Ok(new { entry.Id, technicianId = technician.Id, technicianName = technician.FullName, entry.ClockInAt, isOpen = true });
+        return Ok(new { entry.Id, staffId = staff.Id, staffName = staff.FullName, entry.ClockInAt, isOpen = true });
     }
 
     [HttpPost("{id:guid}/clock-out")]
     public async Task<IActionResult> ClockOut(Guid id, CancellationToken ct)
     {
+        var isEligibleOpenShift = await _db.TechnicianTimeEntries.AnyAsync(x =>
+            x.Id == id && x.ClockOutAt == null &&
+            _db.DomainUsers.Any(u => u.Id == x.TechnicianId &&
+                !ExcludedStaffNames.Contains(u.FullName.Trim().ToLower()) &&
+                !EF.Functions.ILike(u.FullName.Trim(), "George%")), ct);
+        if (!isEligibleOpenShift)
+        {
+            var exists = await _db.TechnicianTimeEntries.AnyAsync(x => x.Id == id, ct);
+            return exists ? Conflict("This shift is closed or belongs to an excluded staff member.") : NotFound();
+        }
+
         var clockOutAt = DateTimeOffset.UtcNow;
         var updated = await _db.TechnicianTimeEntries
             .Where(x => x.Id == id && x.ClockOutAt == null)
@@ -129,11 +149,11 @@ public sealed class TimekeepingController : ControllerBase
         }
 
         var entry = await _db.TechnicianTimeEntries.AsNoTracking().FirstAsync(x => x.Id == id, ct);
-        var technicianName = await _db.DomainUsers.Where(u => u.Id == entry.TechnicianId).Select(u => u.FullName).FirstAsync(ct);
-        await _audit.LogAsync(CurrentUserId, "TECHNICIAN_CLOCKED_OUT", "TechnicianTimeEntry", entry.Id,
-            $"Clocked out {technicianName} at {clockOutAt.ToOffset(NairobiOffset):yyyy-MM-dd HH:mm} EAT.", HttpContext.Connection.RemoteIpAddress?.ToString());
+        var staffName = await _db.DomainUsers.Where(u => u.Id == entry.TechnicianId).Select(u => u.FullName).FirstAsync(ct);
+        await _audit.LogAsync(CurrentUserId, "STAFF_CLOCKED_OUT", "TechnicianTimeEntry", entry.Id,
+            $"Clocked out {staffName} at {clockOutAt.ToOffset(NairobiOffset):yyyy-MM-dd HH:mm} EAT.", HttpContext.Connection.RemoteIpAddress?.ToString());
 
-        return Ok(new { entry.Id, technicianId = entry.TechnicianId, technicianName, entry.ClockInAt, entry.ClockOutAt, isOpen = false });
+        return Ok(new { entry.Id, staffId = entry.TechnicianId, staffName, entry.ClockInAt, entry.ClockOutAt, isOpen = false });
     }
 
     [HttpGet("export/pdf")]
@@ -144,12 +164,16 @@ public sealed class TimekeepingController : ControllerBase
 
         var entries = await _db.TechnicianTimeEntries.AsNoTracking()
             .Where(x => x.ClockInAt < toExclusive && (x.ClockOutAt == null || x.ClockOutAt > from))
+            .Where(x => _db.DomainUsers.Any(u =>
+                u.Id == x.TechnicianId &&
+                !ExcludedStaffNames.Contains(u.FullName.Trim().ToLower()) &&
+                !EF.Functions.ILike(u.FullName.Trim(), "George%")))
             .OrderBy(x => x.ClockInAt)
             .Select(x => new
             {
                 x.ClockInAt,
                 x.ClockOutAt,
-                Technician = _db.DomainUsers.Where(u => u.Id == x.TechnicianId).Select(u => u.FullName).FirstOrDefault() ?? "Unknown technician",
+                StaffMember = _db.DomainUsers.Where(u => u.Id == x.TechnicianId).Select(u => u.FullName).FirstOrDefault() ?? "Unknown staff member",
                 RecordedBy = _db.DomainUsers.Where(u => u.Id == x.ClockInRecordedByUserId).Select(u => u.FullName).FirstOrDefault() ?? "Unknown user",
                 ClockOutRecordedBy = x.ClockOutRecordedByUserId == null ? null : _db.DomainUsers.Where(u => u.Id == x.ClockOutRecordedByUserId).Select(u => u.FullName).FirstOrDefault(),
             }).ToListAsync(ct);
@@ -169,7 +193,7 @@ public sealed class TimekeepingController : ControllerBase
             page.DefaultTextStyle(style => style.FontFamily("Helvetica").FontSize(9));
             page.Header().Column(column =>
             {
-                column.Item().Text("TECHNICIAN TIMEKEEPING SUMMARY").FontSize(18).Bold();
+                column.Item().Text("STAFF TIMEKEEPING SUMMARY").FontSize(18).Bold();
                 column.Item().PaddingTop(4).Text($"{fromDay:dd MMM yyyy} — {toDay:dd MMM yyyy} · EAT (UTC+3)").FontColor(Colors.Grey.Darken1);
                 column.Item().PaddingTop(4).Text($"Generated {DateTimeOffset.UtcNow.ToOffset(NairobiOffset):dd MMM yyyy HH:mm} EAT · {entries.Count} shift(s) · {totalHours:0.00} total hours").FontColor(Colors.Grey.Darken1);
             });
@@ -182,7 +206,7 @@ public sealed class TimekeepingController : ControllerBase
                 });
                 table.Header(header =>
                 {
-                    foreach (var title in new[] { "Technician", "Clock in (EAT)", "Clock out (EAT)", "Clock-in recorded by", "Clock-out recorded by", "Hours" })
+                    foreach (var title in new[] { "Staff member", "Clock in (EAT)", "Clock out (EAT)", "Clock-in recorded by", "Clock-out recorded by", "Hours" })
                         header.Cell().Background(Colors.Grey.Lighten3).Padding(6).Text(title).SemiBold();
                 });
                 foreach (var row in entries)
@@ -193,7 +217,7 @@ public sealed class TimekeepingController : ControllerBase
                     var hours = Math.Max(0, (rangeEnd - rangeStart).TotalHours);
                     var cells = new[]
                     {
-                        row.Technician,
+                        row.StaffMember,
                         row.ClockInAt.ToOffset(NairobiOffset).ToString("dd MMM yyyy HH:mm"),
                         row.ClockOutAt?.ToOffset(NairobiOffset).ToString("dd MMM yyyy HH:mm") ?? "Shift open",
                         row.RecordedBy,
@@ -208,8 +232,8 @@ public sealed class TimekeepingController : ControllerBase
         }));
 
         await _audit.LogAsync(CurrentUserId, "REPORT_EXPORTED", "Report", CurrentUserId,
-            $"Exported Technician timekeeping report from {fromDay:yyyy-MM-dd} to {toDay:yyyy-MM-dd} as PDF.", HttpContext.Connection.RemoteIpAddress?.ToString());
-        return File(document.GeneratePdf(), "application/pdf", $"technician-timekeeping-{fromDay:yyyyMMdd}-{toDay:yyyyMMdd}.pdf");
+            $"Exported Staff timekeeping report from {fromDay:yyyy-MM-dd} to {toDay:yyyy-MM-dd} as PDF.", HttpContext.Connection.RemoteIpAddress?.ToString());
+        return File(document.GeneratePdf(), "application/pdf", $"staff-timekeeping-{fromDay:yyyyMMdd}-{toDay:yyyyMMdd}.pdf");
     }
 
     private static (DateTimeOffset From, DateTimeOffset ToExclusive, DateOnly FromDay, DateOnly ToDay) GetRange(DateOnly? fromDate, DateOnly? toDate)
@@ -222,5 +246,5 @@ public sealed class TimekeepingController : ControllerBase
         return (from, toExclusive, fromDay, toDay);
     }
 
-    public sealed record ClockInRequest(Guid TechnicianId);
+    public sealed record ClockInRequest(Guid StaffId);
 }

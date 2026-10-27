@@ -12,6 +12,8 @@ public class SaleItem : BaseEntity
 
     public int Quantity { get; set; } = 1;
     public decimal UnitPrice { get; set; }
+    /// <summary>Unit cost captured when this item was sold. Null only for historical sales.</summary>
+    public decimal? CostPriceAtSale { get; set; }
     public decimal DiscountAmount { get; set; }
     public decimal TaxAmount { get; set; }
     public decimal LineTotal { get; set; }

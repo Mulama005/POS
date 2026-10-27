@@ -1,9 +1,10 @@
 ﻿import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth'
 import { isAxiosError } from 'axios'
 import { getProduct, listProducts } from '../services/ProductsService'
 import { listCategories } from '../services/categoriesService'
-import { receiveBulkStock, receiveSerialStock } from '../services/stockService'
+import { receiveBulkStock, receiveSerialStock, sourceStock } from '../services/stockService'
 import type { Category, Product } from '../types/product'
 import type { ApiErrorBody } from '../types/auth'
 import './ReceiveStock.css'
@@ -22,6 +23,9 @@ function getErrorMessage(err: unknown, fallback: string): string {
 
 export function ReceiveStock() {
     const [searchParams] = useSearchParams()
+    const navigate = useNavigate()
+    const { user } = useAuth()
+    const isCashier = user?.role === 'Cashier'
 
     const [categories, setCategories] = useState<Category[]>([])
     const [selected, setSelected] = useState<Product | null>(null)
@@ -37,14 +41,23 @@ export function ReceiveStock() {
     // Receiving form state (unchanged from before).
     const [serialInput, setSerialInput] = useState('')
     const [serials, setSerials] = useState<string[]>([])
-    const [bulkQuantity, setBulkQuantity] = useState('')
+    const [bulkQuantity, setBulkQuantity] = useState(searchParams.get('quantity') ?? '')
     const [submitting, setSubmitting] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [successMessage, setSuccessMessage] = useState<string | null>(null)
+    const [mode, setMode] = useState<'standard' | 'source'>(searchParams.get('mode') === 'source' || user?.role === 'Cashier' ? 'source' : 'standard')
+    const [supplierName, setSupplierName] = useState('')
+    const [unitCost, setUnitCost] = useState('')
+    const [purchaseReference, setPurchaseReference] = useState('')
+    const [purchaseTransactionId, setPurchaseTransactionId] = useState(() => crypto.randomUUID())
 
     useEffect(() => {
         void listCategories().then(setCategories)
     }, [])
+
+    useEffect(() => {
+        if (isCashier || searchParams.get('mode') === 'source') setMode('source')
+    }, [isCashier, searchParams])
 
     // Arriving from ProductsPage's "Receive stock →" link with ?productId=...
     // preselects that product directly — same behaviour as before.
@@ -86,6 +99,7 @@ export function ReceiveStock() {
         setBulkQuantity('')
         setError(null)
         setSuccessMessage(null)
+        setPurchaseTransactionId(crypto.randomUUID())
     }
 
     const category = selected
@@ -139,6 +153,42 @@ export function ReceiveStock() {
             setBulkQuantity('')
         } catch (err) {
             setError(getErrorMessage(err, 'Could not receive stock.'))
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
+    const submitSourced = async () => {
+        if (!selected) return
+        const quantity = isSerialized ? serials.length : Number(bulkQuantity)
+        const cost = Number(unitCost)
+        if (!supplierName.trim()) { setError('Enter the neighboring shop or supplier name.'); return }
+        if (!Number.isFinite(cost) || cost < 0) { setError('Enter a valid unit purchase cost.'); return }
+        if (!Number.isInteger(quantity) || quantity <= 0) { setError(isSerialized ? 'Add a serial number for each unit.' : 'Enter a quantity greater than zero.'); return }
+
+        setSubmitting(true)
+        setError(null)
+        try {
+            const result = await sourceStock({
+                clientTransactionId: purchaseTransactionId,
+                productId: selected.id,
+                supplierName: supplierName.trim(),
+                quantity,
+                unitCost: cost,
+                serialNumbers: isSerialized ? serials : undefined,
+                reference: purchaseReference.trim() || null,
+            })
+            setSuccessMessage(`Recorded ${quantity} × ${selected.name} from ${supplierName.trim()} for ${result.totalCost.toLocaleString('en-KE', { minimumFractionDigits: 2 })} KES. ${result.newQuantity} now in stock.`)
+            setSerials([])
+            setSerialInput('')
+            setBulkQuantity('')
+            setSupplierName('')
+            setUnitCost('')
+            setPurchaseReference('')
+            setPurchaseTransactionId(crypto.randomUUID())
+            if (searchParams.get('returnTo') === 'checkout') navigate('/checkout')
+        } catch (err) {
+            setError(getErrorMessage(err, 'Could not record the sourced purchase. Check the details and try again.'))
         } finally {
             setSubmitting(false)
         }
@@ -248,8 +298,20 @@ export function ReceiveStock() {
                         </button>
                     </div>
 
+                    {!isCashier && <div className="receive-stock-modes" role="group" aria-label="Stock receiving type">
+                        <button type="button" className={mode === 'standard' ? 'is-active' : ''} onClick={() => setMode('standard')}>Regular stock</button>
+                        <button type="button" className={mode === 'source' ? 'is-active' : ''} onClick={() => setMode('source')}>Bought from another shop</button>
+                    </div>}
+
                     {successMessage && <p className="receive-stock-success">{successMessage}</p>}
                     {error && <p className="receive-stock-error" role="alert">{error}</p>}
+
+                    {mode === 'source' && <div className="receive-stock-source-fields">
+                        <label>Supplier / neighboring shop<input value={supplierName} onChange={e => setSupplierName(e.target.value)} maxLength={160} placeholder="Shop name" /></label>
+                        <label>Purchase cost per unit (KES)<input type="number" min="0" step="0.01" value={unitCost} onChange={e => setUnitCost(e.target.value)} placeholder="What you paid per item" /></label>
+                        <label>Receipt / reference (optional)<input value={purchaseReference} onChange={e => setPurchaseReference(e.target.value)} maxLength={120} placeholder="Reference or note" /></label>
+                        <p className="receive-stock-hint">The actual supplier cost is saved and used for profit reports when the item sells.</p>
+                    </div>}
 
                     {isSerialized ? (
                         <div className="receive-stock-form">
@@ -287,9 +349,9 @@ export function ReceiveStock() {
                                 type="button"
                                 className="receive-stock-submit"
                                 disabled={serials.length === 0 || submitting}
-                                onClick={() => void submitSerial()}
+                                onClick={() => void (mode === 'source' ? submitSourced() : submitSerial())}
                             >
-                                {submitting ? 'Receiving…' : `Receive ${serials.length || ''} unit(s)`.trim()}
+                                {submitting ? 'Saving…' : mode === 'source' ? `Record purchase & receive ${serials.length || ''} unit(s)`.trim() : `Receive ${serials.length || ''} unit(s)`.trim()}
                             </button>
                         </div>
                     ) : (
@@ -310,9 +372,9 @@ export function ReceiveStock() {
                                     type="button"
                                     className="receive-stock-submit"
                                     disabled={submitting}
-                                    onClick={() => void submitBulk()}
+                                    onClick={() => void (mode === 'source' ? submitSourced() : submitBulk())}
                                 >
-                                    {submitting ? 'Receiving…' : 'Receive'}
+                                    {submitting ? 'Saving…' : mode === 'source' ? 'Record purchase & receive' : 'Receive'}
                                 </button>
                             </div>
                         </div>

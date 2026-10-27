@@ -12,7 +12,7 @@ public class RepairJob
     // check, so a ticket number alone isn't enough to see someone else's repair.
     public string TicketNumber { get; set; } = string.Empty;
 
-    public Guid CustomerId { get; set; }
+    public Guid? CustomerId { get; set; }
     public Customer? Customer { get; set; }
 
     public string DeviceDescription { get; set; } = string.Empty; // e.g. "Samsung A14, cracked screen"

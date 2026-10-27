@@ -172,16 +172,22 @@ public class ProductsController : ControllerBase
         if (category == null)
             return BadRequest("Invalid category");
 
-        if (await _context.Products.AnyAsync(
-                p => p.Sku == request.Sku))
+        var requestedSku = request.Sku?.Trim();
+        if (!string.IsNullOrWhiteSpace(requestedSku) &&
+            await _context.Products.AnyAsync(
+                p => p.Sku == requestedSku))
         {
             return BadRequest("SKU already exists");
         }
 
+        var sku = string.IsNullOrWhiteSpace(requestedSku)
+            ? await GenerateProductSkuAsync()
+            : requestedSku;
+
         var product = new Product
         {
             Id = Guid.NewGuid(),
-            Sku = request.Sku,
+            Sku = sku,
             Barcode = request.Barcode,
             Name = request.Name,
             Description = request.Description,
@@ -246,6 +252,15 @@ public class ProductsController : ControllerBase
             nameof(Get),
             new { id = product.Id },
             dto);
+    }
+
+    private async Task<string> GenerateProductSkuAsync()
+    {
+        var sequenceValue = await _context.Database
+            .SqlQueryRaw<long>("SELECT nextval('\"ProductSkuSequence\"') AS \"Value\"")
+            .SingleAsync();
+
+        return $"EDT-{sequenceValue:D6}";
     }
 
     [HttpPut("{id}")]

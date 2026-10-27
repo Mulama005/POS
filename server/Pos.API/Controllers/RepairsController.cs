@@ -33,12 +33,19 @@ public sealed class RepairsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateRepairRequest request, CancellationToken cancellationToken)
     {
-        var customerExists = await _db.Customers.AnyAsync(c => c.Id == request.CustomerId, cancellationToken);
-        if (!customerExists)
+        if (string.IsNullOrWhiteSpace(request.DeviceDescription))
+            return BadRequest("Enter the product type.");
+        if (request.QuotedCost is null or <= 0)
+            return BadRequest("Enter an amount greater than zero.");
+        if (request.AssignedTechnicianId is null)
+            return BadRequest("Choose the technician responsible for this repair.");
+
+        if (request.CustomerId is not null &&
+            !await _db.Customers.AnyAsync(c => c.Id == request.CustomerId, cancellationToken))
         {
-            return BadRequest("Unknown customer. Create the customer record first.");
+            return BadRequest("Unknown customer. Choose an existing customer or leave it blank.");
         }
-        if (request.AssignedTechnicianId is not null && !await IsActiveTechnicianAsync(request.AssignedTechnicianId.Value, cancellationToken))
+        if (!await IsActiveTechnicianAsync(request.AssignedTechnicianId.Value, cancellationToken))
         {
             return BadRequest("Assigned user must be an active Technician.");
         }
@@ -48,8 +55,8 @@ public sealed class RepairsController : ControllerBase
             Id = Guid.NewGuid(),
             TicketNumber = await GenerateTicketNumberAsync(cancellationToken),
             CustomerId = request.CustomerId,
-            DeviceDescription = request.DeviceDescription,
-            ReportedFault = request.ReportedFault,
+            DeviceDescription = request.DeviceDescription.Trim(),
+            ReportedFault = string.IsNullOrWhiteSpace(request.ReportedFault) ? "Not recorded at intake" : request.ReportedFault.Trim(),
             QuotedCost = request.QuotedCost,
             AssignedTechnicianId = request.AssignedTechnicianId,
             Status = RepairStatus.Received,
@@ -244,27 +251,33 @@ public sealed class RepairsController : ControllerBase
             return BadRequest("This repair's cost has already been finalized.");
         }
 
-        var customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == job.CustomerId, cancellationToken);
-        if (customer is null) return NotFound("Customer record for this repair no longer exists.");
+        var customer = job.CustomerId is Guid customerId
+            ? await _db.Customers.FirstOrDefaultAsync(c => c.Id == customerId, cancellationToken)
+            : null;
+        if (job.CustomerId is not null && customer is null) return NotFound("Customer record for this repair no longer exists.");
 
         job.FinalCost = request.FinalCost;
         job.UpdatedAt = DateTimeOffset.UtcNow;
 
-        customer.CurrentCreditBalance += request.FinalCost;
-        _db.CreditTransactions.Add(new CreditTransaction
+        if (customer is not null)
         {
-            Id = Guid.NewGuid(),
-            CustomerId = customer.Id,
-            Type = CreditTransactionType.CreditSale,
-            Amount = request.FinalCost,
-            Notes = $"Repair {job.TicketNumber} — {job.DeviceDescription}",
-            RecordedByUserId = CurrentUserId,
-            BalanceAfter = customer.CurrentCreditBalance,
-        });
+            customer.CurrentCreditBalance += request.FinalCost;
+            _db.CreditTransactions.Add(new CreditTransaction
+            {
+                Id = Guid.NewGuid(),
+                CustomerId = customer.Id,
+                Type = CreditTransactionType.CreditSale,
+                Amount = request.FinalCost,
+                RepairJobId = job.Id,
+                Notes = $"Repair {job.TicketNumber} — {job.DeviceDescription}",
+                RecordedByUserId = CurrentUserId,
+                BalanceAfter = customer.CurrentCreditBalance,
+            });
+        }
 
         await _db.SaveChangesAsync(cancellationToken);
 
-        return Ok(new { message = "Cost finalized and charged to customer.", finalCost = job.FinalCost, customerBalance = customer.CurrentCreditBalance });
+        return Ok(new { message = customer is null ? "Repair cost finalized." : "Cost finalized and charged to customer.", finalCost = job.FinalCost, customerBalance = (decimal?)customer?.CurrentCreditBalance });
     }
 
     /// <summary>
@@ -303,32 +316,50 @@ public sealed class RepairsController : ControllerBase
             return BadRequest("Finalize this repair's cost before recording a payment.");
         }
 
-        var customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == job.CustomerId, cancellationToken);
-        if (customer is null) return NotFound("Customer record for this repair no longer exists.");
+        var customer = job.CustomerId is Guid customerId
+            ? await _db.Customers.FirstOrDefaultAsync(c => c.Id == customerId, cancellationToken)
+            : null;
+        if (job.CustomerId is not null && customer is null) return NotFound("Customer record for this repair no longer exists.");
 
         job.AmountPaid += request.Amount;
         job.UpdatedAt = DateTimeOffset.UtcNow;
 
-        customer.CurrentCreditBalance -= request.Amount;
-        // Not clamped at zero, same as CustomersController.RecordPayment — an
-        // overpayment is meaningful information (customer now in credit), not an error.
-
-        _db.CreditTransactions.Add(new CreditTransaction
+        var paymentTime = DateTimeOffset.UtcNow;
+        _db.RepairPayments.Add(new RepairPayment
         {
-            Id = Guid.NewGuid(),
-            CustomerId = customer.Id,
-            Type = CreditTransactionType.Payment,
+            RepairJobId = job.Id,
             Amount = request.Amount,
+            Status = PaymentStatus.Success,
             PaymentMethod = request.PaymentMethod,
             BankName = request.BankName?.Trim(),
             ExternalReference = request.Reference?.Trim(),
-            RepairJobId = job.Id,
-            Notes = request.Notes is null
-                ? $"Repair {job.TicketNumber} payment"
-                : $"Repair {job.TicketNumber} payment — {request.Notes}",
-            RecordedByUserId = CurrentUserId,
-            BalanceAfter = customer.CurrentCreditBalance,
+            InitiatedByUserId = CurrentUserId,
+            CreatedAt = paymentTime,
+            ProcessedAt = paymentTime,
         });
+
+        if (customer is not null)
+        {
+            customer.CurrentCreditBalance -= request.Amount;
+            // Not clamped at zero: an overpayment is meaningful ledger information.
+            _db.CreditTransactions.Add(new CreditTransaction
+            {
+                Id = Guid.NewGuid(),
+                CustomerId = customer.Id,
+                Type = CreditTransactionType.Payment,
+                Amount = request.Amount,
+                PaymentMethod = request.PaymentMethod,
+                BankName = request.BankName?.Trim(),
+                ExternalReference = request.Reference?.Trim(),
+                RepairJobId = job.Id,
+                Notes = request.Notes is null
+                    ? $"Repair {job.TicketNumber} payment"
+                    : $"Repair {job.TicketNumber} payment — {request.Notes}",
+                RecordedByUserId = CurrentUserId,
+                Timestamp = paymentTime,
+                BalanceAfter = customer.CurrentCreditBalance,
+            });
+        }
 
         await _db.SaveChangesAsync(cancellationToken);
 
@@ -337,7 +368,7 @@ public sealed class RepairsController : ControllerBase
             message = "Payment recorded.",
             amountPaid = job.AmountPaid,
             balance = job.FinalCost - job.AmountPaid,
-            customerBalance = customer.CurrentCreditBalance,
+            customerBalance = (decimal?)customer?.CurrentCreditBalance,
         });
     }
 
@@ -352,26 +383,23 @@ public sealed class RepairsController : ControllerBase
         var job = await _db.RepairJobs.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
         if (job is null) return NotFound();
 
-        var customer = await _db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == job.CustomerId, cancellationToken);
+        var customer = job.CustomerId is Guid customerId
+            ? await _db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == customerId, cancellationToken)
+            : null;
 
-        // Both payment paths (manual + M-Pesa callback) write Notes starting with this prefix.
-        var prefix = $"Repair {job.TicketNumber} payment";
-        var rows = await _db.CreditTransactions.AsNoTracking()
-            .Where(t => t.CustomerId == job.CustomerId
-                        && t.Type == CreditTransactionType.Payment
-                        && t.Notes != null && t.Notes.StartsWith(prefix))
-            .OrderBy(t => t.Timestamp)
-            .Select(t => new { t.Timestamp, t.PaymentMethod, t.Amount, t.Notes, t.ExternalReference, t.BankName })
+        var rows = await _db.RepairPayments.AsNoTracking()
+            .Where(p => p.RepairJobId == job.Id && p.Status == PaymentStatus.Success)
+            .OrderBy(p => p.ProcessedAt ?? p.CreatedAt)
+            .Select(p => new { Timestamp = p.ProcessedAt ?? p.CreatedAt, p.PaymentMethod, p.Amount, p.ExternalReference, p.MpesaReceiptNumber, p.CheckoutRequestId, p.BankName })
             .ToListAsync(cancellationToken);
 
-        var payments = rows.Select(t =>
+        var payments = rows.Select(p => new
         {
-            // The M-Pesa callback writes "... - M-Pesa <RECEIPT>"; surface just the code.
-            string? reference = t.ExternalReference;
-            var marker = "M-Pesa ";
-            var at = t.Notes!.LastIndexOf(marker, StringComparison.Ordinal);
-            if (reference is null && at >= 0) reference = t.Notes[(at + marker.Length)..].Trim();
-            return new { timestamp = t.Timestamp, method = t.PaymentMethod, amount = t.Amount, reference, bankName = t.BankName };
+            timestamp = p.Timestamp,
+            method = p.PaymentMethod ?? "M-Pesa",
+            amount = p.Amount,
+            reference = p.ExternalReference ?? p.MpesaReceiptNumber ?? p.CheckoutRequestId,
+            bankName = p.BankName,
         }).ToList();
 
         return Ok(new
@@ -380,7 +408,7 @@ public sealed class RepairsController : ControllerBase
             job.CreatedAt,
             job.CollectedAt,
             Status = job.Status.ToString(),
-            CustomerName = customer?.FullName ?? "Customer",
+            CustomerName = customer?.FullName ?? "No customer linked",
             CustomerPhone = customer?.Phone,
             job.DeviceDescription,
             job.ReportedFault,

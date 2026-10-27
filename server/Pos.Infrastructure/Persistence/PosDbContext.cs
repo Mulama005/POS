@@ -20,6 +20,7 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<StockUnit> StockUnits => Set<StockUnit>();
+    public DbSet<SupplierSourcedPurchase> SupplierSourcedPurchases => Set<SupplierSourcedPurchase>();
     public DbSet<Sale> Sales => Set<Sale>();
     public DbSet<SaleItem> SaleItems => Set<SaleItem>();
     public DbSet<Payment> Payments => Set<Payment>();
@@ -104,6 +105,7 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         // ---------- StockUnit ----------
         modelBuilder.Entity<StockUnit>(e =>
         {
+            e.Property(x => x.PurchaseCost).HasColumnType("decimal(18,2)");
             e.Property(x => x.SerialNumber).IsRequired().HasMaxLength(100);
             e.HasIndex(x => x.SerialNumber).IsUnique();
             e.Property(x => x.Status).IsRequired().HasMaxLength(30);
@@ -235,6 +237,7 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
         modelBuilder.Entity<SaleItem>(e =>
         {
             e.Property(x => x.UnitPrice).HasColumnType("decimal(18,2)");
+            e.Property(x => x.CostPriceAtSale).HasColumnType("decimal(18,2)");
             e.Property(x => x.DiscountAmount).HasColumnType("decimal(18,2)");
             e.Property(x => x.TaxAmount).HasColumnType("decimal(18,2)");
             e.Property(x => x.LineTotal).HasColumnType("decimal(18,2)");
@@ -255,11 +258,27 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        // ---------- Supplier-sourced stock purchases ----------
+        modelBuilder.Entity<SupplierSourcedPurchase>(e =>
+        {
+            e.Property(x => x.SupplierName).IsRequired().HasMaxLength(160);
+            e.Property(x => x.UnitCost).HasColumnType("decimal(18,2)");
+            e.Property(x => x.TotalCost).HasColumnType("decimal(18,2)");
+            e.Property(x => x.Reference).HasMaxLength(120);
+            e.HasIndex(x => x.PurchasedAt);
+            e.HasIndex(x => x.ProductId);
+            e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.RecordedByUser).WithMany().HasForeignKey(x => x.RecordedByUserId).OnDelete(DeleteBehavior.Restrict);
+        });
+
         // ---------- RepairPayment (M-Pesa attempts against a repair balance) ----------
         modelBuilder.Entity<RepairPayment>(e =>
         {
             e.Property(x => x.Amount).HasColumnType("decimal(18,2)");
             e.Property(x => x.Status);
+            e.Property(x => x.PaymentMethod).HasMaxLength(40);
+            e.Property(x => x.BankName).HasMaxLength(80);
+            e.Property(x => x.ExternalReference).HasMaxLength(120);
             e.Property(x => x.CheckoutRequestId).HasMaxLength(100);
             e.Property(x => x.MpesaReceiptNumber).HasMaxLength(50);
             e.Property(x => x.PhoneNumber).HasMaxLength(20);

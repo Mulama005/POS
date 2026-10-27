@@ -439,10 +439,12 @@ export function ProductsPage() {
           <div className="products-form-grid">
             <input
               type="text"
-              placeholder="SKU"
+              placeholder={editingId ? 'SKU' : 'Generated automatically when saved'}
               value={formValues.sku}
               onChange={(e) => setFormValues((v) => ({ ...v, sku: e.target.value }))}
-              required
+              readOnly={!editingId}
+              aria-label={editingId ? 'SKU' : 'SKU generated automatically'}
+              title={editingId ? 'Product SKU' : 'A unique SKU will be assigned when this product is saved'}
             />
             <input
               type="text"

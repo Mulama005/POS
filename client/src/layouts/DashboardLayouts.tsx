@@ -124,7 +124,10 @@ const NAV_BY_ROLE: Record<UserRole, NavGroup[]> = {
   Cashier: [
     {
       label: 'Operations',
-      items: [{ id: 'checkout', label: 'Checkout', icon: 'checkout', path: '/checkout' }],
+      items: [
+        { id: 'checkout', label: 'Checkout', icon: 'checkout', path: '/checkout' },
+        { id: 'source-stock', label: 'Source stock', icon: 'receive', path: '/stock/receive?mode=source' },
+      ],
     },
     {
       label: 'Lookups',
