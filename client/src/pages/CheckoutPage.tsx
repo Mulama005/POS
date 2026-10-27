@@ -1,6 +1,7 @@
 import { ReceiptPreview } from '../components/receipt/ReceiptSheet'
 import { buildSaleReceipt } from '../utils/receiptBuilders'
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { isAxiosError } from 'axios'
 import { useAuth } from '../hooks/useAuth'
 import { listRegisters, type RegisterSummary } from '../services/registersService'
@@ -45,6 +46,7 @@ function getErrorMessage(err: unknown, fallback: string): string {
 }
 
 export function CheckoutPage() {
+  const navigate = useNavigate()
   const { user } = useAuth()
   const isManagerOrAdmin = user?.role === 'Manager' || user?.role === 'Admin'
 
@@ -187,6 +189,14 @@ export function CheckoutPage() {
   const handleAddProduct = (product: ProductSummary) => {
     if (!cart) return
     persist(addProductToCart(cart, product))
+  }
+  const handleSourceProduct = async (product: ProductSummary) => {
+    if (!cart) return
+    const updated = addProductToCart(cart, product)
+    await saveCart(updated)
+    setCart(updated)
+    const quantity = updated.lines.filter(line => line.product.id === product.id).reduce((sum, line) => sum + line.quantity, 0)
+    navigate(`/stock/receive?productId=${encodeURIComponent(product.id)}&quantity=${quantity}&mode=source&returnTo=checkout`)
   }
   const handleQuantityChange = (lineId: string, quantity: number) => {
     if (!cart) return
@@ -342,26 +352,30 @@ export function CheckoutPage() {
     <div className="checkout-screen">
       <div className="checkout-header">
         <h1>Checkout</h1>
-
-        {isManagerOrAdmin && registers.length > 1 ? (
-          <select
-            className="checkout-register-picker"
-            value={selectedRegisterId ?? ''}
-            onChange={(e) => setRegisterOverride(e.target.value)}
-          >
-            {registers.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name} — till {r.isTillOpen ? 'open' : 'closed'}
-              </option>
-            ))}
-          </select>
-        ) : (
-          selectedRegister && (
-            <span className="checkout-register-indicator">
-              {selectedRegister.name} — till {selectedRegister.isTillOpen ? 'open' : 'closed'}
-            </span>
-          )
-        )}
+        <div className="checkout-header__actions">
+          <button type="button" className="checkout-source-action" onClick={() => navigate('/stock/receive?mode=source')}>
+            Source stock
+          </button>
+          {isManagerOrAdmin && registers.length > 1 ? (
+            <select
+              className="checkout-register-picker"
+              value={selectedRegisterId ?? ''}
+              onChange={(e) => setRegisterOverride(e.target.value)}
+            >
+              {registers.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name} — till {r.isTillOpen ? 'open' : 'closed'}
+                </option>
+              ))}
+            </select>
+          ) : (
+            selectedRegister && (
+              <span className="checkout-register-indicator">
+                {selectedRegister.name} — till {selectedRegister.isTillOpen ? 'open' : 'closed'}
+              </span>
+            )
+          )}
+        </div>
       </div>
 
       {selectedRegister && !selectedRegister.isTillOpen && (
@@ -387,7 +401,7 @@ export function CheckoutPage() {
 
       <div className="checkout-body">
         <div className="checkout-main">
-          <ProductSearchBar onAdd={handleAddProduct} disabled={completing} />
+          <ProductSearchBar onAdd={handleAddProduct} onSource={handleSourceProduct} disabled={completing} />
           <HeldSalesList
             heldCarts={heldCarts}
             onResume={(id) => void handleResume(id)}

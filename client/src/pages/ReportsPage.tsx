@@ -43,6 +43,8 @@ interface MonthlySummary {
 }
 interface RepairTechnicianSummary { technicianId: string; technicianName: string; completedRepairs: number; clockedHours: number; workRate: number | null; moneyCollected: number; }
 interface RepairSummaryData { fromDay: string; toDay: string; technicians: RepairTechnicianSummary[]; totalCompletedRepairs: number; totalMoneyCollected: number; totalClockedHours: number; unassignedRepairs: number; unassignedMoneyCollected: number; }
+interface SourcedPurchase { purchaseId: string; purchasedAt: string; supplierName: string; sku: string; productName: string; quantity: number; unitCost: number; totalCost: number; reference: string | null; recordedBy: string; }
+interface SourcedPurchaseData { year: number; month: number; totalPurchases: number; totalCost: number; purchases: SourcedPurchase[]; }
 
 const money = (value: number) => `KES ${value.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const signedMoney = (value: number) => `${value >= 0 ? "+" : "−"}${money(Math.abs(value))}`;
@@ -263,6 +265,43 @@ function RepairReportsSection({ reportMonth, onNotice }: { reportMonth: string; 
     </section>;
 }
 
+function SourcedPurchasesSection({ reportMonth, onNotice }: { reportMonth: string; onNotice: (message: string, dismissAfterMs?: number) => void }) {
+    const { accessToken } = useAuth();
+    const [data, setData] = useState<SourcedPurchaseData | null>(null);
+    const [error, setError] = useState("");
+    const [year, month] = reportMonth.split("-");
+
+    useEffect(() => {
+        let active = true;
+        setError("");
+        apiClient.get<SourcedPurchaseData>("/api/reports/sourced-purchases", { params: { year, month } })
+            .then(({ data: result }) => { if (active) setData(result); })
+            .catch(() => { if (active) setError("We could not load sourced purchases. Please try again."); });
+        return () => { active = false; };
+    }, [accessToken, year, month]);
+
+    const exportCsv = () => {
+        if (!data) return;
+        downloadCsvFile(`sourced-purchases-${reportMonth}.csv`, [
+            ["Date", "Supplier", "SKU", "Product", "Quantity", "Unit cost (KES)", "Total cost (KES)", "Reference", "Recorded by"],
+            ...data.purchases.map(row => [new Date(row.purchasedAt).toLocaleString("en-KE", { timeZone: "Africa/Nairobi" }), row.supplierName, row.sku, row.productName, row.quantity, row.unitCost, row.totalCost, row.reference ?? "", row.recordedBy]),
+            ["TOTAL", "", "", "", "", "", data.totalCost, "", ""]
+        ]);
+        onNotice("Your sourced-purchase CSV is downloading.", 4500);
+    };
+
+    return <section className="report-section report-breakdown sourced-purchases-report">
+        <div className="section-header"><div><h2>Neighboring-shop purchases</h2><p>Items sourced and received into stock during {reportMonth}. Purchase value is inventory cost; it is counted in profit when the item is sold.</p></div><div className="export-buttons"><button onClick={exportCsv} disabled={!data}>CSV</button></div></div>
+        {error && <p className="report-error">{error}</p>}
+        {data && <>
+            <div className="report-kpis"><article className="report-kpi"><span>Purchases recorded</span><strong>{data.totalPurchases}</strong></article><article className="report-kpi"><span>Total purchase value</span><strong>{money(data.totalCost)}</strong></article></div>
+            {data.purchases.length === 0 ? <p className="report-empty">No neighboring-shop purchases recorded this month.</p> : <div className="report-table-scroll"><table><thead><tr><th>Date</th><th>Supplier</th><th>Product</th><th>Qty</th><th>Unit cost</th><th>Total</th><th>Recorded by</th></tr></thead><tbody>
+                {data.purchases.map(row => <tr key={row.purchaseId}><td>{new Date(row.purchasedAt).toLocaleString("en-KE", { timeZone: "Africa/Nairobi" })}</td><td>{row.supplierName}</td><td><span className="sku-code">{row.sku}</span>{row.productName}</td><td>{row.quantity}</td><td>{money(row.unitCost)}</td><td>{money(row.totalCost)}</td><td>{row.recordedBy}</td></tr>)}
+            </tbody></table></div>}
+        </>}
+    </section>;
+}
+
 export default function ReportsPage() {
     const { accessToken } = useAuth();
     const [selectedMonth, setSelectedMonth] = useState("");
@@ -426,13 +465,14 @@ export default function ReportsPage() {
         </section>
 
         <RepairReportsSection reportMonth={reportMonth} onNotice={showExportNotice} />
+        <SourcedPurchasesSection reportMonth={reportMonth} onNotice={showExportNotice} />
 
         <section className="report-section financial-summary">
             <div className="section-header"><div><h2>Financial summary</h2><p>A decision-ready monthly view of profit, stock capital and forward targets.</p></div><div className="export-buttons"><a href="/financial-setup">Operating costs</a><button onClick={() => void downloadFinancialExport("pdf")}>PDF</button><button onClick={() => void downloadFinancialExport("csv")}>CSV</button></div></div>
             <div className="financial-groups">
                 <section className="financial-group"><div><p className="financial-group__number">01</p><h3>Income statement</h3><p>What the business made from completed sales before overheads.</p></div><div className="financial-metrics">
                     <MetricCard label="Gross revenue" value={money(summary.currentPeriod.total)} detail="Completed sales, including tax" />
-                    <MetricCard label="Cost of goods sold" value={money(cogs)} detail="Sold units × current product cost" />
+                    <MetricCard label="Cost of goods sold" value={money(cogs)} detail="Sold units × cost captured at sale" />
                     <MetricCard label="Gross profit" value={money(grossProfit)} detail={`Gross margin ${percent(grossMargin)}`} />
                     <MetricCard label="Operating costs" value={money(monthlyOperatingCosts)} detail={`${summary.operatingCosts.items.length} saved monthly cost${summary.operatingCosts.items.length === 1 ? "" : "s"}`} />
                     <MetricCard label="Operating profit" value={money(operatingProfit)} detail="Gross profit less saved operating costs; before tax and finance" />

@@ -3,9 +3,9 @@ using Pos.Domain.Enums;
 namespace Pos.Api.Controllers;
 
 public sealed record CreateRepairRequest(
-    Guid CustomerId,
+    Guid? CustomerId,
     string DeviceDescription,
-    string ReportedFault,
+    string? ReportedFault,
     decimal? QuotedCost,
     Guid? AssignedTechnicianId);
 

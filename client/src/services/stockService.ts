@@ -27,6 +27,32 @@ export async function receiveBulkStock(
   return data
 }
 
+export interface SourceStockRequest {
+  clientTransactionId: string
+  productId: string
+  supplierName: string
+  quantity: number
+  unitCost: number
+  serialNumbers?: string[]
+  reference?: string | null
+}
+
+export interface SourceStockResult {
+  purchaseId: string
+  productId: string
+  productName: string
+  quantity: number
+  totalCost: number
+  newQuantity: number
+  averageCost: number
+  replayed: boolean
+}
+
+export async function sourceStock(request: SourceStockRequest): Promise<SourceStockResult> {
+  const { data } = await apiClient.post<SourceStockResult>('/api/stock/source', request)
+  return data
+}
+
 export interface WarrantyInfo {
   name: string
   serial: string

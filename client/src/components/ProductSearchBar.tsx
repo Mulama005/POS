@@ -6,6 +6,7 @@ import type { ProductSummary } from '../types/product'
 
 interface ProductSearchBarProps {
   onAdd: (product: ProductSummary) => void
+  onSource?: (product: ProductSummary) => void
   disabled?: boolean
 }
 
@@ -16,7 +17,7 @@ function looksLikeBarcode(value: string): boolean {
   return /^\d{6,}$/.test(value.trim())
 }
 
-export function ProductSearchBar({ onAdd, disabled }: ProductSearchBarProps) {
+export function ProductSearchBar({ onAdd, onSource, disabled }: ProductSearchBarProps) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<ProductSummary[]>([])
   const [loading, setLoading] = useState(false)
@@ -135,6 +136,12 @@ export function ProductSearchBar({ onAdd, disabled }: ProductSearchBarProps) {
                   </span>
                 </span>
               </button>
+              {product.stockQuantity === 0 && onSource && <button
+                type="button"
+                className="product-search__source-button"
+                onClick={(event) => { event.stopPropagation(); onSource(product); setQuery(''); setResults([]); }}
+                disabled={disabled}
+              >Source & sell</button>}
             </li>
           ))}
         </ul>

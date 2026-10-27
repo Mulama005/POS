@@ -9,7 +9,7 @@ namespace Pos.Api.Controllers;
 /// <summary>Small, role-scoped directory used by repair assignment controls.</summary>
 [ApiController]
 [Route("api/staff")]
-[Authorize(Roles = "Manager,Admin")]
+[Authorize]
 public sealed class StaffDirectoryController : ControllerBase
 {
     private readonly PosDbContext _db;

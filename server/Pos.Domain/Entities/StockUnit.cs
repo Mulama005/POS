@@ -10,6 +10,8 @@ public class StockUnit : BaseEntity
     public string SerialNumber { get; set; } = string.Empty;
     public string? Imei { get; set; }
     public DateTime? PurchaseDate { get; set; }
+    /// <summary>Actual unit purchase cost when known (including supplier-sourced stock).</summary>
+    public decimal? PurchaseCost { get; set; }
     public DateTime? SaleDate { get; set; }
     public decimal? SalePrice { get; set; }
     public string Status { get; set; } = "InStock"; // InStock, Sold, Returned, etc.

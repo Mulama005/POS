@@ -11,7 +11,7 @@ export interface Customer {
 export interface Repair {
   id: string
   ticketNumber: string
-  customerId: string
+  customerId: string | null
   deviceDescription: string
   reportedFault: string
   quotedCost: number | null

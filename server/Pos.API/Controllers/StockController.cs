@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Pos.Application.Features.Products;
 using Pos.Infrastructure.Persistence;
 using Pos.Domain.Entities;
+using Pos.Domain.Enums;
 using Pos.Application.Common.Interfaces;
 using System.Security.Claims;
 
@@ -112,6 +113,142 @@ public class StockController : ControllerBase
         return Ok(new { productId = product.Id, newQuantity = product.BulkQuantityOnHand });
     }
 
+    /// <summary>Records a purchase from a neighboring shop and receives it into stock.</summary>
+    [HttpPost("source")]
+    [Authorize(Roles = "Cashier,Manager,Admin")]
+    public async Task<IActionResult> SourceStock([FromBody] SourceStockRequest request, CancellationToken cancellationToken)
+    {
+        if (request.ClientTransactionId == Guid.Empty)
+            return BadRequest("A purchase transaction ID is required.");
+
+        var existing = await _context.SupplierSourcedPurchases.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == request.ClientTransactionId, cancellationToken);
+        if (existing is not null)
+        {
+            var inventory = await _context.Products.AsNoTracking()
+                .Where(x => x.Id == existing.ProductId)
+                .Select(x => new { x.Name, x.CostPrice, Quantity = x.BulkQuantityOnHand + x.StockUnits.Count(unit => unit.Status == "InStock") })
+                .FirstAsync(cancellationToken);
+            return Ok(new
+            {
+                purchaseId = existing.Id, productId = existing.ProductId, productName = inventory.Name,
+                quantity = existing.Quantity, totalCost = existing.TotalCost,
+                newQuantity = inventory.Quantity, averageCost = inventory.CostPrice, replayed = true
+            });
+        }
+
+        var supplierName = request.SupplierName?.Trim();
+        if (string.IsNullOrWhiteSpace(supplierName) || supplierName.Length > 160)
+            return BadRequest("Enter the supplier shop name (up to 160 characters).");
+        if (request.Quantity <= 0 || request.Quantity > 10000)
+            return BadRequest("Quantity must be between 1 and 10,000.");
+        if (request.UnitCost < 0 || request.UnitCost > 100_000_000m)
+            return BadRequest("Enter a valid unit purchase cost.");
+        var unitCost = Math.Round(request.UnitCost, 2, MidpointRounding.AwayFromZero);
+
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!Guid.TryParse(userIdClaim, out var userId)) return Unauthorized();
+
+        var product = await _context.Products.Include(x => x.Category).Include(x => x.StockUnits)
+            .FirstOrDefaultAsync(x => x.Id == request.ProductId && x.IsActive, cancellationToken);
+        if (product is null) return NotFound("Active product not found.");
+
+        var serialNumbers = (request.SerialNumbers ?? new List<string>()).Select(x => x.Trim()).ToList();
+        var imeiNumbers = request.Imei ?? new List<string>();
+        if (product.Category.RequiresSerialTracking)
+        {
+            if (serialNumbers.Count != request.Quantity || serialNumbers.Any(string.IsNullOrWhiteSpace) || serialNumbers.Distinct(StringComparer.OrdinalIgnoreCase).Count() != serialNumbers.Count)
+                return BadRequest("Add a unique serial number for every unit being sourced.");
+            var normalizedSerials = serialNumbers.Select(x => x.ToUpperInvariant()).ToList();
+            var existingSerial = await _context.StockUnits.AnyAsync(x => normalizedSerials.Contains(x.SerialNumber.ToUpper()), cancellationToken);
+            if (existingSerial) return Conflict("One or more serial numbers are already recorded in stock.");
+            if (imeiNumbers.Count > 0 && (imeiNumbers.Count != request.Quantity || imeiNumbers.Any(string.IsNullOrWhiteSpace) || imeiNumbers.Distinct(StringComparer.OrdinalIgnoreCase).Count() != imeiNumbers.Count))
+                return BadRequest("If supplied, add a unique IMEI for every sourced unit.");
+        }
+        else if (serialNumbers.Count > 0 || imeiNumbers.Count > 0)
+        {
+            return BadRequest("This product is bulk-tracked; serial numbers and IMEIs are not used.");
+        }
+
+        var recordedAt = DateTime.UtcNow;
+        var currentStock = product.BulkQuantityOnHand + product.StockUnits.Count(x => x.Status == "InStock");
+        var currentInventoryCost = product.BulkQuantityOnHand * product.CostPrice + product.StockUnits
+            .Where(x => x.Status == "InStock")
+            .Sum(x => x.PurchaseCost ?? product.CostPrice);
+        var totalCost = Math.Round(unitCost * request.Quantity, 2, MidpointRounding.AwayFromZero);
+        product.CostPrice = currentStock == 0
+            ? unitCost
+            : Math.Round((currentInventoryCost + totalCost) / (currentStock + request.Quantity), 2, MidpointRounding.AwayFromZero);
+        product.UpdatedAt = recordedAt;
+
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            if (product.Category.RequiresSerialTracking)
+            {
+                var units = serialNumbers.Select((serial, index) => new StockUnit
+                {
+                    Id = Guid.NewGuid(), ProductId = product.Id, SerialNumber = serial,
+                    Imei = imeiNumbers.Count > index ? imeiNumbers[index].Trim() : null,
+                    PurchaseDate = recordedAt, PurchaseCost = unitCost,
+                    Status = "InStock", CreatedAt = recordedAt
+                });
+                _context.StockUnits.AddRange(units);
+            }
+            else
+            {
+                product.BulkQuantityOnHand += request.Quantity;
+            }
+
+            _context.SupplierSourcedPurchases.Add(new SupplierSourcedPurchase
+            {
+                Id = request.ClientTransactionId,
+                ProductId = product.Id,
+                SupplierName = supplierName,
+                Quantity = request.Quantity,
+                UnitCost = unitCost,
+                TotalCost = totalCost,
+                Reference = string.IsNullOrWhiteSpace(request.Reference) ? null : request.Reference.Trim(),
+                PurchasedAt = recordedAt,
+                RecordedByUserId = userId,
+                CreatedAt = recordedAt
+            });
+            _context.InventoryAdjustments.Add(new InventoryAdjustment
+            {
+                ProductId = product.Id,
+                AdjustmentType = InventoryAdjustmentType.Increase,
+                Quantity = request.Quantity,
+                Reason = $"Sourced from {supplierName}",
+                AdjustedByUserId = userId,
+                Timestamp = recordedAt,
+                CreatedAt = recordedAt
+            });
+
+            await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+
+        await _auditService.LogAsync(userId, "SUPPLIER_STOCK_SOURCED", "SupplierSourcedPurchase", request.ClientTransactionId,
+            $"Received {request.Quantity} × {product.Name} from {supplierName} at KES {unitCost:N2} each.");
+
+        return Ok(new
+        {
+            purchaseId = request.ClientTransactionId,
+            productId = product.Id,
+            productName = product.Name,
+            quantity = request.Quantity,
+            totalCost,
+            newQuantity = currentStock + request.Quantity,
+            averageCost = product.CostPrice,
+            replayed = false
+        });
+    }
+
     [HttpGet("warranty/{serialNumber}")]
     [Authorize]
     public async Task<IActionResult> WarrantyLookup(string serialNumber)
@@ -139,3 +276,13 @@ public class StockController : ControllerBase
         return Ok(warrantyInfo);
     }
 }
+
+public sealed record SourceStockRequest(
+    Guid ClientTransactionId,
+    Guid ProductId,
+    string SupplierName,
+    int Quantity,
+    decimal UnitCost,
+    IReadOnlyList<string>? SerialNumbers = null,
+    IReadOnlyList<string>? Imei = null,
+    string? Reference = null);

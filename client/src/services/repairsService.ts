@@ -14,7 +14,7 @@ export const recordPayment = (id: string, amount: number, paymentMethod: string,
 
 export const listRepairs = async () => (await apiClient.get<Repair[]>('/api/repairs')).data
 export const myRepairQueue = async () => (await apiClient.get<Repair[]>('/api/repairs/my-queue')).data
-export const createRepair = async (payload: { customerId: string; deviceDescription: string; reportedFault: string; quotedCost?: number | null; assignedTechnicianId?: string | null }) =>
+export const createRepair = async (payload: { customerId: string | null; deviceDescription: string; quotedCost: number; assignedTechnicianId: string }) =>
   (await apiClient.post<Repair>('/api/repairs', payload)).data
 export const updateRepairStatus = (id: string, newStatus: RepairStatus, diagnosisNotes: string) =>
   apiClient.put(`/api/repairs/${id}/status`, { newStatus, diagnosisNotes: diagnosisNotes || null })

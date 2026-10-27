@@ -365,9 +365,31 @@ public sealed class SalesController : ControllerBase
                 : 0m;
             var finalLineAmount = Math.Round(afterLineDiscount - shareOfCartDiscount, 2, MidpointRounding.AwayFromZero);
 
+            Guid? consumedStockUnitId = null;
+            var costPriceAtSale = product.CostPrice;
+            StockUnit? unitToSell = null;
+            if (product.Category.RequiresSerialTracking)
+            {
+                unitToSell = product.StockUnits
+                    .Where(u => u.Status == "InStock")
+                    .OrderBy(u => u.PurchaseDate ?? DateTime.MaxValue)
+                    .ThenBy(u => u.CreatedAt)
+                    .FirstOrDefault();
+
+                if (unitToSell is null)
+                {
+                    return Conflict(new
+                    {
+                        message = $"'{product.Name}' just sold out — no available unit left to sell.",
+                        productId = product.Id,
+                    });
+                }
+                costPriceAtSale = unitToSell.PurchaseCost ?? product.CostPrice;
+            }
+
             // Hard floor: after every discount and override, a unit may never sell below cost.
             // The message deliberately doesn't state the cost price (cashiers shouldn't see it).
-            if (product.CostPrice > 0 && finalLineAmount < product.CostPrice * itemRequest.Quantity)
+            if (costPriceAtSale > 0 && finalLineAmount < costPriceAtSale * itemRequest.Quantity)
             {
                 return BadRequest(new
                 {
@@ -386,31 +408,12 @@ public sealed class SalesController : ControllerBase
             // Consume stock now, inside the same transaction the sale itself is saved in.
             // Server picks which unit is sold rather than trusting itemRequest.StockUnitId —
             // the client can't be relied on to pick a unit that's actually still InStock.
-            Guid? consumedStockUnitId = null;
             if (product.Category.RequiresSerialTracking)
             {
-                // Validated above to be exactly 1 for serialized lines.
-                var unitToSell = product.StockUnits
-                    .Where(u => u.Status == "InStock")
-                    .OrderBy(u => u.PurchaseDate ?? DateTime.MaxValue)
-                    .ThenBy(u => u.CreatedAt)
-                    .FirstOrDefault();
-
-                if (unitToSell is null)
-                {
-                    // The aggregate stock check above already confirmed enough units
-                    // exist — this only happens if two sales raced for the last unit of
-                    // the same product between that check and here.
-                    return Conflict(new
-                    {
-                        message = $"'{product.Name}' just sold out — no available unit left to sell.",
-                        productId = product.Id,
-                    });
-                }
-
-                unitToSell.Status = "Sold";
+                // Validated above to be exactly one serialized unit on this line.
+                unitToSell!.Status = "Sold";
                 unitToSell.SaleDate = DateTime.UtcNow;
-                unitToSell.SalePrice = finalLineAmount; // serialized lines are qty 1
+                unitToSell.SalePrice = finalLineAmount;
                 consumedStockUnitId = unitToSell.Id;
             }
             else
@@ -424,6 +427,7 @@ public sealed class SalesController : ControllerBase
                 StockUnitId = consumedStockUnitId,
                 Quantity = itemRequest.Quantity,
                 UnitPrice = unitBase,
+                CostPriceAtSale = costPriceAtSale,
                 DiscountAmount = totalLineDiscount,
                 TaxAmount = lineTax,
                 LineTotal = finalLineAmount,
