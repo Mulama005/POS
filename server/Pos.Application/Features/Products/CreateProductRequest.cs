@@ -4,7 +4,10 @@ namespace Pos.Application.Features.Products;
 
 public class CreateProductRequest
 {
-    public string Sku { get; set; } = string.Empty;
+    // New products receive an SKU from the database sequence when this is blank.
+    // Keep the request nullable so ASP.NET's implicit required validation does not
+    // reject the intentionally empty SKU sent by the inventory form.
+    public string? Sku { get; set; }
     public string? Barcode { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
