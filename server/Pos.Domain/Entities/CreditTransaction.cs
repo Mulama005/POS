@@ -26,6 +26,8 @@ public class CreditTransaction
     public Guid RecordedByUserId { get; set; }
     public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.UtcNow;
 
+    public ICollection<CreditTransactionNote> ProductNotes { get; set; } = new List<CreditTransactionNote>();
+
     // Snapshot of the running balance immediately AFTER this transaction — makes the
     // ledger readable chronologically without recomputing a running sum every time it's
     // displayed, while CreditTransaction rows remain the append-only source of truth.

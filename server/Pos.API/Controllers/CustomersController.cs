@@ -100,21 +100,12 @@ public sealed class CustomersController : ControllerBase
                 t.Notes,
                 t.BalanceAfter,
                 t.Timestamp,
+                ProductNotes = t.ProductNotes
+                    .OrderBy(note => note.CreatedAt)
+                    .Select(note => new { note.Id, note.Content, note.CreatedAt, note.UpdatedAt }),
             })
             .ToListAsync(cancellationToken);
         
-        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userId == null) return Unauthorized();
-        var currentUserId = Guid.Parse(userId);
-        
-        await _auditService.LogAsync(
-            userId: currentUserId,
-            actionType: "CREDIT_LEDGER_ADJUSTMENT",
-            entityName: "Customer",
-            entityId: id,
-            details: $"Adjusted credit balance" /// by {transactions.Amount}, reason: {transactions.Notes}"
-        );
-
         return Ok(transactions);
     }
 
@@ -128,6 +119,12 @@ public sealed class CustomersController : ControllerBase
     public async Task<IActionResult> RecordCreditSale(Guid id, [FromBody] RecordCreditSaleRequest request, CancellationToken cancellationToken)
     {
         if (request.Amount <= 0) return BadRequest("Amount must be positive.");
+        var productNotes = (request.ProductNotes ?? Array.Empty<string>())
+            .Select(note => note.Trim())
+            .Where(note => note.Length > 0)
+            .ToArray();
+        if (productNotes.Length == 0) return BadRequest("Add at least one product or note for this credit sale.");
+        if (productNotes.Any(note => note.Length > 300)) return BadRequest("Each product note must be 300 characters or fewer.");
 
         var customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
         if (customer is null) return NotFound();
@@ -138,7 +135,7 @@ public sealed class CustomersController : ControllerBase
         // exact same moment — not included here to keep this focused, flagged for later.
         customer.CurrentCreditBalance += request.Amount;
 
-        _db.CreditTransactions.Add(new CreditTransaction
+        var transaction = new CreditTransaction
         {
             Id = Guid.NewGuid(),
             CustomerId = id,
@@ -148,7 +145,12 @@ public sealed class CustomersController : ControllerBase
             Notes = request.Notes,
             RecordedByUserId = CurrentUserId,
             BalanceAfter = customer.CurrentCreditBalance,
-        });
+        };
+        foreach (var content in productNotes)
+        {
+            transaction.ProductNotes.Add(new CreditTransactionNote { Id = Guid.NewGuid(), Content = content });
+        }
+        _db.CreditTransactions.Add(transaction);
 
         await _db.SaveChangesAsync(cancellationToken);
         
@@ -161,6 +163,61 @@ public sealed class CustomersController : ControllerBase
         );
 
         return Ok(new { message = "Credit sale recorded.", newBalance = customer.CurrentCreditBalance });
+    }
+
+    [HttpPost("{id:guid}/ledger/{transactionId:guid}/notes")]
+    public async Task<IActionResult> AddCreditNote(Guid id, Guid transactionId, [FromBody] CreditTransactionNoteRequest request, CancellationToken cancellationToken)
+    {
+        var validation = ValidateCreditNote(request.Content);
+        if (validation is not null) return BadRequest(validation);
+
+        var transaction = await _db.CreditTransactions
+            .FirstOrDefaultAsync(t => t.Id == transactionId && t.CustomerId == id, cancellationToken);
+        if (transaction is null) return NotFound();
+        if (transaction.Type != CreditTransactionType.CreditSale) return BadRequest("Notes can only be added to credit sales.");
+
+        var note = new CreditTransactionNote { Id = Guid.NewGuid(), CreditTransactionId = transactionId, Content = request.Content.Trim() };
+        _db.CreditTransactionNotes.Add(note);
+        await _db.SaveChangesAsync(cancellationToken);
+        await _auditService.LogAsync(CurrentUserId, "CREDIT_NOTE_ADDED", "CreditTransactionNote", note.Id, $"Added a product note to credit sale {transactionId}.");
+        return Ok(new { note.Id, note.Content, note.CreatedAt, note.UpdatedAt });
+    }
+
+    [HttpPut("{id:guid}/ledger/{transactionId:guid}/notes/{noteId:guid}")]
+    public async Task<IActionResult> UpdateCreditNote(Guid id, Guid transactionId, Guid noteId, [FromBody] CreditTransactionNoteRequest request, CancellationToken cancellationToken)
+    {
+        var validation = ValidateCreditNote(request.Content);
+        if (validation is not null) return BadRequest(validation);
+
+        var note = await _db.CreditTransactionNotes
+            .FirstOrDefaultAsync(n => n.Id == noteId && n.CreditTransactionId == transactionId && n.CreditTransaction.CustomerId == id, cancellationToken);
+        if (note is null) return NotFound();
+
+        note.Content = request.Content.Trim();
+        note.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(cancellationToken);
+        await _auditService.LogAsync(CurrentUserId, "CREDIT_NOTE_UPDATED", "CreditTransactionNote", note.Id, $"Updated a product note on credit sale {transactionId}.");
+        return Ok(new { note.Id, note.Content, note.CreatedAt, note.UpdatedAt });
+    }
+
+    [HttpDelete("{id:guid}/ledger/{transactionId:guid}/notes/{noteId:guid}")]
+    public async Task<IActionResult> DeleteCreditNote(Guid id, Guid transactionId, Guid noteId, CancellationToken cancellationToken)
+    {
+        var note = await _db.CreditTransactionNotes
+            .FirstOrDefaultAsync(n => n.Id == noteId && n.CreditTransactionId == transactionId && n.CreditTransaction.CustomerId == id, cancellationToken);
+        if (note is null) return NotFound();
+
+        _db.CreditTransactionNotes.Remove(note);
+        await _db.SaveChangesAsync(cancellationToken);
+        await _auditService.LogAsync(CurrentUserId, "CREDIT_NOTE_DELETED", "CreditTransactionNote", note.Id, $"Deleted a product note from credit sale {transactionId}.");
+        return NoContent();
+    }
+
+    private static string? ValidateCreditNote(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return "Enter a product or note.";
+        if (content.Trim().Length > 300) return "Each product note must be 300 characters or fewer.";
+        return null;
     }
 
     /// <summary>Records a partial or full payment against the balance — timestamped and
