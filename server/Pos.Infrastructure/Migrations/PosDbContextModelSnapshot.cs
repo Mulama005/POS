@@ -335,6 +335,33 @@ namespace Pos.Infrastructure.Migrations
                     b.ToTable("CreditTransactions");
                 });
 
+            modelBuilder.Entity("Pos.Domain.Entities.CreditTransactionNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreditTransactionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreditTransactionId", "CreatedAt");
+
+                    b.ToTable("CreditTransactionNotes");
+                });
+
             modelBuilder.Entity("Pos.Domain.Entities.Customer", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1729,6 +1756,17 @@ namespace Pos.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("Pos.Domain.Entities.CreditTransactionNote", b =>
+                {
+                    b.HasOne("Pos.Domain.Entities.CreditTransaction", "CreditTransaction")
+                        .WithMany("ProductNotes")
+                        .HasForeignKey("CreditTransactionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CreditTransaction");
+                });
+
             modelBuilder.Entity("Pos.Domain.Entities.EtimsCode", b =>
                 {
                     b.HasOne("Pos.Domain.Entities.EtimsCodeClass", "EtimsCodeClass")
@@ -2037,6 +2075,11 @@ namespace Pos.Infrastructure.Migrations
                     b.Navigation("ChildCategories");
 
                     b.Navigation("Products");
+                });
+
+            modelBuilder.Entity("Pos.Domain.Entities.CreditTransaction", b =>
+                {
+                    b.Navigation("ProductNotes");
                 });
 
             modelBuilder.Entity("Pos.Domain.Entities.Customer", b =>

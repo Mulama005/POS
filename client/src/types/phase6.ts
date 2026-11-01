@@ -48,8 +48,16 @@ export interface LedgerEntry {
   bankName?: string | null
   externalReference?: string | null
   notes: string | null
+  productNotes?: CreditProductNote[]
   balanceAfter: number
   timestamp: string
+}
+
+export interface CreditProductNote {
+  id: string
+  content: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface PublicRepairStatus {

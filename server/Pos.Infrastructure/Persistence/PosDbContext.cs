@@ -39,6 +39,7 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<RepairStatusHistory> RepairStatusHistories => Set<RepairStatusHistory>();
     public DbSet<RepairPartUsed> RepairPartsUsed => Set<RepairPartUsed>();
     public DbSet<CreditTransaction> CreditTransactions => Set<CreditTransaction>();
+    public DbSet<CreditTransactionNote> CreditTransactionNotes => Set<CreditTransactionNote>();
     public DbSet<PricingTier> PricingTiers => Set<PricingTier>();
     public DbSet<ProductTierPrice> ProductTierPrices => Set<ProductTierPrice>();
     public DbSet<EtimsCodeClass> EtimsCodeClasses => Set<EtimsCodeClass>();
@@ -319,6 +320,17 @@ public class PosDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
                 .WithMany()
                 .HasForeignKey(x => x.RecordedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ---------- CreditTransactionNote ----------
+        modelBuilder.Entity<CreditTransactionNote>(e =>
+        {
+            e.Property(x => x.Content).IsRequired().HasMaxLength(300);
+            e.HasOne(x => x.CreditTransaction)
+                .WithMany(x => x.ProductNotes)
+                .HasForeignKey(x => x.CreditTransactionId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(x => new { x.CreditTransactionId, x.CreatedAt });
         });
 
         // ---------- Repair ----------

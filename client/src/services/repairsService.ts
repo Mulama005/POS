@@ -7,8 +7,14 @@ export const createCustomer = async (payload: { fullName: string; phoneNumber: s
   (await apiClient.post<Customer>('/api/customers', payload)).data
 export const getCustomer = async (id: string) => (await apiClient.get<Customer>(`/api/customers/${id}`)).data
 export const getLedger = async (id: string) => (await apiClient.get<LedgerEntry[]>(`/api/customers/${id}/ledger`)).data
-export const recordCreditSale = (id: string, amount: number, notes?: string) =>
-  apiClient.post(`/api/customers/${id}/credit-sale`, { amount, relatedSaleId: null, notes: notes || null })
+export const recordCreditSale = (id: string, amount: number, productNotes: string[], notes?: string) =>
+  apiClient.post(`/api/customers/${id}/credit-sale`, { amount, relatedSaleId: null, notes: notes || null, productNotes })
+export const addCreditProductNote = (customerId: string, transactionId: string, content: string) =>
+  apiClient.post(`/api/customers/${customerId}/ledger/${transactionId}/notes`, { content })
+export const updateCreditProductNote = (customerId: string, transactionId: string, noteId: string, content: string) =>
+  apiClient.put(`/api/customers/${customerId}/ledger/${transactionId}/notes/${noteId}`, { content })
+export const deleteCreditProductNote = (customerId: string, transactionId: string, noteId: string) =>
+  apiClient.delete(`/api/customers/${customerId}/ledger/${transactionId}/notes/${noteId}`)
 export const recordPayment = (id: string, amount: number, paymentMethod: string, notes?: string) =>
   apiClient.post(`/api/customers/${id}/payment`, { amount, paymentMethod, notes: notes || null })
 

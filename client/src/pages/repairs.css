@@ -474,6 +474,226 @@
     font-size: 12px;
 }
 
+/* --- Customer credit products and ledger notes ---------------------- */
+.customer-list-heading {
+    margin-top: 36px !important;
+}
+
+.customer-transaction-form {
+    display: grid;
+    gap: 20px;
+    padding: 24px;
+    border: 1px solid var(--pos-border);
+    background: color-mix(in srgb, var(--pos-bg) 94%, var(--pos-ink) 6%);
+}
+
+.customer-form-heading p,
+.customer-ledger-heading p {
+    margin: 7px 0 0;
+    color: var(--pos-ink-muted);
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+.customer-credit-amount,
+.customer-payment-fields label {
+    display: grid;
+    gap: 8px;
+    color: var(--pos-ink-muted);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.customer-credit-amount input,
+.customer-payment-fields input,
+.customer-payment-fields select,
+.credit-product-input input,
+.customer-add-note-row input,
+.customer-note-edit input {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    padding: 11px 12px;
+    border: 1px solid var(--pos-border);
+    border-radius: 4px;
+    background: var(--pos-bg);
+    color: var(--pos-ink);
+    font: inherit;
+    letter-spacing: normal;
+    text-transform: none;
+}
+
+.customer-credit-amount input:focus,
+.customer-payment-fields input:focus,
+.customer-payment-fields select:focus,
+.credit-product-input input:focus,
+.customer-add-note-row input:focus,
+.customer-note-edit input:focus {
+    outline: 2px solid color-mix(in srgb, var(--pos-ink) 20%, transparent);
+    border-color: var(--pos-ink-muted);
+}
+
+.credit-product-fields {
+    display: grid;
+    gap: 10px;
+}
+
+.credit-product-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--pos-ink-muted);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.credit-product-heading span:last-child {
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    text-transform: none;
+}
+
+.credit-product-input,
+.customer-add-note-row,
+.customer-note-edit {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.customer-add-note,
+.customer-note-remove,
+.customer-add-note-row button,
+.customer-note-actions button,
+.customer-note-edit button {
+    border: 0;
+    background: transparent;
+    color: var(--pos-ink-muted);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.customer-add-note {
+    justify-self: start;
+    padding: 4px 0;
+    color: var(--pos-ink);
+    font-weight: 600;
+}
+
+.customer-note-remove,
+.customer-note-delete {
+    color: var(--pos-danger) !important;
+}
+
+.customer-payment-form {
+    margin-top: 16px;
+    padding: 20px 0 28px;
+    border: 0;
+    border-bottom: 1px solid var(--pos-border);
+    background: transparent;
+}
+
+.customer-payment-fields {
+    display: grid;
+    grid-template-columns: minmax(100px, 0.8fr) minmax(120px, 0.8fr) minmax(120px, 1fr) auto;
+    gap: 12px;
+    align-items: end;
+}
+
+.customer-ledger-heading {
+    margin: 32px 0 14px;
+}
+
+.customer-ledger-scroll {
+    overflow-x: auto;
+}
+
+.customer-ledger-table {
+    min-width: 760px;
+}
+
+.customer-ledger-table td {
+    vertical-align: top;
+}
+
+.customer-notes-cell {
+    min-width: 200px;
+}
+
+.customer-legacy-note {
+    margin: 0 0 8px;
+    color: var(--pos-ink-muted);
+    font-size: 13px;
+}
+
+.customer-product-note {
+    display: grid;
+    gap: 6px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--pos-border);
+    color: var(--pos-ink);
+    font-size: 13px;
+}
+
+.customer-note-actions {
+    display: flex;
+    gap: 12px;
+    opacity: 0.75;
+}
+
+.customer-note-actions button,
+.customer-note-edit button,
+.customer-add-note-row button {
+    padding: 3px 0;
+    color: var(--pos-ink);
+    font-weight: 600;
+}
+
+.customer-add-note-row {
+    margin-top: 9px;
+}
+
+.customer-add-note-row button {
+    white-space: nowrap;
+}
+
+.customer-note-edit {
+    flex-wrap: wrap;
+}
+
+.customer-note-edit input {
+    flex-basis: 100%;
+}
+
+@media (max-width: 800px) {
+    .customer-transaction-form {
+        padding: 18px;
+    }
+
+    .customer-payment-fields {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 520px) {
+    .customer-payment-fields {
+        grid-template-columns: 1fr;
+    }
+
+    .credit-product-heading {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 4px;
+    }
+}
+
 /* --- Ledger summary --------------------------------------------------
    Was a tinted bar. Now a ledger footer: label + figure, ruled above. */
 .ledger-summary {
