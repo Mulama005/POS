@@ -129,7 +129,7 @@ public sealed class SalesController : ControllerBase
     }
 
     /// <summary>Completes a sale: validates stock and register/till state, computes pricing
-    /// and tax server-side, enforces the discount-approval threshold, records payments, and
+    /// and tax server-side, records payments, and
     /// decrements stock — all in one transaction.</summary>
     [HttpPost]
     public async Task<IActionResult> Complete([FromBody] CompleteSaleRequest request, CancellationToken cancellationToken)
@@ -309,7 +309,7 @@ public sealed class SalesController : ControllerBase
             // Price override: the cashier may agree a different unit price than the list price.
             // Higher than list -> that price is the line's UnitPrice. Lower than list -> UnitPrice
             // stays at list and the difference is a markdown, so it flows through the existing
-            // discount threshold/approval, eTIMS discount fields and reports unchanged.
+            // eTIMS discount fields and reports unchanged.
             var agreedUnitPrice = item.OverrideUnitPrice is { } ov
                 ? Math.Round(ov, 2, MidpointRounding.AwayFromZero)
                 : product.SalePrice;
@@ -332,24 +332,7 @@ public sealed class SalesController : ControllerBase
         var cartDiscount = Math.Min(request.CartDiscountAmount, afterLineDiscountsTotal);
         var totalDiscount = (rawSubtotal - afterLineDiscountsTotal) + cartDiscount;
 
-        var thresholdKes = _config.GetValue<decimal?>("Sales:DiscountApprovalThresholdKes") ?? 500m;
         Guid? discountApprovedByUserId = null;
-        if (totalDiscount > thresholdKes)
-        {
-            if (string.IsNullOrWhiteSpace(request.DiscountApprovalToken) ||
-                !_approvalStore.TryConsumeApproval(request.DiscountApprovalToken, out var approverId))
-            {
-                return StatusCode(StatusCodes.Status428PreconditionRequired, new
-                {
-                    message = $"Discount of {totalDiscount:F2} exceeds the {thresholdKes:F2} threshold and needs Manager/Admin approval.",
-                    requiresDiscountApproval = true,
-                });
-            }
-            discountApprovedByUserId = approverId;
-            
-            
-        }
-
         // Distribute the cart-level discount proportionally across lines (by each line's
         // share of the post-line-discount total) so tax is computed on the true taxable
         // amount per line, not just the aggregate.
@@ -385,18 +368,6 @@ public sealed class SalesController : ControllerBase
                     });
                 }
                 costPriceAtSale = unitToSell.PurchaseCost ?? product.CostPrice;
-            }
-
-            // Hard floor: after every discount and override, a unit may never sell below cost.
-            // The message deliberately doesn't state the cost price (cashiers shouldn't see it).
-            if (costPriceAtSale > 0 && finalLineAmount < costPriceAtSale * itemRequest.Quantity)
-            {
-                return BadRequest(new
-                {
-                    message = $"'{product.Name}' can't be sold at this price - it is below the minimum allowed. " +
-                              "Raise the price or reduce the discount.",
-                    productId = product.Id,
-                });
             }
 
             var lineTax = product.TaxClass == TaxClass.Standard

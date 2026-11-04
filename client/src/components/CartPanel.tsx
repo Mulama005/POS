@@ -111,7 +111,6 @@ interface CartLineRowProps {
 
 function CartLineRow({ line, disabled, onQuantityChange, onDiscountChange, onPriceChange, onRemove }: CartLineRowProps) {
   const pricing = linePricing(line)
-  const lineRaw = pricing.unitBase * line.quantity
   // Draft text so the cashier can clear and retype; committed on blur / Enter.
   const [priceDraft, setPriceDraft] = useState<string | null>(null)
   const commitPrice = () => {
@@ -161,7 +160,6 @@ function CartLineRow({ line, disabled, onQuantityChange, onDiscountChange, onPri
           <input
             type="number"
             min={0}
-            max={lineRaw}
             step="0.01"
             value={line.discountAmount || ''}
             placeholder="0.00"
