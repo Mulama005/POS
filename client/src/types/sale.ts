@@ -3,7 +3,7 @@ import type { ProductSummary } from './product'
 export type PaymentMethod = 'Cash' | 'Mpesa' | 'BankTransfer' | 'Card'
 
 /** One line in an in-progress cart, kept client-side (Dexie) until checkout completes.
- * Price/tax shown here are for display only — the server recomputes everything
+ * Price shown here is for display only — the server recomputes everything
  * authoritatively from the current Product row at completion time. */
 export interface CartLine {
   /** Stable id for this line within the cart (not a server id) — lets the same
@@ -14,7 +14,7 @@ export interface CartLine {
   quantity: number
   /** Manager-applied markdown on this line, in KES. */
   discountAmount: number
-  /** Negotiated unit price (VAT-inclusive). null/undefined = list price. */
+  /** Negotiated unit price. null/undefined = list price. */
   overrideUnitPrice?: number | null
 }
 

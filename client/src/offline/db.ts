@@ -88,7 +88,7 @@ class PosOfflineDatabase extends Dexie {
 
     // Version 2: adds a `barcode` index (for offline barcode-scan lookups) and renames
     // `price` -> `salePrice` on cached products to match ProductSummary, plus backfills
-    // `taxClass` so CartMath's VAT calc works correctly on products added from the
+    // `taxClass` so cached products retain their eTIMS classification.
     // offline cache. The upgrade function fixes up any product rows a register already
     // has cached from v1 — without it, those rows would sit without a correct
     // salePrice/taxClass/barcode until the next successful refreshCatalogCache, which is
@@ -112,8 +112,8 @@ class PosOfflineDatabase extends Dexie {
               product.barcode = "";
             }
             if (product.taxClass === undefined) {
-              // Best-effort default so pre-v2 cached rows don't compute zero tax by
-              // omission. This is a stopgap, not a source of truth — it's overwritten by
+              // Best-effort eTIMS classification for pre-v2 cached rows. This is a
+              // stopgap, not a source of truth — it's overwritten by
               // the real value on the next refreshCatalogCache while online.
               product.taxClass = "Standard";
             }

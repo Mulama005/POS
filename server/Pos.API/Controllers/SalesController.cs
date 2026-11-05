@@ -18,20 +18,15 @@ namespace Pos.Api.Controllers;
 /// that final moment, which is deliberate — it's what lets a sale in progress survive a
 /// lost connection.
 ///
-/// Pricing/tax are always computed here from the current Product row, never trusted from
+/// Pricing is always computed here from the current Product row, never trusted from
 /// the client, so a tampered request can't change what a customer is actually charged.
 ///
-/// VAT assumption: Product.SalePrice is treated as VAT-inclusive (the shelf/receipt price a
-/// customer actually pays), matching standard Kenyan retail practice. The 16% component is
-/// backed out of that price for Standard-rated items. Confirm this matches how the shop
-/// prices its shelf tags before Step 26 (eTIMS) locks in the same assumption.
 /// </summary>
 [ApiController]
 [Route("api/sales")]
 [Authorize(Roles = RoleGroups.RegisterCapableRoles)]
 public sealed class SalesController : ControllerBase
 {
-    private const decimal StandardVatRate = 0.16m;
     private static readonly HashSet<string> AcceptedPaymentMethods = new(StringComparer.OrdinalIgnoreCase)
     {
         "Cash", "Mpesa", "BankTransfer", "Card",
@@ -129,7 +124,7 @@ public sealed class SalesController : ControllerBase
     }
 
     /// <summary>Completes a sale: validates stock and register/till state, computes pricing
-    /// and tax server-side, records payments, and
+    /// server-side, records payments, and
     /// decrements stock — all in one transaction.</summary>
     [HttpPost]
     public async Task<IActionResult> Complete([FromBody] CompleteSaleRequest request, CancellationToken cancellationToken)
@@ -297,7 +292,7 @@ public sealed class SalesController : ControllerBase
             return BadRequest("Cart discount cannot be negative.");
         }
 
-        // --- Pricing: server is the sole source of truth for price and tax. ---
+        // --- Pricing: server is the sole source of truth for prices. ---
         var lines = new List<(SaleItemRequest Request, Product Product, decimal UnitBase, decimal RawAmount, decimal AfterLineDiscount)>();
         var priceOverrides = new List<string>();
         decimal rawSubtotal = 0m;
@@ -334,9 +329,7 @@ public sealed class SalesController : ControllerBase
 
         Guid? discountApprovedByUserId = null;
         // Distribute the cart-level discount proportionally across lines (by each line's
-        // share of the post-line-discount total) so tax is computed on the true taxable
-        // amount per line, not just the aggregate.
-        decimal saleTaxTotal = 0m;
+        // share of the post-line-discount total).
         decimal saleTotal = 0m;
         var saleItems = new List<SaleItem>();
         var itemResponses = new List<SaleItemResponse>();
@@ -370,9 +363,7 @@ public sealed class SalesController : ControllerBase
                 costPriceAtSale = unitToSell.PurchaseCost ?? product.CostPrice;
             }
 
-            var lineTax = product.TaxClass == TaxClass.Standard
-                ? Math.Round(finalLineAmount - (finalLineAmount / (1 + StandardVatRate)), 2, MidpointRounding.AwayFromZero)
-                : 0m;
+            const decimal lineTax = 0m;
 
             var totalLineDiscount = rawAmount - finalLineAmount;
 
@@ -409,7 +400,6 @@ public sealed class SalesController : ControllerBase
                 product.Id, product.Name, consumedStockUnitId, itemRequest.Quantity,
                 unitBase, totalLineDiscount, lineTax, finalLineAmount));
 
-            saleTaxTotal += lineTax;
             saleTotal += finalLineAmount;
         }
 
@@ -486,7 +476,7 @@ public sealed class SalesController : ControllerBase
             SaleDate = DateTime.UtcNow,
             Subtotal = rawSubtotal,
             DiscountTotal = totalDiscount,
-            TaxTotal = saleTaxTotal,
+            TaxTotal = 0m,
             Total = saleTotal,
             Status = SaleStatus.Completed,
             DiscountApprovedByUserId = discountApprovedByUserId,
@@ -693,7 +683,7 @@ public sealed class SalesController : ControllerBase
             var pkgUnitCode = product.EtimsPackagingUnitCode ?? "NT";
             var qtyUnitCode = product.EtimsQuantityUnitCode ?? "U";
 
-            var taxableAmount = Math.Round(item.LineTotal - item.TaxAmount, 2, MidpointRounding.AwayFromZero);
+            var taxableAmount = Math.Round(item.LineTotal, 2, MidpointRounding.AwayFromZero);
             if (taxableAmount < 0) taxableAmount = 0;
 
             switch (taxTypeCode)

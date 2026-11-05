@@ -2,7 +2,7 @@ namespace Pos.Domain.Enums;
 
 public enum TaxClass
 {
-    Standard,   // 16% VAT
+    Standard,
     ZeroRated,
     Exempt
 }

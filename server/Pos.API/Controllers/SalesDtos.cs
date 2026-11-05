@@ -14,7 +14,7 @@ public sealed record SaleItemRequest(
     /// <summary>Manager-applied markdown on this specific line, in KES. Server-validated —
     /// never trust a client-submitted price directly.</summary>
     decimal DiscountAmount,
-    /// <summary>Negotiated unit price for this line (VAT-inclusive, like SalePrice). Null = list
+    /// <summary>Negotiated unit price for this line. Null = list
     /// price. Below list it is recorded as a discount (and counts toward the approval
     /// threshold); above list it becomes the line's UnitPrice. Never below the product's cost.</summary>
     decimal? OverrideUnitPrice = null);
@@ -37,7 +37,7 @@ public sealed record CompleteSaleRequest(
     Guid? CustomerId,
     IReadOnlyList<SaleItemRequest> Items,
     /// <summary>Additional discount applied across the whole cart (on top of any per-line
-    /// discounts), in KES. Distributed proportionally across lines before tax is computed.</summary>
+    /// discounts), in KES. Distributed proportionally across lines.</summary>
     decimal CartDiscountAmount,
     /// <summary>Required only when total discount (line + cart) exceeds the configured
     /// threshold — obtained from POST /api/sales/approve-discount.</summary>

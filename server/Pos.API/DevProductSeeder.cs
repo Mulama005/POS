@@ -37,7 +37,7 @@ public static class DevProductSeeder
         var computingCategory = await GetOrCreateCategoryAsync(db, "Computing", requiresSerialTracking: true, defaultWarrantyMonths: 12);
 
         // (Sku, Barcode, Name, Category, CostPrice, SalePrice, TaxClass, StockQuantity)
-        // Prices are VAT-inclusive, matching SalesController's pricing assumption.
+        // Product prices are the final customer-facing prices.
         // StockQuantity means: for a serialized category, how many StockUnit rows to
         // generate; for a bulk category, the BulkQuantityOnHand value to set.
         var seedProducts = new (string Sku, string Barcode, string Name, Category Category, decimal CostPrice, decimal SalePrice, TaxClass TaxClass, int StockQuantity)[]

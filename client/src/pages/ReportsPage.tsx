@@ -435,7 +435,7 @@ export default function ReportsPage() {
             <div className="report-periods"><span>{summary.currentPeriod.label}</span><span>Compared with {summary.previousPeriod.label}</span></div>
             <div className="report-kpis">
                 <article className="report-kpi"><span>Total sales</span><strong>{money(summary.currentPeriod.total)}</strong><ChangeBadge delta={summary.delta} /></article>
-                <article className="report-kpi"><span>Subtotal</span><strong>{money(summary.currentPeriod.subtotal)}</strong><small>Before tax and discounts</small></article>
+                <article className="report-kpi"><span>Subtotal</span><strong>{money(summary.currentPeriod.subtotal)}</strong><small>Before discounts</small></article>
                 <article className="report-kpi"><span>Discounts</span><strong>{money(summary.currentPeriod.discountTotal)}</strong><small>For the selected period</small></article>
                 <article className="report-kpi report-kpi--credit"><span>Credit sales</span><strong>{money(summary.creditSales.currentTotal)}</strong><ChangeBadge delta={{ absolute: summary.creditSales.absoluteDelta, percent: summary.creditSales.percent }} /><small>Separate Deni ledger entries — not included in Total Sales.</small></article>
             </div>
@@ -471,7 +471,7 @@ export default function ReportsPage() {
             <div className="section-header"><div><h2>Financial summary</h2><p>A decision-ready monthly view of profit, stock capital and forward targets.</p></div><div className="export-buttons"><a href="/financial-setup">Operating costs</a><button onClick={() => void downloadFinancialExport("pdf")}>PDF</button><button onClick={() => void downloadFinancialExport("csv")}>CSV</button></div></div>
             <div className="financial-groups">
                 <section className="financial-group"><div><p className="financial-group__number">01</p><h3>Income statement</h3><p>What the business made from completed sales before overheads.</p></div><div className="financial-metrics">
-                    <MetricCard label="Gross revenue" value={money(summary.currentPeriod.total)} detail="Completed sales, including tax" />
+                    <MetricCard label="Gross revenue" value={money(summary.currentPeriod.total)} detail="Completed sales" />
                     <MetricCard label="Cost of goods sold" value={money(cogs)} detail="Sold units × cost captured at sale" />
                     <MetricCard label="Gross profit" value={money(grossProfit)} detail={`Gross margin ${percent(grossMargin)}`} />
                     <MetricCard label="Operating costs" value={money(monthlyOperatingCosts)} detail={`${summary.operatingCosts.items.length} saved monthly cost${summary.operatingCosts.items.length === 1 ? "" : "s"}`} />
@@ -494,7 +494,7 @@ export default function ReportsPage() {
                 </div></section>
             </div>
             <div className="calculation-grid">
-                <CalculationNote title="Gross margin" formula="(revenue excluding tax − COGS) ÷ revenue excluding tax" evidence={`${money(grossProfit)} gross profit is generated after ${money(cogs)} cost of goods sold.`} />
+                <CalculationNote title="Gross margin" formula="(sales revenue − COGS) ÷ sales revenue" evidence={`${money(grossProfit)} gross profit is generated after ${money(cogs)} cost of goods sold.`} />
                 <CalculationNote title="GMROI" formula="gross profit ÷ current inventory cost" evidence={gmroi === null ? "No on-hand inventory value is recorded." : `${money(grossProfit)} ÷ ${money(inventoryValue)} = ${gmroi.toFixed(2)}x.`} />
                 <CalculationNote title="Sales projection" formula="actual revenue × (1 + sales growth rate)" evidence={projectedRevenue === null ? "A completed prior-month sales period is required." : `${money(summary.currentPeriod.total)} extended by ${percent(summary.salesPerformance.salesGrowthRate)} growth.`} />
             </div>
@@ -544,7 +544,7 @@ export default function ReportsPage() {
             <div className="section-header"><div><h2>Stock movement evidence</h2><p>Ranked by net sales revenue; zero-sales products remain visible in slow-moving stock.</p></div></div>
             <div className="ranked-charts"><RankedSkuChart title="Leading products by revenue" rows={summary.topSkuPerformance} /><RankedSkuChart title="Slow-moving products by units" rows={summary.slowSkuPerformance} value="units" /></div>
             <div className="calculation-grid calculation-grid--two">
-                <CalculationNote title="Top moving" formula="products ranked from highest to lowest net sales revenue" evidence="Revenue excludes tax; gross profit deducts current product cost." />
+                <CalculationNote title="Top moving" formula="products ranked from highest to lowest sales revenue" evidence="Gross profit deducts current product cost." />
                 <CalculationNote title="Slow moving" formula="active products ranked from lowest to highest net sales revenue" evidence="This includes items with no recorded sale in the selected month." />
             </div>
         </section>
