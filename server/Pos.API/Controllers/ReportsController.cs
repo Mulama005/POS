@@ -73,7 +73,7 @@ public class ReportsController : ControllerBase
             .Where(s => s.Status == SaleStatus.Completed
                      && s.SaleDate >= previousStartUtc
                      && s.SaleDate < currentEndUtc)
-            .Select(s => new MonthlySale(s.SaleDate, s.Subtotal, s.DiscountTotal, s.TaxTotal, s.Total))
+            .Select(s => new MonthlySale(s.SaleDate, s.Subtotal, s.DiscountTotal, s.Total))
             .ToListAsync();
 
         var saleItems = await _context.SaleItems.AsNoTracking()
@@ -83,7 +83,6 @@ public class ReportsController : ControllerBase
             .Select(item => new MonthlySaleItem(
                 item.Sale.SaleDate,
                 item.LineTotal,
-                item.TaxAmount,
                 item.Quantity,
                 item.ProductId,
                 item.Product.Sku,
@@ -248,7 +247,7 @@ public class ReportsController : ControllerBase
             {
                 currentItemGroups.TryGetValue(product.Id, out var items);
                 var unitsSold = items?.Sum(item => item.Quantity) ?? 0;
-                var revenue = items?.Sum(item => item.LineTotal - item.TaxAmount) ?? 0m;
+                var revenue = items?.Sum(item => item.LineTotal) ?? 0m;
                 var cogs = items?.Sum(item => item.Quantity * item.CostPrice) ?? 0m;
                 return new SkuPerformanceDto(product.Id, product.Sku, product.Name, unitsSold, revenue, revenue - cogs);
             })
@@ -440,13 +439,11 @@ public class ReportsController : ControllerBase
             .ToListAsync();
 
         var totalRevenue = completedSales.Sum(s => s.Total);
-        var totalTax = completedSales.Sum(s => s.TaxTotal);
+        const decimal totalTax = 0m;
         var totalDiscounts = completedSales.Sum(s => s.DiscountTotal);
 
-        // NOTE: this must stay identical to the export calculation below.
-        // Verify against your data model: if Sale.Total is post-discount,
-        // remove the discount subtraction from both places.
-        var netRevenue = totalRevenue - totalDiscounts - totalTax;
+        // Sale.Total already reflects all applied discounts.
+        var netRevenue = totalRevenue;
 
         var outstandingCredit = await _context.Customers
             .SumAsync(c => c.CurrentCreditBalance);
@@ -686,8 +683,7 @@ public class ReportsController : ControllerBase
                     SaleDate = sale.SaleDate,
                     ProductDescription = item.Product?.Name ?? "(deleted product)",
                     Quantity = item.Quantity,
-                    Subtotal = item.LineTotal - item.TaxAmount,
-                    Tax = item.TaxAmount,
+                    Subtotal = item.LineTotal,
                     Total = item.LineTotal,
                     PayMode = payMode.Length == 0 ? "—" : payMode,
                     BankName = string.Join(", ", salePayments.Where(p => !string.IsNullOrWhiteSpace(p.BankName)).Select(p => p.BankName).Distinct()),
@@ -845,15 +841,15 @@ public class ReportsController : ControllerBase
             .ToListAsync();
 
         var totalRevenue = completedSales.Sum(s => s.Total);
-        var totalTax = completedSales.Sum(s => s.TaxTotal);
+        const decimal totalTax = 0m;
         var totalDiscounts = completedSales.Sum(s => s.DiscountTotal);
         var soldItems = await _context.SaleItems.AsNoTracking()
             .Where(item => item.Sale.Status == SaleStatus.Completed
                         && item.Sale.SaleDate >= from
                         && item.Sale.SaleDate < toExclusive)
-            .Select(item => new { item.LineTotal, item.TaxAmount, item.Quantity, CostPrice = item.CostPriceAtSale ?? item.Product.CostPrice })
+            .Select(item => new { item.LineTotal, item.Quantity, CostPrice = item.CostPriceAtSale ?? item.Product.CostPrice })
             .ToListAsync();
-        var netRevenue = soldItems.Sum(item => item.LineTotal - item.TaxAmount);
+        var netRevenue = soldItems.Sum(item => item.LineTotal);
         var cogs = soldItems.Sum(item => item.Quantity * item.CostPrice);
         var grossProfit = netRevenue - cogs;
         var inventoryValue = await _context.Products.AsNoTracking()
@@ -921,7 +917,7 @@ public class ReportsController : ControllerBase
 
         var sales = await _context.Sales.AsNoTracking()
             .Where(s => s.Status == SaleStatus.Completed && s.SaleDate >= priorStart.UtcDateTime && s.SaleDate < periodEnd.UtcDateTime)
-            .Select(s => new { s.SaleDate, s.Total, s.Subtotal, s.DiscountTotal, s.TaxTotal })
+            .Select(s => new { s.SaleDate, s.Total, s.Subtotal, s.DiscountTotal })
             .ToListAsync();
         var trailingStart = monthStart.AddMonths(-11);
         var trailing = await _context.Sales.AsNoTracking()
@@ -933,7 +929,7 @@ public class ReportsController : ControllerBase
         var priorSales = sales.Where(s => IsInRange(s.SaleDate, priorStart.UtcDateTime, priorEnd.UtcDateTime)).ToList();
         var dto = new MonthlyInsightsPdfDto(
             monthStart.ToString("MMMM yyyy", CultureInfo.InvariantCulture), monthStart, periodEnd,
-            currentSales.Sum(s => s.Total), currentSales.Sum(s => s.Subtotal), currentSales.Sum(s => s.DiscountTotal), currentSales.Sum(s => s.TaxTotal), currentSales.Count,
+            currentSales.Sum(s => s.Total), currentSales.Sum(s => s.Subtotal), currentSales.Sum(s => s.DiscountTotal), 0m, currentSales.Count,
             priorSales.Sum(s => s.Total),
             Enumerable.Range(0, 12).Select(i => monthStart.AddMonths(i - 11)).Select(start =>
             {
@@ -967,13 +963,13 @@ public class ReportsController : ControllerBase
             .Select(p => new { p.Id, p.Sku, p.Name, p.CostPrice }).ToListAsync();
         var soldItems = await _context.SaleItems.AsNoTracking()
             .Where(i => i.Sale.Status == SaleStatus.Completed && i.Sale.SaleDate >= monthStart.UtcDateTime && i.Sale.SaleDate < periodEnd.UtcDateTime)
-            .Select(i => new { i.ProductId, i.Quantity, i.LineTotal, i.TaxAmount, CostPrice = i.CostPriceAtSale ?? i.Product.CostPrice }).ToListAsync();
+            .Select(i => new { i.ProductId, i.Quantity, i.LineTotal, CostPrice = i.CostPriceAtSale ?? i.Product.CostPrice }).ToListAsync();
         var groupedItems = soldItems.GroupBy(i => i.ProductId).ToDictionary(g => g.Key, g => g.ToList());
         var rows = products.Select(product =>
         {
             groupedItems.TryGetValue(product.Id, out var items);
             var units = items?.Sum(i => i.Quantity) ?? 0;
-            var revenue = items?.Sum(i => i.LineTotal - i.TaxAmount) ?? 0m;
+            var revenue = items?.Sum(i => i.LineTotal) ?? 0m;
             var cogs = items?.Sum(i => i.Quantity * i.CostPrice) ?? 0m;
             return new SkuPerformancePdfRow(product.Sku, product.Name, units, revenue, revenue - cogs);
         });
@@ -1053,7 +1049,6 @@ public class ReportsController : ControllerBase
                         card.Item().Text("REVENUE COMPOSITION").FontSize(9).SemiBold().FontColor(Colors.Teal.Darken3);
                         card.Item().PaddingTop(10).Text($"Subtotal  KES {dto.Subtotal:N2}");
                         card.Item().PaddingTop(5).Text($"Discounts  KES {dto.Discounts:N2}");
-                        card.Item().PaddingTop(5).Text($"Tax  KES {dto.Tax:N2}");
                     });
                     row.ConstantItem(12);
                     row.RelativeItem().Background(Colors.BlueGrey.Lighten5).Padding(14).Column(card =>
@@ -1132,7 +1127,7 @@ public class ReportsController : ControllerBase
                 {
                     InsightMetricCard(row.RelativeItem(), "SKUS SHOWN", rows.Count.ToString(), "Ranked products", Colors.Teal.Darken3);
                     row.ConstantItem(10);
-                    InsightMetricCard(row.RelativeItem(), "NET REVENUE", $"KES {totalRevenue:N2}", "Excludes tax", Colors.Blue.Darken2);
+                    InsightMetricCard(row.RelativeItem(), "NET REVENUE", $"KES {totalRevenue:N2}", "Completed sales", Colors.Blue.Darken2);
                     row.ConstantItem(10);
                     InsightMetricCard(row.RelativeItem(), "UNITS MOVED", totalUnits.ToString("N0"), "Completed sales only", Colors.Green.Darken2);
                 });
@@ -1320,8 +1315,6 @@ public class ReportsController : ControllerBase
                     dto.TotalRevenue, LineStyle.Amount),
                 new("Less: Total Customer Discounts Offered",
                     dto.TotalDiscounts, LineStyle.Deduct),
-                new("Less: VAT Output Tax Obligation (16% statutory band)",
-                    dto.TotalTax, LineStyle.Deduct),
                 new("NET TRADING REVENUE",
                     dto.NetRevenue, LineStyle.Subtotal),
             });
@@ -1444,8 +1437,7 @@ public class ReportsController : ControllerBase
 
         sb.AppendLine($"1. Revenue & Trading Metrics,Gross Register Revenue,{dto.TotalRevenue:F2},Sum of completed Sale.Total");
         sb.AppendLine($",Less: Total Customer Discounts,{dto.TotalDiscounts:F2},Sum of completed Sale.DiscountTotal");
-        sb.AppendLine($",Less: VAT Output Tax,{dto.TotalTax:F2},Sum of completed Sale.TaxTotal");
-        sb.AppendLine($",NET TRADING REVENUE,{dto.NetRevenue:F2},Sum of sold line totals less line tax");
+        sb.AppendLine($",NET TRADING REVENUE,{dto.NetRevenue:F2},Sum of completed Sale.Total");
         sb.AppendLine($"2. Profitability & Inventory Capital,Cost of Goods Sold,{dto.Cogs:F2},Sold units x current product cost");
         sb.AppendLine($",GROSS PROFIT,{dto.GrossProfit:F2},Net trading revenue - COGS");
         sb.AppendLine($",Gross Margin,{dto.GrossMarginPercent?.ToString("F1", CultureInfo.InvariantCulture) ?? ""}%,Gross profit / net trading revenue");
@@ -1479,7 +1471,6 @@ public class ReportsController : ControllerBase
         new SalesColumn("Product Description", 2.5f, true,  TextAlign.Left),
         new SalesColumn("Qty",                 26,   false, TextAlign.Right),
         new SalesColumn("Subtotal",            56,   false, TextAlign.Right),
-        new SalesColumn("VAT (16%)",           56,   false, TextAlign.Right),
         new SalesColumn("Total (KES)",         62,   false, TextAlign.Right),
         new SalesColumn("Pay Mode",            54,   false, TextAlign.Left),
         new SalesColumn("Bank",                58,   false, TextAlign.Left),
@@ -1586,7 +1577,6 @@ public class ReportsController : ControllerBase
                     (row.ProductDescription,                        TextAlign.Left),
                     (row.Quantity.ToString(),                       TextAlign.Right),
                     (row.Subtotal.ToString("N2"),                   TextAlign.Right),
-                    (row.Tax.ToString("N2"),                        TextAlign.Right),
                     (row.Total.ToString("N2"),                      TextAlign.Right),
                     (row.PayMode       ?? "—",                      TextAlign.Left),
                     (row.BankName      ?? "—",                      TextAlign.Left),
@@ -1619,7 +1609,6 @@ public class ReportsController : ControllerBase
             // 4. Total row
             var totalQty = rows.Sum(r => r.Quantity);
             var totalSubtotal = rows.Sum(r => r.Subtotal);
-            var totalTax = rows.Sum(r => r.Tax);
             var totalTotal = rows.Sum(r => r.Total);
 
             table.Cell().ColumnSpan(2)
@@ -1637,13 +1626,9 @@ public class ReportsController : ControllerBase
 
             table.Cell().BorderTop(1.5f).BorderColor(Colors.Black)
                 .PaddingTop(8).PaddingBottom(2).AlignRight()
-                .Text(totalTax.ToString("N2")).Bold().FontSize(8);
-
-            table.Cell().BorderTop(1.5f).BorderColor(Colors.Black)
-                .PaddingTop(8).PaddingBottom(2).AlignRight()
                 .Text(totalTotal.ToString("N2")).Bold().FontSize(8);
 
-            for (int i = 0; i < 6; i++)
+            for (int i = 0; i < 7; i++)
             {
                 table.Cell()
                     .BorderTop(1.5f).BorderColor(Colors.Black)
@@ -1678,7 +1663,7 @@ public class ReportsController : ControllerBase
         var sb = new System.Text.StringBuilder();
 
         sb.AppendLine(
-            "Sale Date/Time,Product Description,Qty,Subtotal,VAT (16%),Total (KES)," +
+            "Sale Date/Time,Product Description,Qty,Subtotal,Total (KES)," +
             "Pay Mode,Bank,M-Pesa or Transfer Ref,M-Pesa Phone,KRA eTIMS CU,eTIMS Status,Cashier");
 
         foreach (var row in rows)
@@ -1688,7 +1673,6 @@ public class ReportsController : ControllerBase
                 Escape(row.ProductDescription),
                 row.Quantity,
                 row.Subtotal.ToString("F2", CultureInfo.InvariantCulture),
-                row.Tax.ToString("F2", CultureInfo.InvariantCulture),
                 row.Total.ToString("F2", CultureInfo.InvariantCulture),
                 Escape(row.PayMode ?? ""),
                 Escape(row.BankName ?? ""),
@@ -1766,7 +1750,7 @@ public class ReportsController : ControllerBase
             periodSales.Sum(s => s.Total),
             periodSales.Sum(s => s.Subtotal),
             periodSales.Sum(s => s.DiscountTotal),
-            periodSales.Sum(s => s.TaxTotal));
+            0m);
     }
 
     private static SalesPerformanceDto BuildSalesPerformance(
@@ -1783,7 +1767,7 @@ public class ReportsController : ControllerBase
             var periodItems = items.Where(item => IsInRange(item.SaleDate, startUtc, endUtc)).ToList();
             var transactions = periodSales.Count;
             var unitsSold = periodItems.Sum(item => item.Quantity);
-            var netRevenue = periodItems.Sum(item => item.LineTotal - item.TaxAmount);
+            var netRevenue = periodItems.Sum(item => item.LineTotal);
             var cogs = periodItems.Sum(item => item.Quantity * item.CostPrice);
             return new PeriodOperationsDto(
                 periodSales.Sum(s => s.Total),
@@ -1846,7 +1830,6 @@ public class SalesReportRow
     public string ProductDescription { get; set; } = "";
     public int Quantity { get; set; }
     public decimal Subtotal { get; set; }
-    public decimal Tax { get; set; }
     public decimal Total { get; set; }
     public string? PayMode { get; set; }
     public string? BankName { get; set; }
@@ -1906,12 +1889,11 @@ public record MonthlyInsightsPdfDto(
 public record SkuPerformancePdfRow(string Sku, string Name, decimal UnitsSold, decimal Revenue, decimal GrossProfit);
 public sealed record SourcedPurchaseReportRow(Guid PurchaseId, DateTime PurchasedAt, string SupplierName, string Sku, string ProductName, int Quantity, decimal UnitCost, decimal TotalCost, string? Reference, string RecordedBy);
 
-public record MonthlySale(DateTime SaleDate, decimal Subtotal, decimal DiscountTotal, decimal TaxTotal, decimal Total);
+public record MonthlySale(DateTime SaleDate, decimal Subtotal, decimal DiscountTotal, decimal Total);
 
 public record MonthlySaleItem(
     DateTime SaleDate,
     decimal LineTotal,
-    decimal TaxAmount,
     int Quantity,
     Guid ProductId,
     string Sku,

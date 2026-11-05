@@ -1,7 +1,5 @@
 import type { Cart } from '../types/sale'
 
-const STANDARD_VAT_RATE = 0.16
-
 /**
  * Mirrors the server's override rule. At or above list the agreed price is the unit price;
  * below list the unit price stays at list and the difference is a per-unit markdown.
@@ -32,7 +30,7 @@ export interface CartLineBreakdown {
   rawAmount: number // unit base price * quantity, before any discount
   lineDiscount: number // line discount + price-override markdown, clamped to rawAmount
   finalLineAmount: number // after line discount AND this line's proportional share of the cart discount, rounded
-  lineTax: number // VAT portion of finalLineAmount, rounded
+  lineTax: number // Retained for receipt/API compatibility; tax is no longer calculated.
 }
 
 interface FullBreakdown {
@@ -62,8 +60,7 @@ function computeFullBreakdown(cart: Cart): FullBreakdown {
     const shareOfCartDiscount =
       afterLineDiscountsTotal > 0 ? cartDiscount * (afterLineDiscount / afterLineDiscountsTotal) : 0
     const finalLineAmount = round2(afterLineDiscount - shareOfCartDiscount)
-    const lineTax =
-      line.product.taxClass === 'Standard' ? round2(finalLineAmount - finalLineAmount / (1 + STANDARD_VAT_RATE)) : 0
+    const lineTax = 0
     return { line, rawAmount, lineDiscount, finalLineAmount, lineTax }
   })
 
@@ -71,7 +68,7 @@ function computeFullBreakdown(cart: Cart): FullBreakdown {
 }
 
 /**
- * Per-line discount distribution + VAT extraction, exposed separately so anything that
+ * Per-line discount distribution, exposed separately so anything that
  * needs the same server-mirroring math per line (e.g. buildProvisionalReceipt, for the
  * offline receipt) can reuse it instead of re-approximating it — that mismatch is what
  * caused line totals not to sum to the header total on offline sales.
@@ -87,7 +84,6 @@ export function calculateCartTotals(cart: Cart): CartTotals {
   const { breakdowns, rawSubtotal, afterLineDiscountsTotal, cartDiscount } = computeFullBreakdown(cart)
 
   const lineDiscountTotal = rawSubtotal - afterLineDiscountsTotal
-  const taxTotal = breakdowns.reduce((sum, b) => sum + b.lineTax, 0)
   const total = breakdowns.reduce((sum, b) => sum + b.finalLineAmount, 0)
 
   return {
@@ -95,7 +91,7 @@ export function calculateCartTotals(cart: Cart): CartTotals {
     lineDiscountTotal: round2(lineDiscountTotal),
     cartDiscount: round2(cartDiscount),
     discountTotal: round2(lineDiscountTotal + cartDiscount),
-    taxTotal: round2(taxTotal),
+    taxTotal: 0,
     total: round2(total),
   }
 }

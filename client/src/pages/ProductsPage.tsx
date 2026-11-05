@@ -484,7 +484,7 @@ export function ProductsPage() {
               type="number"
               step="0.01"
               min="0"
-              placeholder="Sale price (KES, VAT-inclusive)"
+              placeholder="Sale price (KES)"
               value={formValues.salePrice}
               onChange={(e) => setFormValues((v) => ({ ...v, salePrice: e.target.value }))}
               required
@@ -615,7 +615,7 @@ export function ProductsPage() {
                 <th>Name</th>
                 <th>Category</th>
                 <th>Price</th>
-                <th>Tax</th>
+                <th>eTIMS tax class</th>
                 <th>Stock</th>
                 {etimsEnabled && <th>eTIMS</th>}
                 <th></th>

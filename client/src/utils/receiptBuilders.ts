@@ -23,7 +23,6 @@ export function buildSaleReceipt(
   const totals: ReceiptRow[] = [{ label: 'Subtotal', value: kes(sale.subtotal) }]
   if (sale.discountTotal > 0) totals.push({ label: 'Discount', value: `-${kes(sale.discountTotal)}` })
   totals.push({ label: 'TOTAL (KES)', value: kes(sale.total), strong: true })
-  totals.push({ label: 'Includes VAT', value: kes(sale.taxTotal), muted: true })
 
   const sections: ReceiptData['sections'] = [
     {

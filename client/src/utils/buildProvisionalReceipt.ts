@@ -6,8 +6,8 @@ import { calculateLineBreakdowns, type CartTotals } from './CartMath'
  * (client-computed) totals rather than the server's authoritative response — because
  * there IS no server response yet when this is used; the sale is sitting in the offline
  * queue. `pending: true` is what the UI checks to show "will sync" instead of treating
- * this as final. Per-line amounts and tax come from calculateLineBreakdowns — the same
- * discount-distribution + VAT math calculateCartTotals uses — so these lines sum exactly
+ * this as final. Per-line amounts come from calculateLineBreakdowns — the same
+ * discount-distribution math calculateCartTotals uses — so these lines sum exactly
  * to `totals.total` instead of drifting from it.
  */
 export function buildProvisionalReceipt(
